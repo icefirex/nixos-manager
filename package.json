@@ -1,6 +1,6 @@
 {
   "name": "nixos-manager",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "A beautiful GUI for managing NixOS configurations",
   "main": "main.js",
   "scripts": {
