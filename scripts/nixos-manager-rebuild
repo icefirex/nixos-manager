@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# nixos-manager-rebuild — generic rebuild fallback shipped with nixos-manager.
+#
+# This script is used when nixos-rebuild-wrapper is not present on PATH.
+# It emits progress strings that the nixos-manager UI parses for step tracking.
+#
+# Usage: nixos-manager-rebuild <action> [<flake_path>] [--update]
+#   action:      switch | boot | test
+#   flake_path:  path to flake directory (default: .)
+#   --update:    also update all flake inputs before rebuilding
+#
+# Command resolution:
+#   nh (preferred) — provides coloured diff output and handles sudo internally
+#   nixos-rebuild  — standard NixOS tool, used when nh is not available
+
+set -euo pipefail
+
+ACTION="${1:?nixos-manager-rebuild: action required (switch|boot|test)}"
+FLAKE_PATH="${2:-.}"
+
+# Scan remaining args for --update
+DO_UPDATE=false
+for arg in "${@:3}"; do
+  [[ "$arg" == "--update" ]] && DO_UPDATE=true
+done
+
+# Emit progress strings that nixos-manager's Dashboard parses for step tracking
+echo "Validating configuration..."
+echo "Staging changes..."
+
+if command -v nh &>/dev/null; then
+  NH_ARGS=("os" "${ACTION}" "--diff" "always" "${FLAKE_PATH}")
+  [[ "${DO_UPDATE}" == "true" ]] && NH_ARGS+=("--update")
+  echo "Fetching inputs..."
+  exec nh "${NH_ARGS[@]}"
+else
+  NR_ARGS=("${ACTION}" "--flake" "${FLAKE_PATH}")
+  [[ "${DO_UPDATE}" == "true" ]] && NR_ARGS+=("--upgrade-all")
+  echo "Building..."
+  exec nixos-rebuild "${NR_ARGS[@]}"
+fi

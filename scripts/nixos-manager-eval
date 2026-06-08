@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# nixos-manager-eval — generic config evaluation fallback shipped with nixos-manager.
+#
+# This script is used when nix-eval-flake is not present on PATH.
+# It discovers all nixosConfigurations in the current flake and evaluates each.
+#
+# Usage: nixos-manager-eval (no arguments; run from the flake directory)
+#
+# Requires: nix; optionally jq for per-configuration reporting
+# Falls back to `nix flake check` if configuration discovery fails.
+
+set -euo pipefail
+
+echo "Discovering configurations..."
+
+# Attempt per-configuration evaluation via nix flake show for better reporting
+if command -v jq &>/dev/null; then
+  CONFIGS=$(nix flake show --json 2>/dev/null \
+    | jq -r 'try .nixosConfigurations | keys[]' 2>/dev/null || true)
+
+  if [[ -n "${CONFIGS}" ]]; then
+    echo "Validating all configurations..."
+    echo ""
+
+    FAILED=0
+    while IFS= read -r cfg; do
+      echo "Evaluating ${cfg}..."
+      if nix eval ".#nixosConfigurations.${cfg}.config.system.build.toplevel" 2>&1; then
+        echo "✓ ${cfg} is valid"
+      else
+        echo "✗ ${cfg} failed validation"
+        FAILED=$((FAILED + 1))
+      fi
+    done <<< "${CONFIGS}"
+
+    echo ""
+    if [[ ${FAILED} -eq 0 ]]; then
+      echo "✓ All configurations valid"
+      exit 0
+    else
+      echo "✗ ${FAILED} configuration(s) failed"
+      exit 1
+    fi
+  fi
+fi
+
+# Fallback: validate the whole flake (covers configurations + checks)
+echo "Validating flake..."
+exec nix flake check 2>&1

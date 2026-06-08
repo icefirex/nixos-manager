@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e2e"/>
+      <stop offset="100%" style="stop-color:#181825"/>
+    </linearGradient>
+    <linearGradient id="nixGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#89b4fa"/>
+      <stop offset="100%" style="stop-color:#b4befe"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a6e3a1"/>
+      <stop offset="100%" style="stop-color:#94e2d5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGrad)" stroke="#313244" stroke-width="2"/>
+
+  <!-- NixOS lambda/snowflake inspired shape -->
+  <g transform="translate(64, 64)">
+    <!-- Six-pointed star base (NixOS inspired) -->
+    <g fill="url(#nixGrad)" opacity="0.9">
+      <!-- Top spoke -->
+      <path d="M0,-40 L8,-15 L-8,-15 Z"/>
+      <!-- Top-right spoke -->
+      <path d="M34.6,-20 L15,-7.5 L15,-27.5 Z" transform="rotate(0)"/>
+      <!-- Bottom-right spoke -->
+      <path d="M34.6,20 L15,27.5 L15,7.5 Z"/>
+      <!-- Bottom spoke -->
+      <path d="M0,40 L-8,15 L8,15 Z"/>
+      <!-- Bottom-left spoke -->
+      <path d="M-34.6,20 L-15,7.5 L-15,27.5 Z"/>
+      <!-- Top-left spoke -->
+      <path d="M-34.6,-20 L-15,-27.5 L-15,-7.5 Z"/>
+    </g>
+
+    <!-- Inner hexagon -->
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="none" stroke="url(#accentGrad)" stroke-width="3" opacity="0.8"/>
+
+    <!-- Center gear/settings indicator -->
+    <circle cx="0" cy="0" r="10" fill="url(#accentGrad)"/>
+    <circle cx="0" cy="0" r="5" fill="#1e1e2e"/>
+
+    <!-- Small gear teeth -->
+    <g fill="url(#accentGrad)">
+      <rect x="-2" y="-14" width="4" height="5" rx="1"/>
+      <rect x="-2" y="9" width="4" height="5" rx="1"/>
+      <rect x="-14" y="-2" width="5" height="4" rx="1"/>
+      <rect x="9" y="-2" width="5" height="4" rx="1"/>
+    </g>
+  </g>
+
+  <!-- Subtle glow effect -->
+  <circle cx="64" cy="64" r="45" fill="none" stroke="#89b4fa" stroke-width="1" opacity="0.2"/>
+</svg>
