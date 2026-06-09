@@ -1,8 +1,31 @@
-# NixOS Manager
+<div align="center">
+  <img src="assets/icon.svg" width="80" height="80"/>
+  <h1>NixOS Manager</h1>
+  <p>A beautiful desktop app for managing NixOS flake configurations.<br/>Built with Electron and Svelte 5, themed with Catppuccin Mocha.</p>
 
-A modern desktop application for managing NixOS flake configurations. Built with Electron and Svelte 5, themed with Catppuccin Mocha.
+  [![Release](https://img.shields.io/github/v/release/icefirex/nixos-manager?style=flat-square&color=89b4fa)](https://github.com/icefirex/nixos-manager/releases)
+  [![License](https://img.shields.io/github/license/icefirex/nixos-manager?style=flat-square&color=a6e3a1)](LICENSE)
+  [![NixOS](https://img.shields.io/badge/NixOS-flakes-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://nixos.org)
+  [![Electron](https://img.shields.io/badge/Electron-desktop-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org)
+  [![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
+  [![Catppuccin](https://img.shields.io/badge/theme-Catppuccin%20Mocha-CBA6F7?style=flat-square)](https://catppuccin.com)
+</div>
 
-![NixOS Manager](assets/icon.svg)
+---
+
+<p align="center">
+  <img src="assets/screenshots/1.png" width="49%"/>
+  <img src="assets/screenshots/2.png" width="49%"/>
+</p>
+<p align="center">
+  <img src="assets/screenshots/3.png" width="49%"/>
+  <img src="assets/screenshots/4.png" width="49%"/>
+</p>
+<p align="center">
+  <img src="assets/screenshots/5.png" width="98%"/>
+</p>
+
+---
 
 ## Features
 
@@ -55,10 +78,6 @@ A modern desktop application for managing NixOS flake configurations. Built with
 - View all flake inputs with age indicators
 - Update individual inputs or all at once
 - Switch between specializations (multi-profile support)
-
-## Screenshots
-
-*Coming soon*
 
 ## Requirements
 

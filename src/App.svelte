@@ -47,6 +47,12 @@
   $effect(() => {
     loadSystemInfo();
     loadNotificationCount();
+
+    // Background flake update check — runs once on launch, updates badges + notifications
+    window.electronAPI.checkFlakeInputUpdates().catch(() => {});
+    window.electronAPI.onFlakeUpdateCheckComplete(() => {
+      loadNotificationCount();
+    });
   });
 
   let isMaximized = $state(false);

@@ -57,7 +57,7 @@ function resolveEvalCommand(spawnEnv) {
  * Register NixOS rebuild IPC handlers
  */
 function register() {
-  ipcMain.handle('nixos-rebuild', async (event, { action, updateInputs, verbose }) => {
+  ipcMain.handle('nixos-rebuild', async (event, { action, updateInputs }) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
       throw new Error('Could not find flake directory');
@@ -88,6 +88,7 @@ function register() {
         });
 
         proc.on('close', (code) => {
+          mainWindow?.webContents.send('build-complete', { success: code === 0 });
           if (code === 0) {
             updateBuildStatus(true, 'Evaluation successful');
             resolve({ success: true, output });
@@ -98,6 +99,7 @@ function register() {
         });
 
         proc.on('error', (err) => {
+          mainWindow?.webContents.send('build-complete', { success: false });
           updateBuildStatus(false, err.message);
           reject(err);
         });
@@ -136,6 +138,7 @@ function register() {
       });
 
       proc.on('close', (code) => {
+        mainWindow?.webContents.send('build-complete', { success: code === 0 });
         if (code === 0) {
           updateBuildStatus(true, `${action} completed successfully`);
           resolve(output);
@@ -143,6 +146,12 @@ function register() {
           updateBuildStatus(false, `${action} failed with code ${code}`);
           reject(new Error(`Build failed with code ${code}`));
         }
+      });
+
+      proc.on('error', (err) => {
+        mainWindow?.webContents.send('build-complete', { success: false });
+        updateBuildStatus(false, err.message);
+        reject(err);
       });
     });
   });

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   switchSpecialization: (name) => ipcRenderer.invoke('switch-specialization', name),
   updateFlakeInputs: () => ipcRenderer.invoke('update-flake-inputs'),
   updateFlakeInput: (name) => ipcRenderer.invoke('update-flake-input', name),
+  checkFlakeInputUpdates: () => ipcRenderer.invoke('check-flake-input-updates'),
   getSpecializations: () => ipcRenderer.invoke('get-specializations'),
   getFlakeInputs: () => ipcRenderer.invoke('get-flake-inputs'),
   getPackages: () => ipcRenderer.invoke('get-packages'),
@@ -60,6 +61,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('build-output', (event, data) => callback(data));
   },
 
+  // Build complete listener
+  onBuildComplete: (callback) => {
+    ipcRenderer.on('build-complete', (event, data) => callback(data));
+  },
+
   // Terminal show listener
   onTerminalShow: (callback) => {
     ipcRenderer.on('terminal-show', (event, data) => callback(data));
@@ -73,5 +79,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Show updates listener (triggered by --show-updates CLI flag)
   onShowUpdates: (callback) => {
     ipcRenderer.on('show-updates', () => callback());
+  },
+
+  // Flake update check completed (background check on launch)
+  onFlakeUpdateCheckComplete: (callback) => {
+    ipcRenderer.on('flake-update-check-complete', (event, status) => callback(status));
   }
 });

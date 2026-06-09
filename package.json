@@ -1,7 +1,16 @@
 {
   "name": "nixos-manager",
-  "version": "1.5.4",
+  "version": "1.5.7",
   "description": "A beautiful GUI for managing NixOS configurations",
+  "author": "icefirex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/icefirex/nixos-manager.git"
+  },
+  "homepage": "https://github.com/icefirex/nixos-manager",
+  "bugs": {
+    "url": "https://github.com/icefirex/nixos-manager/issues"
+  },
   "main": "main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:svelte\" \"npm run dev:electron\"",

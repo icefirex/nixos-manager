@@ -2,6 +2,7 @@ const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { findFlakeDir, getLastBuildStatus, runCmd } = require('../utils');
+const { getInputUpdateStatus } = require('./flake');
 
 /**
  * Register notifications IPC handlers
@@ -131,7 +132,33 @@ function register() {
       }
     } catch (e) {}
 
-    // 5. Last build status
+    // 5. Flake input updates available (from background check cache)
+    try {
+      const updateStatus = getInputUpdateStatus();
+      const updatable = Object.entries(updateStatus)
+        .filter(([, hasUpdate]) => hasUpdate)
+        .map(([name]) => name);
+
+      if (updatable.length > 0) {
+        const preview = updatable.slice(0, 3).join(', ') +
+          (updatable.length > 3 ? ` +${updatable.length - 3} more` : '');
+        notifications.push({
+          id: 'flake-updates-available',
+          type: 'info',
+          title: updatable.length === 1
+            ? 'Flake update available'
+            : `${updatable.length} flake updates available`,
+          message: updatable.length === 1
+            ? `${updatable[0]} has a newer version available`
+            : preview,
+          action: updatable.length === 1
+            ? `nix flake update ${updatable[0]}`
+            : 'nix flake update'
+        });
+      }
+    } catch (e) {}
+
+    // 6. Last build status
     const lastBuildStatus = getLastBuildStatus();
     if (lastBuildStatus) {
       notifications.push({

@@ -10,7 +10,7 @@
 
 let
   pname = "nixos-manager";
-  version = "1.5.4";
+  version = "1.5.7";
 
   desktopItem = makeDesktopItem {
     name = pname;

@@ -49,14 +49,14 @@
       if (terminalComponent) {
         terminalComponent.write(data);
       }
-      // Detect completion/error from output
-      if (data.includes('exited successfully') || data.includes('completed successfully')) {
-        isRunning = false;
-        hasError = false;
-      } else if (data.includes('exited with code') || data.includes('failed') || data.includes('was terminated')) {
-        isRunning = false;
-        hasError = data.includes('failed') || data.includes('exited with code');
-      }
+    });
+  });
+
+  // Listen for build completion
+  $effect(() => {
+    window.electronAPI.onBuildComplete(({ success }) => {
+      isRunning = false;
+      hasError = !success;
     });
   });
 

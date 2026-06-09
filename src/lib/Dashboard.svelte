@@ -6,8 +6,6 @@
   let { systemInfo = {} } = $props();
 
   let updateInputs = $state(true);
-  let showDiff = $state(true);
-  let verboseOutput = $state(false);
 
   let isBuilding = $state(false);
   let currentAction = $state(null);
@@ -111,7 +109,6 @@
   }
 
   async function handleAction(action) {
-    console.log("Action:", action);
     isBuilding = true;
     currentAction = action;
     buildError = null;
@@ -130,7 +127,6 @@
       await window.electronAPI.nixosRebuild({
         action,
         updateInputs,
-        verbose: verboseOutput,
       });
       buildProgress.percentage = 100;
       buildProgress.currentStep = 5;
@@ -140,6 +136,8 @@
       buildError = e.message || "Build failed";
       buildProgress.eta = "Failed";
     } finally {
+      // Brief pause so the user sees the completed/failed state
+      await new Promise(r => setTimeout(r, 2000));
       isBuilding = false;
       currentAction = null;
     }
@@ -192,28 +190,6 @@
           class:active={updateInputs}
           disabled={isBuilding}
           onclick={() => updateInputs = !updateInputs}
-        >
-          <span class="toggle-knob"></span>
-        </button>
-      </label>
-      <label class="toggle-item">
-        <span class="toggle-label">Show diff</span>
-        <button
-          class="toggle-switch"
-          class:active={showDiff}
-          disabled={isBuilding}
-          onclick={() => showDiff = !showDiff}
-        >
-          <span class="toggle-knob"></span>
-        </button>
-      </label>
-      <label class="toggle-item">
-        <span class="toggle-label">Verbose output</span>
-        <button
-          class="toggle-switch"
-          class:active={verboseOutput}
-          disabled={isBuilding}
-          onclick={() => verboseOutput = !verboseOutput}
         >
           <span class="toggle-knob"></span>
         </button>

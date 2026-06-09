@@ -14,6 +14,10 @@
   $effect(() => {
     loadSpecializations();
     loadFlakeInputs();
+    // Re-render inputs when the background update check finishes
+    window.electronAPI.onFlakeUpdateCheckComplete(() => {
+      loadFlakeInputs();
+    });
   });
 
   async function loadSpecializations() {
@@ -175,7 +179,12 @@
           onclick={() => selectInput(input.name)}
           disabled={isUpdatingInput}
         >
-          <span class="input-name">{input.name}</span>
+          <span class="input-left">
+            <span class="input-name">{input.name}</span>
+            {#if input.hasUpdate}
+              <span class="update-pill">↑ update</span>
+            {/if}
+          </span>
           <span class="input-status {input.status}"><Icon name="Circle" size={8} /> {input.age}</span>
           {#if selectedInput === input.name && !isUpdatingInput}
             <button
@@ -384,6 +393,28 @@
   .input-name {
     font-size: 12px;
     color: #cdd6f4;
+  }
+
+  .input-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .update-pill {
+    font-size: 9px;
+    font-weight: 600;
+    color: #89b4fa;
+    background: rgba(137, 180, 250, 0.15);
+    border: 1px solid rgba(137, 180, 250, 0.35);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.2px;
   }
 
   .input-status {

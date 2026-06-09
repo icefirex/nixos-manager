@@ -2,8 +2,62 @@ const { ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { findFlakeDir, getSpawnEnv } = require('../utils');
+const { findFlakeDir, getSpawnEnv, execAsync } = require('../utils');
 const { getMainWindow } = require('../window');
+
+// Per-input update availability cache  { inputName: boolean }
+let inputUpdateStatus = {};
+
+function getInputUpdateStatus() {
+  return inputUpdateStatus;
+}
+
+/**
+ * Check each GitHub-type flake input for upstream changes using git ls-remote.
+ * Writes results into inputUpdateStatus in-place.
+ */
+async function runUpdateChecks(flakeDir) {
+  const lockPath = path.join(flakeDir, 'flake.lock');
+  if (!fs.existsSync(lockPath)) return;
+
+  let lockContent;
+  try {
+    lockContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  } catch {
+    return;
+  }
+
+  const nodes = lockContent.nodes || {};
+  const rootInputs = nodes.root?.inputs || {};
+  const env = getSpawnEnv();
+
+  const checks = Object.entries(rootInputs).map(async ([name, nodeRef]) => {
+    const node = nodes[nodeRef];
+    if (!node?.locked) return;
+
+    const { type, owner, repo, rev } = node.locked;
+    if (type !== 'github') return;
+    // Skip inputs pinned to a specific commit — no rolling update to check
+    if (node.original?.rev) return;
+
+    const branch = node.original?.ref;
+    const refSpec = branch ? `refs/heads/${branch}` : 'HEAD';
+
+    try {
+      const { stdout } = await execAsync(
+        `git ls-remote "https://github.com/${owner}/${repo}.git" "${refSpec}"`,
+        { timeout: 15000, env }
+      );
+      const latestRev = (stdout || '').trim().split(/\s+/)[0];
+      inputUpdateStatus[name] = Boolean(latestRev && latestRev !== rev);
+    } catch {
+      // Network error, private repo, etc. — leave existing status or assume none
+      if (!(name in inputUpdateStatus)) inputUpdateStatus[name] = false;
+    }
+  });
+
+  await Promise.all(checks);
+}
 
 /**
  * Register flake management IPC handlers
@@ -18,6 +72,9 @@ function register() {
 
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send('terminal-show', { title: 'Updating All Flake Inputs' });
+
+    const lockPath = path.join(flakeDir, 'flake.lock');
+    const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
 
     return new Promise((resolve, reject) => {
       const proc = spawn('nix', ['flake', 'update'], {
@@ -38,6 +95,15 @@ function register() {
 
       proc.on('close', (code) => {
         if (code === 0) {
+          const lockAfter = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
+          const changed = lockBefore !== lockAfter;
+          const summary = changed
+            ? '\n✓ All flake inputs updated successfully.'
+            : '\n• All flake inputs are already up to date.';
+          mainWindow?.webContents.send('build-output', summary);
+        }
+        mainWindow?.webContents.send('build-complete', { success: code === 0 });
+        if (code === 0) {
           resolve('Flake inputs updated');
         } else {
           reject(new Error(`Update failed with code ${code}`));
@@ -45,6 +111,7 @@ function register() {
       });
 
       proc.on('error', (err) => {
+        mainWindow?.webContents.send('build-complete', { success: false });
         reject(err);
       });
     });
@@ -59,6 +126,9 @@ function register() {
 
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send('terminal-show', { title: `Updating ${inputName}` });
+
+    const lockPath = path.join(flakeDir, 'flake.lock');
+    const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
 
     return new Promise((resolve, reject) => {
       const proc = spawn('nix', ['flake', 'update', inputName], {
@@ -79,6 +149,17 @@ function register() {
 
       proc.on('close', (code) => {
         if (code === 0) {
+          const lockAfter = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
+          const changed = lockBefore !== lockAfter;
+          const summary = changed
+            ? `\n✓ ${inputName} updated successfully.`
+            : `\n• ${inputName} is already up to date.`;
+          mainWindow?.webContents.send('build-output', summary);
+          // Clear cached update status for this input — badge disappears immediately
+          inputUpdateStatus[inputName] = false;
+        }
+        mainWindow?.webContents.send('build-complete', { success: code === 0 });
+        if (code === 0) {
           resolve(`Flake input "${inputName}" updated`);
         } else {
           reject(new Error(`Update failed with code ${code}`));
@@ -86,6 +167,7 @@ function register() {
       });
 
       proc.on('error', (err) => {
+        mainWindow?.webContents.send('build-complete', { success: false });
         reject(err);
       });
     });
@@ -133,7 +215,7 @@ function register() {
             }
           }
 
-          inputs.push({ name, status, age });
+          inputs.push({ name, status, age, hasUpdate: inputUpdateStatus[name] === true });
         }
       }
 
@@ -143,6 +225,18 @@ function register() {
       return [];
     }
   });
+  // Background check: detect available upstream updates for all GitHub-type inputs
+  ipcMain.handle('check-flake-input-updates', async () => {
+    const flakeDir = findFlakeDir();
+    if (!flakeDir) return {};
+
+    await runUpdateChecks(flakeDir);
+
+    const mainWindow = getMainWindow();
+    mainWindow?.webContents.send('flake-update-check-complete', inputUpdateStatus);
+
+    return inputUpdateStatus;
+  });
 }
 
-module.exports = { register };
+module.exports = { register, getInputUpdateStatus };
