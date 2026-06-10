@@ -6,8 +6,8 @@
   outputs =
     { self, nixpkgs }:
     let
-      # Primary platform. aarch64-linux support is possible but untested.
-      systems = [ "x86_64-linux" ];
+      # Supported platforms. aarch64-linux builds are untested but structurally supported.
+      systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
       nixpkgsFor = system: nixpkgs.legacyPackages.${system};
     in

@@ -30,19 +30,27 @@
     "wait-on": "^8.0.0"
   },
   "build": {
-    "appId": "com.nixos.manager",
+    "appId": "io.github.icefirex.nixos-manager",
     "productName": "NixOS Manager",
+    "icon": "assets/icon.svg",
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "System"
+      "category": "System;Settings;PackageManager;",
+      "executableName": "nixos-manager"
+    },
+    "deb": {
+      "depends": [],
+      "maintainer": "icefirex <1530893+icefirex@users.noreply.github.com>"
     },
     "files": [
       "dist/**/*",
       "main.js",
-      "preload.js"
+      "preload.js",
+      "package.json",
+      "src/main/**/*"
     ]
   },
   "dependencies": {
