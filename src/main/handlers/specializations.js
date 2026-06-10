@@ -1,7 +1,11 @@
 const { ipcMain } = require('electron');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } = require('../constants');
+
+// Valid specialization names: alphanumeric, hyphens, underscores only
+const VALID_SPEC_NAME = /^[a-zA-Z0-9_-]+$/;
 
 /**
  * Register specialization IPC handlers
@@ -9,12 +13,16 @@ const path = require('path');
 function register() {
   // Switch specialization
   ipcMain.handle('switch-specialization', async (event, name) => {
-    let specPath;
+    // SEC-05: validate name before constructing any path
+    if (!name || !VALID_SPEC_NAME.test(name)) {
+      throw new Error(`Invalid specialization name: "${name}"`);
+    }
 
+    let specPath;
     if (name === 'base') {
-      specPath = '/nix/var/nix/profiles/system/bin/switch-to-configuration';
+      specPath = `${NIX_SYSTEM_PROFILE}/bin/switch-to-configuration`;
     } else {
-      specPath = `/nix/var/nix/profiles/system/specialisation/${name}/bin/switch-to-configuration`;
+      specPath = `${NIX_SYSTEM_PROFILE}/specialisation/${name}/bin/switch-to-configuration`;
     }
 
     if (!fs.existsSync(specPath)) {
@@ -22,7 +30,8 @@ function register() {
     }
 
     return new Promise((resolve, reject) => {
-      exec(`pkexec ${specPath} switch`, (error, stdout, stderr) => {
+      // Use execFile — passes args as array, not through /bin/sh
+      execFile('pkexec', [specPath, 'switch'], (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
         } else {
@@ -34,9 +43,9 @@ function register() {
 
   // Get available specializations
   ipcMain.handle('get-specializations', async () => {
-    const baseSystem = '/nix/var/nix/profiles/system';
+    const baseSystem = NIX_SYSTEM_PROFILE;
     const specDir = `${baseSystem}/specialisation`;
-    const currentSystem = '/run/current-system';
+    const currentSystem = NIX_CURRENT_SYSTEM;
     const specializations = [];
 
     let currentPath = null;

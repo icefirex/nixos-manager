@@ -3,6 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const { findFlakeDir, getLastBuildStatus, runCmd } = require('../utils');
 const { getInputUpdateStatus } = require('./flake');
+const {
+  NIX_PROFILES_DIR,
+  FLAKE_STALE_DAYS,
+  DISK_CRITICAL_PCT,
+  DISK_WARN_PCT,
+  MAX_GENERATIONS_WARN,
+} = require('../constants');
 
 /**
  * Register notifications IPC handlers
@@ -15,12 +22,12 @@ function register() {
     // 1. Check git sync status (async)
     if (flakeDir) {
       try {
-        await runCmd('git fetch --quiet 2>/dev/null || true', 5000);
+        await runCmd(`git -C "${flakeDir}" fetch --quiet 2>/dev/null || true`, 5000);
 
         const [behindCount, aheadCount, status] = await Promise.all([
-          runCmd('git rev-list --count HEAD..@{u} 2>/dev/null || echo 0'),
-          runCmd('git rev-list --count @{u}..HEAD 2>/dev/null || echo 0'),
-          runCmd('git status --porcelain 2>/dev/null')
+          runCmd(`git -C "${flakeDir}" rev-list --count HEAD..@{u} 2>/dev/null || echo 0`),
+          runCmd(`git -C "${flakeDir}" rev-list --count @{u}..HEAD 2>/dev/null || echo 0`),
+          runCmd(`git -C "${flakeDir}" status --porcelain 2>/dev/null`)
         ]);
 
         if (parseInt(behindCount) > 0) {
@@ -60,7 +67,7 @@ function register() {
       try {
         const lockPath = path.join(flakeDir, 'flake.lock');
         if (fs.existsSync(lockPath)) {
-          const lockContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+          const lockContent = JSON.parse(await fs.promises.readFile(lockPath, 'utf8'));
           const nodes = lockContent.nodes || {};
           const rootInputs = nodes.root?.inputs || {};
 
@@ -70,19 +77,27 @@ function register() {
             if (node && node.locked && node.locked.lastModified) {
               const ageMs = Date.now() - (node.locked.lastModified * 1000);
               const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-              if (ageDays > 14) {
+              if (ageDays > FLAKE_STALE_DAYS) {
                 staleInputs.push({ name, days: ageDays });
               }
             }
           }
 
           if (staleInputs.length > 0) {
-            const oldest = staleInputs.sort((a, b) => b.days - a.days)[0];
+            staleInputs.sort((a, b) => b.days - a.days);
+            // UX-05: list all stale input names; truncate beyond 3
+            let nameList;
+            if (staleInputs.length <= 3) {
+              nameList = staleInputs.map(i => `${i.name} (${i.days}d)`).join(', ');
+            } else {
+              nameList = staleInputs.slice(0, 2).map(i => `${i.name} (${i.days}d)`).join(', ')
+                + ` +${staleInputs.length - 2} more`;
+            }
             notifications.push({
               id: 'flake-stale',
               type: 'warning',
               title: 'Flake inputs outdated',
-              message: `${staleInputs.length} input(s) older than 14 days (${oldest.name}: ${oldest.days}d)`,
+              message: `${staleInputs.length} input(s) older than ${FLAKE_STALE_DAYS} days: ${nameList}`,
               action: 'nix flake update'
             });
           }
@@ -96,7 +111,7 @@ function register() {
       const parts = dfOutput.split(/\s+/);
       const percentage = parseInt(parts[4]) || 0;
 
-      if (percentage > 90) {
+      if (percentage > DISK_CRITICAL_PCT) {
         notifications.push({
           id: 'disk-critical',
           type: 'error',
@@ -104,7 +119,7 @@ function register() {
           message: `Root partition ${percentage}% full`,
           action: 'nix-collect-garbage -d'
         });
-      } else if (percentage > 80) {
+      } else if (percentage > DISK_WARN_PCT) {
         notifications.push({
           id: 'disk-warning',
           type: 'warning',
@@ -117,11 +132,11 @@ function register() {
 
     // 4. Check generation count
     try {
-      const profiles = fs.readdirSync('/nix/var/nix/profiles')
+      const profiles = fs.readdirSync(NIX_PROFILES_DIR)
         .filter(f => f.startsWith('system-') && f.endsWith('-link'));
       const genCount = profiles.length;
 
-      if (genCount > 20) {
+      if (genCount > MAX_GENERATIONS_WARN) {
         notifications.push({
           id: 'generations-many',
           type: 'info',

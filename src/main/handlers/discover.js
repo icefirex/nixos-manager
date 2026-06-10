@@ -5,9 +5,10 @@ const os = require('os');
 const zlib = require('zlib');
 const https = require('https');
 const { promisify } = require('util');
-const { execSync, spawn } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 const { getMainWindow } = require('../window');
 const { getSpawnEnv } = require('../utils');
+const { NIX_FLAKE_REGISTRY } = require('../constants');
 
 const gunzip = promisify(zlib.gunzip);
 
@@ -40,6 +41,52 @@ const TTY_ERROR_PATTERNS = [
 ];
 
 /**
+ * Check if a command is available on PATH without using a shell.
+ */
+function isCommandAvailable(cmd) {
+  try {
+    execFileSync('which', [cmd], { stdio: 'ignore', env: getSpawnEnv() });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Run `nix eval --raw nixpkgs#<attrPath>` safely (no shell injection).
+ * Returns the stdout trimmed, or '' on any error.
+ */
+function nixEvalRaw(attrPath) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    const proc = spawn('nix', ['eval', '--raw', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
+      env: getSpawnEnv(),
+    });
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.on('close', () => resolve(stdout.trim()));
+    proc.on('error', () => resolve(''));
+  });
+}
+
+/**
+ * Run `nix eval --json nixpkgs#<attrPath>` safely (no shell injection).
+ * Returns parsed JSON or null on any error.
+ */
+function nixEvalJson(attrPath) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    const proc = spawn('nix', ['eval', '--json', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
+      env: getSpawnEnv(),
+    });
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.on('close', () => {
+      try { resolve(JSON.parse(stdout.trim())); } catch { resolve(null); }
+    });
+    proc.on('error', () => resolve(null));
+  });
+}
+
+/**
  * Check if stderr output indicates a TTY/terminal error
  */
 function isTTYError(stderr) {
@@ -47,17 +94,10 @@ function isTTYError(stderr) {
 }
 
 /**
- * Detect an available terminal emulator on the system
+ * Detect an available terminal emulator on the system.
+ * Uses execFileSync (no shell) to avoid injection via $TERMINAL.
  */
 function detectTerminal() {
-  if (process.env.TERMINAL) {
-    try {
-      execSync(`command -v ${process.env.TERMINAL}`, { stdio: 'ignore' });
-      // Default to -e for user-specified terminal
-      return { cmd: process.env.TERMINAL, buildArgs: (args) => ['-e', ...args] };
-    } catch (e) { /* not found */ }
-  }
-
   const terminals = [
     { cmd: 'foot', buildArgs: (args) => args },
     { cmd: 'kitty', buildArgs: (args) => ['--', ...args] },
@@ -67,11 +107,19 @@ function detectTerminal() {
     { cmd: 'xterm', buildArgs: (args) => ['-e', ...args] },
   ];
 
+  // Check $TERMINAL env var first — only accept simple command names (no metacharacters)
+  if (process.env.TERMINAL) {
+    const termCmd = process.env.TERMINAL.trim();
+    if (/^[a-zA-Z0-9_-]+$/.test(termCmd) && isCommandAvailable(termCmd)) {
+      const known = terminals.find(t => t.cmd === termCmd);
+      return known || { cmd: termCmd, buildArgs: (args) => ['-e', ...args] };
+    }
+  }
+
   for (const term of terminals) {
-    try {
-      execSync(`command -v ${term.cmd}`, { stdio: 'ignore' });
+    if (isCommandAvailable(term.cmd)) {
       return term;
-    } catch (e) { /* not found, try next */ }
+    }
   }
 
   return null;
@@ -127,8 +175,14 @@ function downloadFile(url, destPath) {
     const file = fs.createWriteStream(destPath);
     https.get(url, (response) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
-        // Follow redirect
+        // Follow redirect — check final status before piping
         https.get(response.headers.location, (res) => {
+          if (res.statusCode !== 200) {
+            file.close();
+            fs.unlink(destPath, () => {});
+            reject(new Error(`HTTP ${res.statusCode} after redirect`));
+            return;
+          }
           res.pipe(file);
           file.on('finish', () => {
             file.close();
@@ -210,9 +264,9 @@ async function ensureAppStreamData() {
         console.log('Downloading icons...');
         await downloadFile(`${APPSTREAM_BASE_URL}/icons-64x64.tar.gz`, iconsPath);
 
-        // Extract icons using system tar (files are at root of tarball)
+        // Extract icons — use execFileSync with arg array (no shell, protects against path traversal)
         fs.mkdirSync(iconsDir, { recursive: true });
-        execSync(`tar -xzf "${iconsPath}" -C "${iconsDir}"`, {
+        execFileSync('tar', ['-xzf', iconsPath, '-C', iconsDir, '--no-overwrite-dir'], {
           stdio: 'pipe'
         });
 
@@ -359,7 +413,14 @@ async function loadComponents() {
   }
 
   const xmlContent = fs.readFileSync(xmlPath, 'utf8');
-  componentsCache = parseAppStreamXML(xmlContent);
+  const parsed = parseAppStreamXML(xmlContent);
+
+  if (parsed.length === 0) {
+    // Don't cache an empty result — data may be corrupt or truncated; allow retry
+    throw new Error('AppStream data parsed empty — file may be corrupt. Try refreshing.');
+  }
+
+  componentsCache = parsed;
   lastCacheTime = Date.now();
 
   // Build pkgname lookup
@@ -496,6 +557,11 @@ function register() {
     const iconsDir = path.join(CACHE_DIR, 'icons');
     const iconPath = path.join(iconsDir, iconName);
 
+    // Guard against path traversal (e.g. iconName = '../../etc/passwd')
+    if (!path.resolve(iconPath).startsWith(path.resolve(iconsDir) + path.sep)) {
+      return null;
+    }
+
     if (fs.existsSync(iconPath)) {
       const iconData = fs.readFileSync(iconPath);
       const ext = path.extname(iconName).slice(1) || 'png';
@@ -512,20 +578,17 @@ function register() {
 
     const component = componentsByPkgname?.get(pkgname);
 
-    // Get additional info from nix
-    const { runCmd } = require('../utils');
+    // Get additional info from nix — using spawn-based helpers (no shell injection)
     let nixMeta = {};
-
     try {
-      const metaJson = await runCmd(`nix eval --json nixpkgs#${pkgname}.meta 2>/dev/null || echo "{}"`);
-      nixMeta = JSON.parse(metaJson || '{}');
+      nixMeta = (await nixEvalJson(`${pkgname}.meta`)) || {};
     } catch (e) {
       // Ignore errors
     }
 
     let version = null;
     try {
-      version = await runCmd(`nix eval --raw nixpkgs#${pkgname}.version 2>/dev/null`);
+      version = (await nixEvalRaw(`${pkgname}.version`)) || null;
     } catch (e) {}
 
     return {
@@ -543,46 +606,57 @@ function register() {
 
   // Search full nixpkgs (not just AppStream packages)
   ipcMain.handle('discover-search-nixpkgs', async (event, query) => {
-    const { runCmd } = require('../utils');
+    if (!query || typeof query !== 'string' || !query.trim()) return [];
 
-    try {
-      // Use nix search to find packages (quote query for safety, longer timeout)
-      const safeQuery = query.replace(/['"\\]/g, '');
-      console.log(`Searching nixpkgs for: "${safeQuery}"`);
-      const result = await runCmd(`nix search nixpkgs "${safeQuery}" --json 2>/dev/null`, 60000);
-      console.log(`Nixpkgs search result length: ${result?.length || 0}`);
-      if (!result || result.trim() === '{}') {
-        return [];
-      }
+    return new Promise((resolve) => {
+      let stdout = '';
+      console.log(`Searching nixpkgs for: "${query}"`);
 
-      const packages = JSON.parse(result);
-      const results = [];
+      // Use spawn with arg array — no shell, no injection possible
+      const proc = spawn('nix', ['search', NIX_FLAKE_REGISTRY, query, '--json'], {
+        env: getSpawnEnv(),
+        timeout: 60000
+      });
 
-      for (const [attrPath, pkg] of Object.entries(packages)) {
-        // attrPath is like "legacyPackages.x86_64-linux.firefox"
-        const parts = attrPath.split('.');
-        const pkgname = parts.slice(2).join('.'); // Remove legacyPackages.x86_64-linux
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', () => {}); // suppress stderr noise
 
-        results.push({
-          id: attrPath,
-          pkgname: pkgname,
-          name: pkg.pname || pkgname.split('.').pop(),
-          summary: pkg.description || '',
-          version: pkg.version || null,
-          categories: [],
-          icon: null,
-          isNixpkgsResult: true // Mark as coming from nix search
-        });
-      }
+      proc.on('close', () => {
+        console.log(`Nixpkgs search result length: ${stdout?.length || 0}`);
+        if (!stdout || stdout.trim() === '{}' || stdout.trim() === '') {
+          resolve([]);
+          return;
+        }
+        try {
+          const packages = JSON.parse(stdout);
+          const results = [];
+          for (const [attrPath, pkg] of Object.entries(packages)) {
+            const parts = attrPath.split('.');
+            const pkgname = parts.slice(2).join('.');
+            results.push({
+              id: attrPath,
+              pkgname,
+              name: pkg.pname || pkgname.split('.').pop(),
+              summary: pkg.description || '',
+              version: pkg.version || null,
+              categories: [],
+              icon: null,
+              isNixpkgsResult: true
+            });
+          }
+          results.sort((a, b) => a.name.localeCompare(b.name));
+          resolve(results.slice(0, 100));
+        } catch (e) {
+          console.error('Failed to parse nixpkgs search result:', e.message);
+          resolve([]);
+        }
+      });
 
-      // Sort by name
-      results.sort((a, b) => a.name.localeCompare(b.name));
-
-      return results.slice(0, 100); // Limit results
-    } catch (e) {
-      console.error('Failed to search nixpkgs:', e.message);
-      return [];
-    }
+      proc.on('error', (err) => {
+        console.error('Failed to search nixpkgs:', err.message);
+        resolve([]);
+      });
+    });
   });
 
   // Force refresh cache
@@ -635,12 +709,11 @@ function register() {
   // Try/run a package in nix-shell
   ipcMain.handle('discover-try-package', async (event, pkgname) => {
     const mainWindow = getMainWindow();
-    const { runCmd } = require('../utils');
 
-    // Get the main program name (binary) - may differ from package name
+    // Get the main program name (binary) — use spawn-based helper (no shell injection)
     let mainProgram = pkgname.split('.').pop(); // Default: last part of package name
     try {
-      const result = await runCmd(`nix eval --raw nixpkgs#${pkgname}.meta.mainProgram 2>/dev/null`);
+      const result = await nixEvalRaw(`${pkgname}.meta.mainProgram`);
       if (result && result.trim()) {
         mainProgram = result.trim();
       }
