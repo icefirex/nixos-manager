@@ -21,6 +21,9 @@
   let searchingNixpkgs = $state(false);
   let nixpkgsSearched = $state(false);
   let showNixpkgsTab = $state(false);
+  // UX-08: delay showing the "Search nixpkgs" button until the user pauses typing
+  let showNixpkgsButton = $state(false);
+  let _nixpkgsButtonTimer = null;
 
   // Category display names and icons
   const categoryMeta = {
@@ -149,12 +152,21 @@
     selectedCategory = null;
   }
 
-  // Reset nixpkgs search when query changes
+  // Reset nixpkgs search when query changes; debounce button visibility (UX-08)
   $effect(() => {
-    searchQuery; // Track changes
+    const q = searchQuery; // Track changes
     nixpkgsResults = [];
     nixpkgsSearched = false;
     showNixpkgsTab = false;
+    showNixpkgsButton = false;
+    if (_nixpkgsButtonTimer) clearTimeout(_nixpkgsButtonTimer);
+    if (q.trim()) {
+      // Show the button only after 350ms of idle typing
+      _nixpkgsButtonTimer = setTimeout(() => {
+        showNixpkgsButton = true;
+        _nixpkgsButtonTimer = null;
+      }, 350);
+    }
   });
 
   async function searchNixpkgs() {
@@ -288,7 +300,7 @@
     {#if searchQuery}
       <button class="clear-btn" onclick={() => searchQuery = ''}>×</button>
     {/if}
-    {#if searchQuery && !showNixpkgsTab && !nixpkgsSearched}
+    {#if searchQuery && showNixpkgsButton && !showNixpkgsTab && !nixpkgsSearched}
       <button class="nixpkgs-search-btn" onclick={searchNixpkgs} disabled={searchingNixpkgs}>
         {#if searchingNixpkgs}
           <span class="spinner-sm"></span>
