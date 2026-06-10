@@ -3,6 +3,9 @@ const { spawn, execSync } = require('child_process');
 const { findFlakeDir, updateBuildStatus, getSpawnEnv } = require('../utils');
 const { getMainWindow } = require('../window');
 
+// Track currently running rebuild process so it can be cancelled
+let runningRebuildProcess = null;
+
 /**
  * Check if a command exists on PATH within the given environment.
  */
@@ -76,6 +79,8 @@ function register() {
           cwd: flakeDir
         });
 
+        runningRebuildProcess = proc;
+
         let output = '';
         proc.stdout.on('data', (data) => {
           output += data.toString();
@@ -88,6 +93,10 @@ function register() {
         });
 
         proc.on('close', (code) => {
+          // Guard: only clear the module-level ref if it still points to THIS process.
+          // Prevents a cancelled process's close event from nulling a subsequently
+          // started process.
+          if (runningRebuildProcess === proc) runningRebuildProcess = null;
           mainWindow?.webContents.send('build-complete', { success: code === 0 });
           if (code === 0) {
             updateBuildStatus(true, 'Evaluation successful');
@@ -99,6 +108,7 @@ function register() {
         });
 
         proc.on('error', (err) => {
+          if (runningRebuildProcess === proc) runningRebuildProcess = null;
           mainWindow?.webContents.send('build-complete', { success: false });
           updateBuildStatus(false, err.message);
           reject(err);
@@ -127,6 +137,8 @@ function register() {
         cwd: flakeDir
       });
 
+      runningRebuildProcess = proc;
+
       let output = '';
       proc.stdout.on('data', (data) => {
         output += data.toString();
@@ -138,6 +150,7 @@ function register() {
       });
 
       proc.on('close', (code) => {
+        if (runningRebuildProcess === proc) runningRebuildProcess = null;
         mainWindow?.webContents.send('build-complete', { success: code === 0 });
         if (code === 0) {
           updateBuildStatus(true, `${action} completed successfully`);
@@ -149,11 +162,20 @@ function register() {
       });
 
       proc.on('error', (err) => {
+        if (runningRebuildProcess === proc) runningRebuildProcess = null;
         mainWindow?.webContents.send('build-complete', { success: false });
         updateBuildStatus(false, err.message);
         reject(err);
       });
     });
+  });
+  ipcMain.handle('cancel-rebuild', () => {
+    if (runningRebuildProcess) {
+      runningRebuildProcess.kill('SIGTERM');
+      runningRebuildProcess = null;
+      return true;
+    }
+    return false;
   });
 }
 
