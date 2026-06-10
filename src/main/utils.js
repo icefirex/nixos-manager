@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const { exec } = require('child_process');
 const util = require('util');
+const { CMD_TIMEOUT_DEFAULT, NIX_CURRENT_SYSTEM } = require('./constants');
 
 const execAsync = util.promisify(exec);
 
@@ -31,7 +32,7 @@ function findFlakeDir() {
 /**
  * Run a shell command asynchronously with timeout
  */
-async function runCmd(cmd, timeout = 15000) {
+async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
   try {
     const { stdout } = await execAsync(cmd, {
       encoding: 'utf8',
@@ -40,6 +41,9 @@ async function runCmd(cmd, timeout = 15000) {
     });
     return stdout.trimEnd();
   } catch (e) {
+    // Log failures so they're visible in dev tools / stderr; return '' to preserve caller compatibility
+    const reason = e.code === 'ETIMEDOUT' ? 'timeout' : (e.code || e.message || 'error');
+    console.error(`[runCmd] failed (${reason}):`, cmd.slice(0, 120));
     return '';
   }
 }
@@ -68,7 +72,7 @@ function getLastBuildStatus() {
 function getSpawnEnv() {
   return {
     ...process.env,
-    PATH: `/run/current-system/sw/bin:${process.env.PATH || ''}`,
+    PATH: `${NIX_CURRENT_SYSTEM}/sw/bin:${process.env.PATH || ''}`,
     TERM: 'xterm-256color',
     FORCE_COLOR: '3',
     CLICOLOR_FORCE: '1',

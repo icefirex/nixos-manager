@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { findFlakeDir, runCmd } = require('../utils');
+const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 
 /**
  * Register package management IPC handlers
@@ -143,8 +144,8 @@ function register() {
 
     // Run meta and version queries in parallel
     const [metaJson, version] = await Promise.all([
-      runCmd(`nix eval --json nixpkgs#${packageName}.meta 2>/dev/null || echo "{}"`),
-      runCmd(`nix eval --raw nixpkgs#${packageName}.version 2>/dev/null || echo ""`)
+      runCmd(`nix eval --json ${NIX_FLAKE_REGISTRY}#${packageName}.meta 2>/dev/null || echo "{}"`),
+      runCmd(`nix eval --raw ${NIX_FLAKE_REGISTRY}#${packageName}.version 2>/dev/null || echo ""`)
     ]);
 
     // Parse meta info
@@ -176,13 +177,13 @@ function register() {
 
     // Try to get pname if version failed
     if (!info.version) {
-      const pname = await runCmd(`nix eval --raw nixpkgs#${packageName}.pname 2>/dev/null || echo ""`);
+      const pname = await runCmd(`nix eval --raw ${NIX_FLAKE_REGISTRY}#${packageName}.pname 2>/dev/null || echo ""`);
       if (pname && pname !== packageName) info.pname = pname;
     }
 
     // Try to list programs provided
     try {
-      const drvPath = await runCmd(`nix eval --raw nixpkgs#${packageName}.outPath 2>/dev/null`);
+      const drvPath = await runCmd(`nix eval --raw ${NIX_FLAKE_REGISTRY}#${packageName}.outPath 2>/dev/null`);
 
       if (drvPath && fs.existsSync(path.join(drvPath, 'bin'))) {
         const bins = fs.readdirSync(path.join(drvPath, 'bin')).filter(f => {
@@ -204,7 +205,7 @@ function register() {
       // 3. Bare package name on its own line (for "with pkgs;" blocks)
       const grepResult = await runCmd(
         `grep -rn --include="*.nix" -E "(pkgs\\.${packageName}([^a-zA-Z0-9_-]|$)|pkgs-[a-z]+\\.${packageName}([^a-zA-Z0-9_-]|$)|^[[:space:]]*${packageName}[[:space:]]*(#.*)?$)" "${flakeDir}" 2>/dev/null | head -10`,
-        10000
+        CMD_TIMEOUT_FAST
       );
 
       if (grepResult) {
@@ -254,12 +255,12 @@ function register() {
 
     // Run all queries in parallel (async)
     const [systemOutput, hmOutput, userOutput] = await Promise.all([
-      runCmd('nix-store -q --references /run/current-system/sw 2>/dev/null', 30000),
+      runCmd(`nix-store -q --references ${NIX_CURRENT_SYSTEM}/sw 2>/dev/null`, CMD_TIMEOUT_NETWORK),
       fs.existsSync(hmProfilePath)
-        ? runCmd(`nix-store -q --references ${hmProfilePath} 2>/dev/null`, 30000)
+        ? runCmd(`nix-store -q --references ${hmProfilePath} 2>/dev/null`, CMD_TIMEOUT_NETWORK)
         : Promise.resolve(''),
       fs.existsSync(userProfilePath)
-        ? runCmd(`nix-store -q --references ${userProfilePath} 2>/dev/null`, 30000)
+        ? runCmd(`nix-store -q --references ${userProfilePath} 2>/dev/null`, CMD_TIMEOUT_NETWORK)
         : Promise.resolve('')
     ]);
 

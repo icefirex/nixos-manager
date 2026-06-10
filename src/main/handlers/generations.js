@@ -2,6 +2,7 @@ const { ipcMain } = require('electron');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { NIX_PROFILES_DIR, NIX_SYSTEM_PROFILE } = require('../constants');
 
 /**
  * Register generation IPC handlers
@@ -9,8 +10,8 @@ const path = require('path');
 function register() {
   // Get all generations
   ipcMain.handle('get-generations', async () => {
-    const profileDir = '/nix/var/nix/profiles';
-    const profilePath = `${profileDir}/system`;
+    const profileDir = NIX_PROFILES_DIR;
+    const profilePath = NIX_SYSTEM_PROFILE;
 
     const generations = [];
 
@@ -62,7 +63,7 @@ function register() {
 
   // Get generation details
   ipcMain.handle('get-generation-info', async (event, genNumber) => {
-    const profilePath = '/nix/var/nix/profiles/system';
+    const profilePath = NIX_SYSTEM_PROFILE;
     const genPath = `${profilePath}-${genNumber}-link`;
 
     // Check if generation exists
@@ -127,7 +128,7 @@ function register() {
 
   // Get diff between two generations
   ipcMain.handle('get-generation-diff', async (event, fromGen, toGen) => {
-    const profilePath = '/nix/var/nix/profiles/system';
+    const profilePath = NIX_SYSTEM_PROFILE;
     const fromPath = `${profilePath}-${fromGen}-link`;
     const toPath = `${profilePath}-${toGen}-link`;
 
@@ -180,7 +181,7 @@ function register() {
 
   // Switch to a specific generation
   ipcMain.handle('switch-generation', async (event, genNumber) => {
-    const profilePath = '/nix/var/nix/profiles/system';
+    const profilePath = NIX_SYSTEM_PROFILE;
     const genPath = `${profilePath}-${genNumber}-link`;
 
     if (!fs.existsSync(genPath)) {
@@ -204,7 +205,7 @@ function register() {
 
   // Set a generation for next boot
   ipcMain.handle('boot-generation', async (event, genNumber) => {
-    const profilePath = '/nix/var/nix/profiles/system';
+    const profilePath = NIX_SYSTEM_PROFILE;
     const genPath = `${profilePath}-${genNumber}-link`;
 
     if (!fs.existsSync(genPath)) {
@@ -226,7 +227,7 @@ function register() {
 
   // Delete a generation
   ipcMain.handle('delete-generation', async (event, genNumber) => {
-    const profilePath = '/nix/var/nix/profiles/system';
+    const profilePath = NIX_SYSTEM_PROFILE;
 
     return new Promise((resolve, reject) => {
       const cmd = `pkexec env SHELL=/bin/sh nix-env --delete-generations ${genNumber} --profile ${profilePath}`;

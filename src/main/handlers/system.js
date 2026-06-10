@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { runCmd } = require('../utils');
+const { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } = require('../constants');
 
 /**
  * Register system info IPC handlers
@@ -27,7 +28,7 @@ function register() {
     // Get generation
     let generation = 1;
     try {
-      const link = fs.readlinkSync('/nix/var/nix/profiles/system');
+      const link = fs.readlinkSync(NIX_SYSTEM_PROFILE);
       const match = link.match(/system-(\d+)-link/);
       if (match) generation = parseInt(match[1]);
     } catch (e) {}
@@ -35,7 +36,7 @@ function register() {
     // Get last build time
     let lastBuild = 'unknown';
     try {
-      const stats = fs.lstatSync('/nix/var/nix/profiles/system');
+      const stats = fs.lstatSync(NIX_SYSTEM_PROFILE);
       const hours = Math.floor((Date.now() - stats.mtimeMs) / 3600000);
       if (hours < 1) lastBuild = 'just now';
       else if (hours < 24) lastBuild = `${hours}h ago`;
@@ -49,7 +50,7 @@ function register() {
       kernelVersion,
       generation,
       lastBuild,
-      healthy: fs.existsSync('/run/current-system')
+      healthy: fs.existsSync(NIX_CURRENT_SYSTEM)
     };
   });
 
@@ -106,7 +107,7 @@ function register() {
 
     // Generation info
     try {
-      const link = fs.readlinkSync('/nix/var/nix/profiles/system');
+      const link = fs.readlinkSync(NIX_SYSTEM_PROFILE);
       const match = link.match(/system-(\d+)-link/);
       info.generation = match ? parseInt(match[1]) : 1;
     } catch (e) {
@@ -115,7 +116,7 @@ function register() {
 
     // System switch time
     try {
-      const stats = fs.lstatSync('/nix/var/nix/profiles/system');
+      const stats = fs.lstatSync(NIX_SYSTEM_PROFILE);
       info.buildTime = stats.mtime.toLocaleString();
     } catch (e) {
       info.buildTime = 'unknown';
@@ -125,7 +126,7 @@ function register() {
     const [dfOutput, storeCount, packageCount] = await Promise.all([
       runCmd('df -h / | tail -1'),
       runCmd('ls /nix/store 2>/dev/null | wc -l'),
-      runCmd('ls /run/current-system/sw/bin 2>/dev/null | wc -l')
+      runCmd(`ls ${NIX_CURRENT_SYSTEM}/sw/bin 2>/dev/null | wc -l`)
     ]);
 
     // Disk usage
@@ -149,12 +150,12 @@ function register() {
 
     // Current specialization
     try {
-      const currentPath = fs.realpathSync('/run/current-system');
-      const basePath = fs.realpathSync('/nix/var/nix/profiles/system');
+      const currentPath = fs.realpathSync(NIX_CURRENT_SYSTEM);
+      const basePath = fs.realpathSync(NIX_SYSTEM_PROFILE);
       if (currentPath === basePath) {
         info.specialization = 'base';
       } else {
-        const specDir = '/nix/var/nix/profiles/system/specialisation';
+        const specDir = `${NIX_SYSTEM_PROFILE}/specialisation`;
         if (fs.existsSync(specDir)) {
           const entries = fs.readdirSync(specDir);
           for (const entry of entries) {

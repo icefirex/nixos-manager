@@ -1,6 +1,7 @@
 const { ipcMain } = require('electron');
 const { findFlakeDir, runCmd } = require('../utils');
 const path = require('path');
+const { CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 
 /**
  * Register git IPC handlers
@@ -200,7 +201,7 @@ function register() {
     }
 
     try {
-      const result = await runCmd(`git -C "${flakeDir}" checkout "${branchName}" 2>&1`, 10000);
+      const result = await runCmd(`git -C "${flakeDir}" checkout "${branchName}" 2>&1`, CMD_TIMEOUT_FAST);
       return { success: true, message: result?.trim() || 'Switched branch' };
     } catch (e) {
       return { success: false, message: e.message };
@@ -215,7 +216,7 @@ function register() {
     }
 
     try {
-      const result = await runCmd(`git -C "${flakeDir}" pull 2>&1`, 30000);
+      const result = await runCmd(`git -C "${flakeDir}" pull 2>&1`, CMD_TIMEOUT_NETWORK);
       return { success: true, message: result?.trim() || 'Pulled successfully' };
     } catch (e) {
       return { success: false, message: e.message };
@@ -230,7 +231,7 @@ function register() {
     }
 
     try {
-      const result = await runCmd(`git -C "${flakeDir}" fetch --all 2>&1`, 30000);
+      const result = await runCmd(`git -C "${flakeDir}" fetch --all 2>&1`, CMD_TIMEOUT_NETWORK);
       return { success: true, message: result?.trim() || 'Fetched successfully' };
     } catch (e) {
       return { success: false, message: e.message };
