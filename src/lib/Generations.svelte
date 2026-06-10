@@ -13,7 +13,11 @@
   let masterSearch = $state("");
   let isIndexing = $state(false);
 
-  // Detail state
+  // Token used to cancel any in-flight background indexing when a new load starts
+  // Plain variable (not $state) — must NOT be reactive; $state here would cause
+  // the loadGenerations $effect to subscribe to it via `++indexingToken`, creating
+  // an infinite re-run loop (effect_update_depth_exceeded).
+  let indexingToken = 0;
   let selectedGeneration = $state(null);
   let generationInfo = $state(null);
   let generationDiff = $state(null);
@@ -24,9 +28,12 @@
   let diffFilter = $state("");
   let diffPage = $state(0);
   const ITEMS_PER_PAGE = 10;
+  const GROUPS_PAGE_SIZE = 25; // UX-07: number of groups to show initially / per "show more"
 
   // Group expansion state
   let expandedGroups = $state(new Set());
+  // UX-07: how many groups are currently visible in the list
+  let visibleGroupCount = $state(GROUPS_PAGE_SIZE);
 
   // Derived filtered groups for search - this ensures reactivity
   let filteredGroups = $derived.by(() => {
@@ -79,6 +86,13 @@
     return filtered;
   });
 
+  // UX-07: visible slice of filteredGroups; reset to first page when filter changes
+  let visibleGroups = $derived(filteredGroups.slice(0, visibleGroupCount));
+  $effect(() => {
+    filteredGroups; // track
+    visibleGroupCount = GROUPS_PAGE_SIZE;
+  });
+
   // Action state
   let showConfirmDialog = $state(false);
   let confirmAction = $state(null);
@@ -97,12 +111,14 @@
     searchIndexArray = [];
     indexingProgress = { current: 0, total: 0, complete: false };
     masterSearch = "";
+    // Increment token to cancel any running background indexing loop
+    const myToken = ++indexingToken;
     try {
       generations = await window.electronAPI.getGenerations();
       // Group identical generations (this also starts building partial index)
       groupedGenerations = await computeGroups(generations);
-      // Start background indexing for search
-      startBackgroundIndexing();
+      // Start background indexing for search — pass token so it can self-cancel
+      startBackgroundIndexing(myToken);
     } catch (e) {
       error = e.message;
       console.error("Failed to load generations:", e);
@@ -178,7 +194,7 @@
     return groups;
   }
 
-  async function startBackgroundIndexing() {
+  async function startBackgroundIndexing(token) {
     if (generations.length < 2) {
       indexingProgress = { current: 0, total: 0, complete: true };
       return;
@@ -194,6 +210,9 @@
 
     // Index diffs that weren't already computed during grouping
     for (let i = 0; i < generations.length - 1; i++) {
+      // Abort if a newer loadGenerations() call has started
+      if (token !== indexingToken) return;
+
       const gen = generations[i];
       const prevGen = generations[i + 1];
 
@@ -222,6 +241,9 @@
       // Small delay to keep UI responsive
       await new Promise(r => setTimeout(r, 50));
     }
+
+    // Check token once more before marking complete
+    if (token !== indexingToken) return;
 
     // Final update
     searchIndexArray = [...workingIndex];
@@ -550,7 +572,7 @@
       </div>
 
       <div class="generation-list">
-        {#each filteredGroups as group, groupIndex}
+        {#each visibleGroups as group, groupIndex}
           {#if group.isGroup}
             <!-- Grouped identical generations -->
             <div class="generation-group">
@@ -591,6 +613,14 @@
             {/if}
           </div>
         {/each}
+        {#if visibleGroupCount < filteredGroups.length}
+          <button
+            class="show-more-btn"
+            onclick={() => visibleGroupCount += GROUPS_PAGE_SIZE}
+          >
+            Show {Math.min(GROUPS_PAGE_SIZE, filteredGroups.length - visibleGroupCount)} older generations
+          </button>
+        {/if}
       </div>
     </div>
   {/if}
@@ -1217,6 +1247,25 @@
 
   .generation-list::-webkit-scrollbar-thumb:hover {
     background: rgba(88, 91, 112, 0.8);
+  }
+
+  .show-more-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 16px;
+    background: rgba(49, 50, 68, 0.5);
+    border: 1px solid rgba(88, 91, 112, 0.4);
+    border-radius: 6px;
+    color: #a6adc8;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .show-more-btn:hover {
+    background: rgba(69, 71, 90, 0.7);
+    color: #cdd6f4;
   }
 
   /* Group styles */

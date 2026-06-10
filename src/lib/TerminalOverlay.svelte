@@ -12,6 +12,7 @@
   let isTryProcess = $state(false);
   let showKillConfirm = $state(false);
   let pendingAction = $state(null); // 'close' or 'new-try'
+  let pendingTryCallback = $state(null); // stored callback for 'new-try' action
 
   // Clamp terminal height when window resizes
   $effect(() => {
@@ -27,7 +28,7 @@
 
   // Listen for terminal show requests
   $effect(() => {
-    window.electronAPI.onTerminalShow((data) => {
+    const cleanup = window.electronAPI.onTerminalShow((data) => {
       showTerminal = true;
       terminalExpanded = true;
       isRunning = true;
@@ -41,31 +42,35 @@
         terminalComponent.clear();
       }
     });
+    return cleanup;
   });
 
   // Listen for build output
   $effect(() => {
-    window.electronAPI.onBuildOutput((data) => {
+    const cleanup = window.electronAPI.onBuildOutput((data) => {
       if (terminalComponent) {
         terminalComponent.write(data);
       }
     });
+    return cleanup;
   });
 
   // Listen for build completion
   $effect(() => {
-    window.electronAPI.onBuildComplete(({ success }) => {
+    const cleanup = window.electronAPI.onBuildComplete(({ success }) => {
       isRunning = false;
       hasError = !success;
     });
+    return cleanup;
   });
 
   // Listen for try process ended
   $effect(() => {
-    window.electronAPI.onTryProcessEnded(() => {
+    const cleanup = window.electronAPI.onTryProcessEnded(() => {
       isTryProcess = false;
       isRunning = false;
     });
+    return cleanup;
   });
 
   function requestClose() {
@@ -126,9 +131,19 @@
       if (terminalComponent) {
         terminalComponent.clear();
       }
+    } else if (pendingAction === 'new-try' && pendingTryCallback) {
+      // BUG-06: invoke the stored callback so the new try actually starts
+      const cb = pendingTryCallback;
+      pendingTryCallback = null;
+      cb();
     }
     pendingAction = null;
     isTryProcess = false;
+  }
+
+  async function cancelRebuild() {
+    await window.electronAPI.cancelRebuild();
+    // build-complete event will fire from main process, updating isRunning/hasError
   }
 
   function cancelKill() {
@@ -147,8 +162,7 @@
     if (isTryProcess && isRunning) {
       pendingAction = 'new-try';
       showKillConfirm = true;
-      // Store callback to call after kill
-      window._pendingTryCallback = callback;
+      pendingTryCallback = callback; // stored as proper state, called in confirmKill()
     } else {
       callback();
     }
@@ -183,6 +197,11 @@
         <span class="title-text">{terminalTitle}</span>
       </div>
       <div class="terminal-controls">
+        {#if isRunning && !isTryProcess}
+          <button class="terminal-btn cancel-build" onclick={cancelRebuild} title="Cancel build">
+            ■
+          </button>
+        {/if}
         <button class="terminal-btn" onclick={toggleTerminal} title={terminalExpanded ? "Minimize" : "Expand"}>
           {terminalExpanded ? "−" : "□"}
         </button>
@@ -353,6 +372,11 @@
   .terminal-btn.close:hover {
     background: rgba(243, 139, 168, 0.3);
     color: #f38ba8;
+  }
+
+  .terminal-btn.cancel-build:hover {
+    background: rgba(250, 179, 135, 0.3);
+    color: #fab387;
   }
 
   .terminal-content {

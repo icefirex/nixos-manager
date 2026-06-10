@@ -5,7 +5,7 @@
 
   let { systemInfo = {} } = $props();
 
-  let updateInputs = $state(true);
+  let updateInputs = $state(false);
 
   let isBuilding = $state(false);
   let currentAction = $state(null);
@@ -23,9 +23,10 @@
 
   // Listen for build output to update progress
   $effect(() => {
-    window.electronAPI.onBuildOutput((data) => {
+    const cleanup = window.electronAPI.onBuildOutput((data) => {
       updateProgressFromOutput(data);
     });
+    return cleanup;
   });
 
   // Listen for flake update events from SidePanel

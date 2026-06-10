@@ -1,8 +1,28 @@
 <script>
-  let { show = false, onClose } = $props();
+  let { show = false, onClose, onCountChange } = $props();
   let notifications = $state([]);
-  let dismissedIds = $state(new Set());
   let loading = $state(true);
+
+  const STORAGE_KEY = 'nixos-manager:dismissed-notifications';
+
+  // Load persisted dismissed IDs from sessionStorage (session-scoped so that
+  // notifications with the same ID but new underlying state reappear after restart)
+  function loadDismissed() {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveDismissed(ids) {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    } catch {}
+  }
+
+  let dismissedIds = loadDismissed();
 
   $effect(() => {
     if (show) {
@@ -16,23 +36,28 @@
       const allNotifications = await window.electronAPI.getNotifications();
       // Filter out dismissed notifications
       notifications = allNotifications.filter(n => !dismissedIds.has(n.id));
+      onCountChange?.(notifications.length);
     } catch (e) {
       console.error('Failed to load notifications:', e);
       notifications = [];
+      onCountChange?.(0);
     } finally {
       loading = false;
     }
   }
 
   function dismissNotification(id) {
-    dismissedIds = new Set([...dismissedIds, id]);
+    dismissedIds.add(id);
+    saveDismissed(dismissedIds);
     notifications = notifications.filter(n => n.id !== id);
+    onCountChange?.(notifications.length);
   }
 
   function clearAll() {
     notifications.forEach(n => dismissedIds.add(n.id));
-    dismissedIds = new Set(dismissedIds);
+    saveDismissed(dismissedIds);
     notifications = [];
+    onCountChange?.(0);
   }
 
   function handleKeydown(e) {

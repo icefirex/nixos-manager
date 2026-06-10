@@ -15,9 +15,10 @@
     loadSpecializations();
     loadFlakeInputs();
     // Re-render inputs when the background update check finishes
-    window.electronAPI.onFlakeUpdateCheckComplete(() => {
+    const cleanup = window.electronAPI.onFlakeUpdateCheckComplete(() => {
       loadFlakeInputs();
     });
+    return cleanup;
   });
 
   async function loadSpecializations() {

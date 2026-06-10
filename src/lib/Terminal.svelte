@@ -159,10 +159,9 @@
       showContextMenu = true;
     });
 
-    // Close context menu on click elsewhere
-    document.addEventListener('click', () => {
-      showContextMenu = false;
-    });
+    // Close context menu on click elsewhere — store handler for cleanup
+    const handleDocumentClick = () => { showContextMenu = false; };
+    document.addEventListener('click', handleDocumentClick);
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
@@ -173,6 +172,7 @@
     resizeObserver.observe(terminalElement);
 
     return () => {
+      document.removeEventListener('click', handleDocumentClick);
       resizeObserver.disconnect();
       terminal?.dispose();
     };
