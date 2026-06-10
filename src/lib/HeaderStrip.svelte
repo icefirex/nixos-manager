@@ -1,7 +1,7 @@
 <script>
   import Icon from "./Icon.svelte";
 
-  let { systemInfo, onSystemInfoClick, onNotificationsClick, onGitClick, notificationCount = 0 } = $props();
+  let { systemInfo, onSystemInfoClick, onNotificationsClick, onGitClick, onFlakeInfoClick, notificationCount = 0 } = $props();
 </script>
 
 <div class="header-strip">
@@ -29,6 +29,7 @@
     <button class="header-btn git-btn" onclick={onGitClick}>
       <Icon name="GitBranch" size={14} /> Git
     </button>
+    <button class="header-btn" onclick={onFlakeInfoClick}>Flake</button>
     <button class="header-btn" onclick={onSystemInfoClick}>System Info</button>
     <button class="header-btn notif-btn" onclick={onNotificationsClick}>
       Notifications

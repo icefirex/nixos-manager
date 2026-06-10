@@ -2,11 +2,25 @@ const { ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { findFlakeDir, getSpawnEnv, execAsync } = require('../utils');
+const { findFlakeDir, getSpawnEnv, execAsync, runCmd } = require('../utils');
 const { getMainWindow } = require('../window');
+const { FLAKE_WARN_DAYS, CMD_TIMEOUT_FAST, NIX_SYSTEM_PROFILE } = require('../constants');
 
 // Per-input update availability cache  { inputName: boolean }
 let inputUpdateStatus = {};
+
+/** Human-readable relative time from epoch ms */
+function relativeTime(ms) {
+  const diff = Date.now() - ms;
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (h < 1)  return 'just now';
+  if (h < 24) return `${h}h ago`;
+  if (d === 1) return 'yesterday';
+  if (d < 30)  return `${d} days ago`;
+  if (d < 365) return `${Math.floor(d / 30)}mo ago`;
+  return `${Math.floor(d / 365)}y ago`;
+}
 
 function getInputUpdateStatus() {
   return inputUpdateStatus;
@@ -95,6 +109,8 @@ function register() {
 
       proc.on('close', (code) => {
         if (code === 0) {
+          // Clear all cached update statuses — every input was just updated
+          inputUpdateStatus = {};
           const lockAfter = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
           const changed = lockBefore !== lockAfter;
           const summary = changed
@@ -210,7 +226,7 @@ function register() {
               age = `${ageDays} days`;
             }
 
-            if (ageDays > 7) {
+            if (ageDays > FLAKE_WARN_DAYS) {
               status = 'stale';
             }
           }
@@ -236,6 +252,102 @@ function register() {
     mainWindow?.webContents.send('flake-update-check-complete', inputUpdateStatus);
 
     return inputUpdateStatus;
+  });
+
+  // Flake info for the info modal
+  ipcMain.handle('get-flake-info', async () => {
+    const flakeDir = findFlakeDir();
+    const info = { flakeDir: flakeDir || null };
+    if (!flakeDir) return info;
+
+    // Description from flake.nix
+    try {
+      const flakeNix = fs.readFileSync(path.join(flakeDir, 'flake.nix'), 'utf8');
+      const m = flakeNix.match(/description\s*=\s*"([^"]+)"/);
+      info.description = m ? m[1] : null;
+    } catch { info.description = null; }
+
+    // flake.lock — input list + nixpkgs pin info
+    const lockPath = path.join(flakeDir, 'flake.lock');
+    if (fs.existsSync(lockPath)) {
+      try {
+        const stats = fs.lstatSync(lockPath);
+        info.lockUpdated = stats.mtime.toLocaleString();
+        info.lockUpdatedRelative = relativeTime(stats.mtimeMs);
+      } catch {}
+
+      try {
+        const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+        const nodes = lock.nodes || {};
+        const rootInputs = nodes.root?.inputs || {};
+        const inputNames = Object.keys(rootInputs);
+        info.inputCount = inputNames.length;
+        info.inputNames = inputNames;
+
+        // nixpkgs details (only when it's a direct string reference, not a follows path)
+        const npRef = rootInputs['nixpkgs'];
+        if (npRef && typeof npRef === 'string') {
+          const npNode = nodes[npRef];
+          if (npNode?.locked) {
+            info.nixpkgsBranch = npNode.original?.ref || null;
+            info.nixpkgsRev    = npNode.locked.rev?.slice(0, 12) || null;
+            if (npNode.locked.lastModified) {
+              const ms = npNode.locked.lastModified * 1000;
+              info.nixpkgsDate     = new Date(ms).toLocaleDateString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric'
+              });
+              info.nixpkgsRelative = relativeTime(ms);
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Git info (local only — no network call)
+    try {
+      const [branch, shortRev, lastLog, statusOut] = await Promise.all([
+        runCmd(`git -C "${flakeDir}" branch --show-current 2>/dev/null`,    CMD_TIMEOUT_FAST),
+        runCmd(`git -C "${flakeDir}" rev-parse --short HEAD 2>/dev/null`,   CMD_TIMEOUT_FAST),
+        runCmd(`git -C "${flakeDir}" log -1 --format="%s|%cr" 2>/dev/null`, CMD_TIMEOUT_FAST),
+        runCmd(`git -C "${flakeDir}" status --porcelain 2>/dev/null`,        CMD_TIMEOUT_FAST),
+      ]);
+      info.gitBranch = branch?.trim()    || null;
+      info.gitRev    = shortRev?.trim()  || null;
+      if (lastLog) {
+        const [msg, when] = lastLog.trim().split('|');
+        info.gitLastMsg  = msg?.trim()  || null;
+        info.gitLastWhen = when?.trim() || null;
+      }
+      info.gitDirty = statusOut
+        ? statusOut.trim().split('\n').filter(Boolean).length
+        : 0;
+    } catch {}
+
+    // Current system profile (generation + last switch time)
+    try {
+      const link  = fs.readlinkSync(NIX_SYSTEM_PROFILE);
+      const m     = link.match(/system-(\d+)-link/);
+      info.generation        = m ? parseInt(m[1]) : null;
+      const stats            = fs.lstatSync(NIX_SYSTEM_PROFILE);
+      info.lastSwitch        = stats.mtime.toLocaleString();
+      info.lastSwitchRelative = relativeTime(stats.mtimeMs);
+    } catch {}
+
+    // NixOS version
+    try {
+      const osRelease = fs.readFileSync('/etc/os-release', 'utf8');
+      const m = osRelease.match(/VERSION_ID="?([^"\n]+)"?/);
+      info.nixosVersion = m ? m[1] : null;
+    } catch {}
+
+    // Nix version (strip to just the semver number)
+    try {
+      const raw = await runCmd('nix --version 2>/dev/null', CMD_TIMEOUT_FAST);
+      const m = raw?.match(/\(Nix\)\s*([\d.]+)/);
+      info.nixVersion = m ? m[1] : (raw?.trim() || null);
+    } catch {}
+
+    return info;
   });
 }
 

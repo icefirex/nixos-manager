@@ -10,11 +10,21 @@
   import NotificationsModal from "./lib/NotificationsModal.svelte";
   import GitModal from "./lib/GitModal.svelte";
   import TerminalOverlay from "./lib/TerminalOverlay.svelte";
+  import FlakeInfoModal from "./lib/FlakeInfoModal.svelte";
 
-  let currentPage = $state("dashboard");
+  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations']);
+  // UX-09: restore last active tab; fall back to dashboard for unknown values
+  const _savedPage = localStorage.getItem('nixos-manager:active-tab');
+  let currentPage = $state(VALID_PAGES.has(_savedPage) ? _savedPage : 'dashboard');
+
+  // Persist active tab whenever it changes
+  $effect(() => {
+    localStorage.setItem('nixos-manager:active-tab', currentPage);
+  });
   let showSystemInfo = $state(false);
   let showNotifications = $state(false);
   let showGit = $state(false);
+  let showFlakeInfo = $state(false);
   let notificationCount = $state(0);
   let systemInfo = $state({
     profile: "",
@@ -37,7 +47,14 @@
   async function loadNotificationCount() {
     try {
       const notifications = await window.electronAPI.getNotifications();
-      notificationCount = notifications.length;
+      // Mirror the dismissed-IDs filter from NotificationsModal so the badge
+      // stays accurate even when the modal is closed or the check fires in the background.
+      let dismissed = new Set();
+      try {
+        const raw = sessionStorage.getItem('nixos-manager:dismissed-notifications');
+        if (raw) dismissed = new Set(JSON.parse(raw));
+      } catch {}
+      notificationCount = notifications.filter(n => !dismissed.has(n.id)).length;
     } catch (e) {
       console.error("Failed to load notifications:", e);
       notificationCount = 0;
@@ -50,9 +67,10 @@
 
     // Background flake update check — runs once on launch, updates badges + notifications
     window.electronAPI.checkFlakeInputUpdates().catch(() => {});
-    window.electronAPI.onFlakeUpdateCheckComplete(() => {
+    const cleanupFlake = window.electronAPI.onFlakeUpdateCheckComplete(() => {
       loadNotificationCount();
     });
+    return cleanupFlake;
   });
 
   let isMaximized = $state(false);
@@ -65,9 +83,10 @@
   });
 
   $effect(() => {
-    window.electronAPI.onShowUpdates(() => {
+    const cleanup = window.electronAPI.onShowUpdates(() => {
       showGit = true;
     });
+    return cleanup;
   });
 
   function handleMinimize() {
@@ -75,8 +94,7 @@
   }
 
   async function handleMaximize() {
-    await window.electronAPI.maximize();
-    isMaximized = !isMaximized;
+    isMaximized = await window.electronAPI.maximize();
   }
 
   function handleClose() {
@@ -108,7 +126,7 @@
     <Sidebar bind:currentPage />
 
     <div class="content">
-      <HeaderStrip {systemInfo} {notificationCount} onSystemInfoClick={() => showSystemInfo = true} onNotificationsClick={() => showNotifications = true} onGitClick={() => showGit = true} />
+      <HeaderStrip {systemInfo} {notificationCount} onSystemInfoClick={() => showSystemInfo = true} onNotificationsClick={() => showNotifications = true} onGitClick={() => showGit = true} onFlakeInfoClick={() => showFlakeInfo = true} />
 
       {#if currentPage === "dashboard"}
         <Dashboard {systemInfo} />
@@ -131,8 +149,9 @@
 </div>
 
 <SystemInfoModal show={showSystemInfo} onClose={() => showSystemInfo = false} />
-<NotificationsModal show={showNotifications} onClose={() => { showNotifications = false; loadNotificationCount(); }} />
+<NotificationsModal show={showNotifications} onClose={() => { showNotifications = false; loadNotificationCount(); }} onCountChange={(n) => { notificationCount = n; }} />
 <GitModal show={showGit} onClose={() => showGit = false} />
+<FlakeInfoModal show={showFlakeInfo} onClose={() => showFlakeInfo = false} />
 <TerminalOverlay />
 
 <style>
