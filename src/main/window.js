@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow = null;
+let cachedVersion = null; // CQ-08: read once, not on every IPC call
 
 /**
  * Check if we're in development mode
@@ -43,12 +44,14 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
   }
 
-  // Enable DevTools shortcut in production too
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-      mainWindow.webContents.toggleDevTools();
-    }
-  });
+  // DevTools keyboard shortcut — dev builds only (BUG-03)
+  if (isDev()) {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        mainWindow.webContents.toggleDevTools();
+      }
+    });
+  }
 
   return mainWindow;
 }
@@ -71,8 +74,10 @@ function registerWindowHandlers() {
   ipcMain.handle('window-maximize', () => {
     if (mainWindow?.isMaximized()) {
       mainWindow.unmaximize();
+      return false; // BUG-08: return actual new state
     } else {
       mainWindow?.maximize();
+      return true;
     }
   });
 
@@ -86,11 +91,12 @@ function registerWindowHandlers() {
   });
 
   ipcMain.handle('get-app-version', () => {
+    if (cachedVersion) return cachedVersion; // CQ-08: serve from cache
     try {
-      // Read version from package.json relative to main.js location
       const packagePath = path.join(__dirname, '..', '..', 'package.json');
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-      return packageJson.version;
+      cachedVersion = packageJson.version;
+      return cachedVersion;
     } catch (e) {
       console.error('Failed to read package.json version:', e);
       return app.getVersion() || '?';

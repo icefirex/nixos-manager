@@ -48,8 +48,7 @@ app.on('window-all-closed', () => {
   discoverHandlers.cleanup();
 
   if (process.platform !== 'darwin') {
-    // Use exit() for faster termination, avoids GPU cleanup delays
-    app.exit(0);
+    app.quit();
   }
 });
 
