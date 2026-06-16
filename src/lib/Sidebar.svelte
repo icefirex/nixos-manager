@@ -10,13 +10,13 @@
     { id: "options", icon: "SlidersHorizontal", tooltip: "Options" },
     { id: "generations", icon: "History", tooltip: "Generations" },
     { id: "rebuild", icon: "Hammer", tooltip: "Rebuild" },
-    { id: "updates", icon: "ArrowDownToLine", tooltip: "Updates" },
-    { id: "profiles", icon: "Users", tooltip: "Profiles" },
+    { id: "updates", icon: "ArrowDownToLine", tooltip: "Updates", comingSoon: true },
+    { id: "profiles", icon: "Users", tooltip: "Profiles", comingSoon: true },
   ];
 
   const secondaryItems = [
-    { id: "cleanup", icon: "Trash2", tooltip: "Cleanup" },
-    { id: "history", icon: "ScrollText", tooltip: "History" },
+    { id: "cleanup", icon: "Trash2", tooltip: "Cleanup", comingSoon: true },
+    { id: "history", icon: "ScrollText", tooltip: "History", comingSoon: true },
   ];
 
   function navigate(pageId) {
@@ -29,10 +29,11 @@
     <button
       class="nav-btn"
       class:active={currentPage === item.id}
+      class:coming-soon={item.comingSoon}
       onclick={() => navigate(item.id)}
     >
       <Icon name={item.icon} size={20} />
-      <span class="tooltip">{item.tooltip}</span>
+      <span class="tooltip">{item.tooltip}{item.comingSoon ? ' (coming soon)' : ''}</span>
     </button>
   {/each}
 
@@ -42,21 +43,21 @@
     <button
       class="nav-btn"
       class:active={currentPage === item.id}
+      class:coming-soon={item.comingSoon}
       onclick={() => navigate(item.id)}
     >
       <Icon name={item.icon} size={20} />
-      <span class="tooltip">{item.tooltip}</span>
+      <span class="tooltip">{item.tooltip}{item.comingSoon ? ' (coming soon)' : ''}</span>
     </button>
   {/each}
 
   <div class="sidebar-footer">
     <button
-      class="nav-btn"
-      class:active={currentPage === "settings"}
+      class="nav-btn coming-soon"
       onclick={() => navigate("settings")}
     >
       <Icon name="Settings" size={20} />
-      <span class="tooltip">Settings</span>
+      <span class="tooltip">Settings (coming soon)</span>
     </button>
   </div>
 </div>
@@ -135,6 +136,17 @@
 
   .nav-btn:hover .tooltip {
     opacity: 1;
+  }
+
+  .nav-btn.coming-soon {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .nav-btn.coming-soon:hover {
+    opacity: 0.5;
+    transform: none;
+    background: transparent;
   }
 
   .sidebar-divider {

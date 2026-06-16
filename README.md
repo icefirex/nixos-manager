@@ -142,8 +142,14 @@ Then enable the NixOS module in your configuration:
     enable = true;
     package = inputs.nixos-manager.packages.${pkgs.system}.default;
   };
+
+  environment.variables = {
+    FLAKE_DIR = "/path/to/your/nixos-config";
+  };
 }
 ```
+
+If your flake isn't at one of the [auto-detected locations](#flake-directory-detection), set `FLAKE_DIR` to point the app at it.
 
 ### Nix Build (standalone)
 
