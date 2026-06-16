@@ -120,6 +120,17 @@ Add to your `flake.nix` inputs:
 }
 ```
 
+A more traditional way to add it to an existing `flake.nix`, ensuring your local `nixpkgs` is used instead of the one pinned by nixos-manager:
+
+```nix
+{
+  inputs.nixos-manager = {
+    url = "github:icefirex/nixos-manager";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+}
+```
+
 Then enable the NixOS module in your configuration:
 
 ```nix
