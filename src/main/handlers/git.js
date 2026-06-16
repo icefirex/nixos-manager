@@ -1,5 +1,5 @@
 const { ipcMain } = require('electron');
-const { findFlakeDir, runCmd } = require('../utils');
+const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const path = require('path');
 const { CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 
@@ -11,7 +11,7 @@ function register() {
   ipcMain.handle('get-git-info', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const info = {
@@ -136,7 +136,7 @@ function register() {
   ipcMain.handle('get-commit-details', async (event, hash) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const details = {
@@ -197,7 +197,7 @@ function register() {
   ipcMain.handle('git-switch-branch', async (event, branchName) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     try {
@@ -212,7 +212,7 @@ function register() {
   ipcMain.handle('git-pull', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     try {
@@ -227,7 +227,7 @@ function register() {
   ipcMain.handle('git-fetch', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     try {

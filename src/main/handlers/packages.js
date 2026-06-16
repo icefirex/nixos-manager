@@ -2,7 +2,7 @@ const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { findFlakeDir, runCmd } = require('../utils');
+const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 
 /**
@@ -13,7 +13,7 @@ function register() {
   ipcMain.handle('get-packages', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const packages = {

@@ -1,7 +1,7 @@
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { findFlakeDir, runCmd } = require('../utils');
+const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 
 /**
  * Register options management IPC handlers
@@ -11,7 +11,7 @@ function register() {
   ipcMain.handle('get-options', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const options = {

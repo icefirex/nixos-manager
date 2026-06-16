@@ -80,11 +80,36 @@ function getSpawnEnv() {
   };
 }
 
+/**
+ * Get a user-friendly error message when no flake directory is found
+ */
+function flakeDirNotFoundMsg() {
+  const candidates = [
+    '$FLAKE_DIR (environment variable)',
+    '~/nixos-config',
+    '~/.config/nixos',
+    '/etc/nixos'
+  ];
+  return [
+    'Could not find a NixOS flake directory.',
+    '',
+    'The app looked in:',
+    ...candidates.map(c => `  • ${c}`),
+    '',
+    'To fix this, either:',
+    '  • Set the FLAKE_DIR environment variable to point to your flake configuration, e.g.',
+    '      export FLAKE_DIR=/home/me/my-nixos-config',
+    '  • Place your flake.nix in one of the default locations above',
+    '  • Symlink your config to one of the default locations',
+  ].join('\n');
+}
+
 module.exports = {
   findFlakeDir,
   runCmd,
   execAsync,
   updateBuildStatus,
   getLastBuildStatus,
-  getSpawnEnv
+  getSpawnEnv,
+  flakeDirNotFoundMsg
 };

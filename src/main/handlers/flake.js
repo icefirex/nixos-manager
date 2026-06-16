@@ -2,7 +2,7 @@ const { ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { findFlakeDir, getSpawnEnv, execAsync, runCmd } = require('../utils');
+const { findFlakeDir, getSpawnEnv, execAsync, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const { getMainWindow } = require('../window');
 const { FLAKE_WARN_DAYS, CMD_TIMEOUT_FAST, NIX_SYSTEM_PROFILE } = require('../constants');
 
@@ -81,7 +81,7 @@ function register() {
   ipcMain.handle('update-flake-inputs', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const mainWindow = getMainWindow();
@@ -137,7 +137,7 @@ function register() {
   ipcMain.handle('update-flake-input', async (event, inputName) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const mainWindow = getMainWindow();

@@ -1,6 +1,6 @@
 const { ipcMain } = require('electron');
 const { spawn, execSync } = require('child_process');
-const { findFlakeDir, updateBuildStatus, getSpawnEnv } = require('../utils');
+const { findFlakeDir, updateBuildStatus, getSpawnEnv, flakeDirNotFoundMsg } = require('../utils');
 const { getMainWindow } = require('../window');
 
 // Track currently running rebuild process so it can be cancelled
@@ -63,7 +63,7 @@ function register() {
   ipcMain.handle('nixos-rebuild', async (event, { action, updateInputs }) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      throw new Error('Could not find flake directory');
+      throw new Error(flakeDirNotFoundMsg());
     }
 
     const mainWindow = getMainWindow();
