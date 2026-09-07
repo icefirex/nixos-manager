@@ -1,5 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 
+app.setName('nixos-manager');
+
 // Import window management
 const { createWindow, registerWindowHandlers } = require('./src/main/window');
 
@@ -14,6 +16,7 @@ const optionsHandlers = require('./src/main/handlers/options');
 const generationsHandlers = require('./src/main/handlers/generations');
 const gitHandlers = require('./src/main/handlers/git');
 const discoverHandlers = require('./src/main/handlers/discover');
+const historyHandlers = require('./src/main/handlers/history');
 
 // Register all IPC handlers
 function registerAllHandlers() {
@@ -28,6 +31,7 @@ function registerAllHandlers() {
   generationsHandlers.register();
   gitHandlers.register();
   discoverHandlers.register();
+  historyHandlers.register();
 }
 
 // App lifecycle
