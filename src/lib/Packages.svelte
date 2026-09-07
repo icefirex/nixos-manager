@@ -2,6 +2,8 @@
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
 
+  let { pendingPackage = null, onPendingConsumed = () => {} } = $props();
+
   let packages = $state({
     system: [],
     user: [],
@@ -18,6 +20,121 @@
   let packageInfo = $state(null);
   let loadingInfo = $state(false);
 
+  // Duplicates
+  let duplicates = $state([]);
+  let showDuplicatesOnly = $state(false);
+  let removingPkg = $state(null);
+
+  $effect(() => {
+    function onPackagesChanged() {
+      loadPackages();
+    }
+    window.addEventListener('packages-changed', onPackagesChanged);
+    return () => {
+      window.removeEventListener('packages-changed', onPackagesChanged);
+    };
+  });
+
+  $effect(() => {
+    if (!searchQuery && selectedPackage &&
+      !packages.system.includes(selectedPackage) &&
+      !packages.user.includes(selectedPackage) &&
+      !packages.homeManager.includes(selectedPackage)) {
+      selectedPackage = null;
+      packageInfo = null;
+    }
+  });
+
+  $effect(() => {
+    function onExternalSelect(e) {
+      const detail = e.detail;
+      const pkg = typeof detail === 'object' ? detail.pkg : detail;
+      const source = typeof detail === 'object' ? detail.source : null;
+
+      if (source === 'live') {
+        sourceMode = 'live';
+        duplicates = [];
+        searchQuery = pkg;
+        loadPackages().then(() => {
+          selectedPackage = pkg;
+          packageInfo = null;
+          loadingInfo = true;
+          window.electronAPI.getPackageInfo(pkg).then(info => {
+            packageInfo = info;
+            loadingInfo = false;
+          }).catch(() => {
+            packageInfo = null;
+            loadingInfo = false;
+          });
+          setTimeout(() => {
+            document.querySelector('.package-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 200);
+        });
+        return;
+      }
+
+      // Default: ensure we're in config mode
+      if (sourceMode !== 'config') {
+        sourceMode = 'config';
+        loadPackages();
+      }
+
+      // Find which tab this package belongs to
+      const allTabs = { system: 'system', user: 'user', homeManager: 'homeManager' };
+      let foundTab = null;
+      for (const [tabId, tabKey] of Object.entries(allTabs)) {
+        if (packages[tabKey]?.includes(pkg)) {
+          foundTab = tabId;
+          break;
+        }
+      }
+
+      if (foundTab) {
+        // Package is in the declared list — switch to correct tab and select it
+        activeTab = foundTab;
+        searchQuery = "";
+        showDuplicatesOnly = false;
+        selectedPackage = pkg;
+        packageInfo = null;
+        loadingInfo = true;
+        window.electronAPI.getPackageInfo(pkg).then(info => {
+          packageInfo = info;
+          loadingInfo = false;
+        }).catch(() => {
+          packageInfo = null;
+          loadingInfo = false;
+        });
+        setTimeout(() => {
+          document.querySelector('.package-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      } else {
+        // Not in any tab — use filter to show it's not found
+        searchQuery = pkg;
+        selectedPackage = pkg;
+        packageInfo = null;
+        loadingInfo = true;
+        window.electronAPI.getPackageInfo(pkg).then(info => {
+          packageInfo = info;
+          loadingInfo = false;
+        }).catch(() => {
+          packageInfo = null;
+          loadingInfo = false;
+        });
+        setTimeout(() => {
+          document.querySelector('.package-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      }
+    }
+    window.addEventListener('select-package', onExternalSelect);
+    return () => window.removeEventListener('select-package', onExternalSelect);
+  });
+
+  let duplicateSet = $derived(new Set(duplicates.map(d => d.pkgname)));
+
+  function isDuplicate(pkg) {
+    return duplicateSet.has(pkg);
+  }
+
   const tabs = [
     { id: "system", label: "System" },
     { id: "user", label: "User Profile" },
@@ -29,7 +146,10 @@
     const result = {};
     const q = searchQuery.trim().toLowerCase();
     for (const tab of tabs) {
-      const list = packages[tab.id] || [];
+      let list = packages[tab.id] || [];
+      if (showDuplicatesOnly && sourceMode === 'config') {
+        list = list.filter(pkg => duplicateSet.has(pkg));
+      }
       if (!q) {
         result[tab.id] = list;
       } else {
@@ -41,7 +161,9 @@
 
   // Determine the best active tab (auto-switch if current becomes empty)
   let effectiveTab = $derived.by(() => {
-    if (!searchQuery.trim()) return activeTab;
+    const filterActive = searchQuery.trim() || (showDuplicatesOnly && sourceMode === 'config');
+
+    if (!filterActive) return activeTab;
 
     // If current tab has results, stay there
     if (filteredByCategory[activeTab]?.length > 0) return activeTab;
@@ -52,6 +174,31 @@
     }
 
     return activeTab;
+  });
+
+  // Auto-select when filter narrows to exactly one result
+  let totalFiltered = $derived(
+    tabs.reduce((sum, tab) => sum + (filteredByCategory[tab.id]?.length || 0), 0)
+  );
+
+  $effect(() => {
+    totalFiltered;
+    effectiveTab;
+    if (totalFiltered === 1 && searchQuery.trim() && !loading) {
+      const list = filteredByCategory[effectiveTab];
+      if (list?.length === 1 && selectedPackage !== list[0]) {
+        selectedPackage = list[0];
+        packageInfo = null;
+        loadingInfo = true;
+        window.electronAPI.getPackageInfo(list[0]).then(info => {
+          packageInfo = info;
+          loadingInfo = false;
+        }).catch(() => {
+          packageInfo = null;
+          loadingInfo = false;
+        });
+      }
+    }
   });
 
   async function loadPackages() {
@@ -73,8 +220,20 @@
     }
   }
 
+  async function loadDuplicates() {
+    try {
+      const result = await window.electronAPI.packagesGetDuplicates();
+      if (result.success) {
+        duplicates = result.duplicates;
+      }
+    } catch (e) {
+      console.error('Failed to load duplicates:', e);
+    }
+  }
+
   $effect(() => {
     loadPackages();
+    loadDuplicates();
   });
 
   // Reload when source mode changes
@@ -82,6 +241,45 @@
     if (mode !== sourceMode) {
       sourceMode = mode;
       loadPackages();
+      if (sourceMode === 'config') loadDuplicates();
+      else duplicates = [];
+    }
+  }
+
+  async function removeLocation(relPath) {
+    if (!selectedPackage) return;
+    removingPkg = selectedPackage;
+    try {
+      const findResult = await window.electronAPI.discoverFindPackage(selectedPackage);
+      if (!findResult.success || findResult.files.length === 0) {
+        alert(`Package '${selectedPackage}' not found in any config file`);
+        return;
+      }
+      const match = findResult.files.find(f => f.relativePath === relPath || f.path.endsWith(relPath));
+      if (!match) {
+        alert(`Could not find file: ${relPath}`);
+        return;
+      }
+      const result = await window.electronAPI.discoverRemovePackage({
+        pkgname: selectedPackage,
+        filePath: match.path
+      });
+      if (result.success) {
+        const entry = { pkgname: selectedPackage, action: 'removed', file: match.path, type: activeTab };
+        window.electronAPI.historyAdd(entry);
+        await Promise.all([loadPackages(), loadDuplicates()]);
+        packageInfo = null;
+        selectedPackage = null;
+        window.dispatchEvent(new CustomEvent('history-updated'));
+        window.dispatchEvent(new CustomEvent('pending-changes'));
+        window.dispatchEvent(new CustomEvent('packages-changed'));
+      } else {
+        alert(result.error || 'Failed to remove package');
+      }
+    } catch (e) {
+      alert(e.message || 'Failed to remove package');
+    } finally {
+      removingPkg = null;
     }
   }
 
@@ -208,6 +406,14 @@
     </div>
   </div>
 
+  {#if sourceMode === 'config' && duplicates.length > 0}
+    <button class="duplicates-banner" class:active={showDuplicatesOnly} onclick={() => showDuplicatesOnly = !showDuplicatesOnly}>
+      <Icon name="AlertTriangle" size={14} />
+      <span>{duplicates.length} duplicate{duplicates.length !== 1 ? 's' : ''} found across files</span>
+      <span class="duplicates-hint">{showDuplicatesOnly ? 'Show all' : 'Show duplicates only'}</span>
+    </button>
+  {/if}
+
   <div class="search-bar">
     <span class="search-icon"><Icon name="Search" size={16} /></span>
     <input
@@ -224,11 +430,14 @@
     {#each tabs as tab}
       {@const total = getTabCount(tab.id)}
       {@const filtered = getFilteredCount(tab.id)}
-      {#if total > 0 || !searchQuery.trim()}
-        {#if !searchQuery.trim() || filtered > 0}
+      {@const dupActive = showDuplicatesOnly && sourceMode === 'config'}
+      {#if total > 0 || !searchQuery.trim() || !dupActive}
+        {#if (!searchQuery.trim() && !dupActive) || filtered > 0}
           <button
             class="tab"
             class:active={effectiveTab === tab.id}
+            class:disabled={dupActive && filtered === 0}
+            disabled={dupActive && filtered === 0}
             onclick={() => activeTab = tab.id}
           >
             {tab.label}
@@ -262,16 +471,34 @@
         <span class="info">{getSourceInfo(effectiveTab)}</span>
       </div>
       <div class="package-list">
+        {#if selectedPackage && searchQuery && !packages.system.includes(selectedPackage) && !packages.user.includes(selectedPackage) && !packages.homeManager.includes(selectedPackage)}
+          <div class="package-item-wrapper external">
+            <div class="external-pkg-header">
+              <span class="package-name">{selectedPackage}</span>
+              <span class="external-badge">not in config</span>
+              <button class="close-external" onclick={() => { selectedPackage = null; packageInfo = null; }}>
+                <Icon name="X" size={14} />
+              </button>
+            </div>
+            <div class="package-detail">
+              {@render packageDetailPanel()}
+            </div>
+          </div>
+        {/if}
         {#each filteredByCategory[effectiveTab] || [] as pkg}
           <div class="package-item-wrapper">
-            <button
-              class="package-item"
-              class:selected={selectedPackage === pkg}
-              onclick={() => selectPackage(pkg)}
-            >
-              <span class="package-name">{pkg}</span>
-              <span class="expand-icon">{#if selectedPackage === pkg}<Icon name="ChevronDown" size={14} />{:else}<Icon name="ChevronRight" size={14} />{/if}</span>
-            </button>
+              <button
+                class="package-item"
+                class:selected={selectedPackage === pkg}
+                class:duplicate={sourceMode === 'config' && isDuplicate(pkg)}
+                onclick={() => selectPackage(pkg)}
+              >
+                <span class="package-name">{pkg}</span>
+                {#if sourceMode === 'config' && isDuplicate(pkg)}
+                  <span class="dup-badge" title="Defined in multiple files"><Icon name="AlertTriangle" size={12} /></span>
+                {/if}
+                <span class="expand-icon">{#if selectedPackage === pkg}<Icon name="ChevronDown" size={14} />{:else}<Icon name="ChevronRight" size={14} />{/if}</span>
+              </button>
             {#if selectedPackage === pkg}
               <div class="package-detail">
                 {@render packageDetailPanel()}
@@ -368,11 +595,40 @@
         {/if}
 
         {#if packageInfo.configLocations && packageInfo.configLocations.length > 0}
+          {@const dupEntry = duplicates.find(d => d.pkgname === selectedPackage)}
           <div class="detail-field full-width">
-            <span class="field-label">Defined In</span>
-            <div class="config-locations">
-              {#each packageInfo.configLocations as loc}
-                <span class="config-location">{loc}</span>
+            <span class="field-label">Defined In ({packageInfo.configLocations.length})</span>
+            {#if dupEntry}
+              {@const locCount = packageInfo.configLocations.length}
+              {@const multiFile = new Set(dupEntry.files.map(f => f.file)).size > 1}
+              <p class="dup-suggestion">
+                <Icon name="AlertTriangle" size={12} />
+                {#if dupEntry.crossUser}
+                  Defined for {dupEntry.users.join(', ')} — consider elevating to environment.systemPackages
+                {:else if multiFile}
+                  Defined in {locCount} locations — consider consolidating to a single declaration
+                {:else}
+                  Duplicate entry in same file — remove one
+                {/if}
+              </p>
+            {/if}
+            <div class="config-locations-list">
+              {#each packageInfo.configLocations as loc, locIdx}
+                {@const locParts = loc.split(':')}
+                {@const locFile = locParts.slice(0, -1).join(':')}
+                {@const locLine = locParts.length > 1 ? locParts[locParts.length - 1] : ''}
+                <div class="config-location-row">
+                  <span class="config-location-path">{locFile}</span>
+                  <div class="location-row-right">
+                    {#if locLine}
+                      <span class="line-pill">line: {locLine}</span>
+                    {/if}
+                    <button class="remove-loc-btn" title="Remove this definition"
+                      onclick={() => removeLocation(locFile)} disabled={removingPkg === selectedPackage}>
+                      <Icon name="Trash2" size={12} />
+                    </button>
+                  </div>
+                </div>
               {/each}
             </div>
           </div>
@@ -399,6 +655,85 @@
 {/snippet}
 
 <style>
+  .pending-changes {
+    margin: 0 24px 8px;
+    border: 1px solid rgba(249, 226, 175, 0.25);
+    border-radius: 8px;
+    background: rgba(249, 226, 175, 0.05);
+    overflow: hidden;
+  }
+
+  .pending-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    color: #f9e2af;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .pending-toggle span {
+    flex: 1;
+  }
+
+  .pending-details {
+    padding: 0 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pending-info {
+    font-size: 12px;
+    color: #cdd6f4;
+    line-height: 1.6;
+    opacity: 0.85;
+  }
+
+  .pending-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pending-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .pending-label.add { color: #a6e3a1; }
+  .pending-label.remove { color: #f38ba8; }
+
+  .pending-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .pending-pkg {
+    font-family: monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: #cdd6f4;
+  }
+
+  .pending-more {
+    font-size: 11px;
+    color: #6c7086;
+    align-self: center;
+  }
+
   .packages-page {
     flex: 1;
     display: flex;
@@ -557,6 +892,12 @@
     background: linear-gradient(135deg, rgba(137, 180, 250, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
     border-color: rgba(137, 180, 250, 0.4);
     color: #89b4fa;
+  }
+
+  .tab.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   .count {
@@ -805,7 +1146,61 @@
     animation: spin 0.8s linear infinite;
   }
 
+  .package-item-wrapper.external {
+    margin-bottom: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .external-pkg-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .external-pkg-header .package-name {
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #cdd6f4;
+  }
+
+  .external-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #a6adc8;
+    background: rgba(166, 173, 200, 0.1);
+    border: 1px solid rgba(166, 173, 200, 0.2);
+  }
+
+  .close-external {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #6c7086;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.1s;
+  }
+
+  .close-external:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #cdd6f4;
+  }
+
   .package-detail {
+    scroll-margin-top: 80px;
     background: rgba(30, 30, 46, 0.8);
     border: 1px solid rgba(137, 180, 250, 0.3);
     border-top: none;
@@ -1087,5 +1482,159 @@
     font-size: 12px;
     color: #6c7086;
     text-align: center;
+  }
+
+  .duplicates-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 14px;
+    margin-bottom: 12px;
+    background: rgba(249, 226, 175, 0.1);
+    border: 1px solid rgba(249, 226, 175, 0.25);
+    border-radius: 8px;
+    color: #f9e2af;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+
+  .duplicates-banner:hover {
+    background: rgba(249, 226, 175, 0.15);
+    border-color: rgba(249, 226, 175, 0.4);
+  }
+
+  .duplicates-banner.active {
+    background: rgba(249, 226, 175, 0.2);
+    border-color: rgba(249, 226, 175, 0.5);
+  }
+
+  .duplicates-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: #f9e2af;
+    opacity: 0.7;
+  }
+
+  .package-item.duplicate {
+    border-left: 2px solid #f9e2af;
+  }
+
+  .dup-badge {
+    display: inline-flex;
+    align-items: center;
+    color: #f9e2af;
+    margin-left: auto;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+
+  .dup-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #f9e2af;
+    background: rgba(249, 226, 175, 0.08);
+    border: 1px solid rgba(249, 226, 175, 0.2);
+    border-radius: 6px;
+  }
+
+  .config-locations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .config-location-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    transition: background 0.1s;
+  }
+
+  .location-row-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .line-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: #9ceaf9;
+    background: rgba(156, 234, 249, 0.1);
+    border: 1px solid rgba(156, 234, 249, 0.25);
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .config-location-row:hover {
+    background: rgba(49, 50, 68, 0.6);
+    border-color: rgba(69, 71, 90, 0.5);
+  }
+
+  .config-location-path {
+    flex: 1;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #a6adc8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .remove-loc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: rgba(243, 139, 168, 0.1);
+    border: 1px solid rgba(243, 139, 168, 0.2);
+    border-radius: 4px;
+    color: #f38ba8;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+
+  .remove-loc-btn:hover:not(:disabled) {
+    background: rgba(243, 139, 168, 0.2);
+    border-color: rgba(243, 139, 168, 0.4);
+  }
+
+  .remove-loc-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .spinner-sm {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(243, 139, 168, 0.3);
+    border-top-color: #f38ba8;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>

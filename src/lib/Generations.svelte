@@ -339,6 +339,18 @@
     return items.filter(pkg => pkg.name.toLowerCase().includes(q));
   }
 
+  function compareVersions(a, b) {
+    const pa = a.split(/[.\-+]/).map(Number);
+    const pb = b.split(/[.\-+]/).map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const na = pa[i] || 0;
+      const nb = pb[i] || 0;
+      if (na > nb) return 1;
+      if (na < nb) return -1;
+    }
+    return 0;
+  }
+
   function getPaginatedItems(items) {
     const filtered = getFilteredDiffItems(items);
     const start = diffPage * ITEMS_PER_PAGE;
@@ -785,13 +797,20 @@
           (filteredChanged.length > 0) ? "changed" :
           (filteredAdded.length > 0) ? "added" :
           (filteredRemoved.length > 0) ? "removed" : diffTab
-        ) : diffTab}
+        ) : (
+          (diffTab === "changed" && generationDiff.changed.length > 0) ? "changed" :
+          (diffTab === "added" && generationDiff.added.length > 0) ? "added" :
+          (diffTab === "removed" && generationDiff.removed.length > 0) ? "removed" :
+          (generationDiff.changed.length > 0) ? "changed" :
+          (generationDiff.added.length > 0) ? "added" :
+          (generationDiff.removed.length > 0) ? "removed" : diffTab
+        )}
         {@const activeTab = bestTab}
         <div class="diff-section">
           <div class="diff-header">
             <h4>Changes in this Generation</h4>
             <div class="diff-tabs">
-              {#if filteredChanged.length > 0 || !diffFilter.trim()}
+              {#if generationDiff.changed.length > 0}
                 <button
                   class="diff-tab"
                   class:active={activeTab === "changed"}
@@ -804,7 +823,7 @@
                   {/if}
                 </button>
               {/if}
-              {#if filteredAdded.length > 0 || !diffFilter.trim()}
+              {#if generationDiff.added.length > 0}
                 <button
                   class="diff-tab"
                   class:active={activeTab === "added"}
@@ -817,7 +836,7 @@
                   {/if}
                 </button>
               {/if}
-              {#if filteredRemoved.length > 0 || !diffFilter.trim()}
+              {#if generationDiff.removed.length > 0}
                 <button
                   class="diff-tab"
                   class:active={activeTab === "removed"}
@@ -854,10 +873,54 @@
             {@const hasPrev = diffPage > 0}
             <div class="diff-list">
               {#each paginatedItems as pkg}
-                <div class="diff-item" class:added={activeTab === "added"} class:removed={activeTab === "removed"} class:changed={activeTab === "changed"}>
-                  <span class="diff-pkg">{pkg.name}</span>
-                  <span class="diff-change">{pkg.change}</span>
-                </div>
+                {#if activeTab === "changed"}
+                  {@const changeParts = pkg.change.split(',')}
+                  {@const versionPart = changeParts[0].trim()}
+                  {@const sizePart = changeParts[1]?.trim() || ''}
+                  {@const versions = versionPart.split('→').map(v => v.trim())}
+                  {@const oldVer = versions[0] || ''}
+                  {@const newVer = versions[1] || ''}
+                  {@const isUpgrade = compareVersions(newVer, oldVer) > 0}
+                  {@const isDowngrade = compareVersions(newVer, oldVer) < 0}
+                  <div class="diff-item changed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                    <span class="diff-pkg">{pkg.name}</span>
+                    <div class="diff-meta">
+                      <span class="version-change">
+                        <span class="ver old">{oldVer}</span>
+                        <span class="ver-arrow">→</span>
+                        <span class="ver new">{newVer}</span>
+                      </span>
+                      {#if sizePart}
+                        <span class="size-badge" class:positive={sizePart.startsWith('+')} class:negative={sizePart.startsWith('-')}>{sizePart}</span>
+                      {/if}
+                      {#if isUpgrade}
+                        <span class="dir-badge up">upgraded</span>
+                      {:else if isDowngrade}
+                        <span class="dir-badge down">downgraded</span>
+                      {/if}
+                    </div>
+                  </div>
+                {:else if activeTab === "added"}
+                  {@const addParts = pkg.change.split(',')}
+                  {@const addVer = addParts[0].trim().replace('∅ → ', '')}
+                  {@const addSize = addParts[1]?.trim() || ''}
+                  <div class="diff-item added clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                    <span class="diff-pkg">{pkg.name}</span>
+                    <div class="diff-meta">
+                      <span class="ver new">{addVer}</span>
+                      {#if addSize}
+                        <span class="size-badge">{addSize}</span>
+                      {/if}
+                    </div>
+                  </div>
+                {:else}
+                  <div class="diff-item removed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                    <span class="diff-pkg">{pkg.name}</span>
+                    <div class="diff-meta">
+                      <span class="ver old">{pkg.change.replace('→ ∅', '').trim()}</span>
+                    </div>
+                  </div>
+                {/if}
               {/each}
             </div>
 
@@ -1696,10 +1759,27 @@
   .diff-item {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 12px;
     padding: 6px 10px;
     border-radius: 4px;
     gap: 12px;
+  }
+
+  .diff-item.clickable {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .diff-item.clickable:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .diff-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   .diff-item.added {
@@ -1727,6 +1807,72 @@
     font-family: monospace;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  .version-change {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: monospace;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .ver.old {
+    color: #6c7086;
+    text-decoration: line-through;
+    opacity: 0.8;
+  }
+
+  .ver.new {
+    color: #a6e3a1;
+    font-weight: 600;
+  }
+
+  .ver-arrow {
+    color: #6c7086;
+    font-size: 10px;
+  }
+
+  .size-badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-family: monospace;
+    white-space: nowrap;
+    color: #cdd6f4;
+    background: rgba(205, 214, 244, 0.08);
+  }
+
+  .size-badge.positive {
+    color: #f38ba8;
+    background: rgba(243, 139, 168, 0.12);
+  }
+
+  .size-badge.negative {
+    color: #a6e3a1;
+    background: rgba(166, 227, 161, 0.12);
+  }
+
+  .dir-badge {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .dir-badge.up {
+    color: #a6e3a1;
+    background: rgba(166, 227, 161, 0.15);
+  }
+
+  .dir-badge.down {
+    color: #f9e2af;
+    background: rgba(249, 226, 175, 0.15);
   }
 
   .diff-empty, .diff-empty-state {

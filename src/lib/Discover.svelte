@@ -16,15 +16,69 @@
   let trying = $state(false);
   let iconCache = $state({});
 
+  // Add to configuration
+  let configFiles = $state([]);
+  let configFilesLoaded = $state(false);
+  let installFile = $state('');
+  let installType = $state('system');
+  let installUser = $state('');
+  let availableUsers = $state([]);
+  let adding = $state(false);
+  let installSuccess = $state(false);
+  let installDiff = $state('');
+  let nixpkgsValid = $state(true);
+  let checkingNixpkgs = $state(false);
+  let currentView = $state('details');
+  let configuredPackages = $state(new Set());
+  let removing = $state(false);
+  let packageLocations = $state([]);
+  let auditLog = $state([]);
+  let toasts = $state([]);
+  let diffOverlay = $state(null);
+
+  function showToast(message, type, diff) {
+    const id = Date.now() + Math.random();
+    toasts = [...toasts, { id, message, type, diff }];
+    if (type !== 'error') {
+      setTimeout(() => {
+        toasts = toasts.filter(t => t.id !== id);
+      }, 4000);
+    }
+  }
+
+  function closeDiffOverlay() {
+    diffOverlay = null;
+  }
+
+  let isConfigured = $derived(selectedPackage ? configuredPackages.has(selectedPackage.pkgname) : false);
+
+  let filteredConfigFiles = $derived.by(() => {
+    const files = configFiles.filter(f => f.sections.includes(installType));
+    files.sort((a, b) => {
+      const aMatch = packageLocations.some(p => p.path === a.path) ? 1 : 0;
+      const bMatch = packageLocations.some(p => p.path === b.path) ? 1 : 0;
+      return bMatch - aMatch;
+    });
+    return files;
+  });
+
+  let isValidRemoveTarget = $derived(
+    packageLocations.some(p => p.path === installFile)
+  );
+
+  function formatTime(ts) {
+    const diff = Date.now() - ts;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
+  }
+
   // Nixpkgs extended search
   let nixpkgsResults = $state([]);
   let searchingNixpkgs = $state(false);
   let nixpkgsSearched = $state(false);
   let showNixpkgsTab = $state(false);
-  // UX-08: delay showing the "Search nixpkgs" button until the user pauses typing
-  let showNixpkgsButton = $state(false);
-  let _nixpkgsButtonTimer = null;
-
   // Category display names and icons
   const categoryMeta = {
     'AudioVideo': { name: 'Media', icon: 'Film' },
@@ -116,6 +170,13 @@
       allPackages = pkgs;
       featuredPackages = featured;
 
+      await loadConfiguredPackages();
+
+      const histResult = await window.electronAPI.historyGet();
+      if (histResult.success) {
+        auditLog = histResult.entries;
+      }
+
       // Preload icons for featured
       for (const pkg of featured) {
         if (pkg.icon?.name) {
@@ -126,6 +187,76 @@
       error = e.message;
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadConfiguredPackages() {
+    try {
+      const result = await window.electronAPI.discoverGetConfigured();
+      if (result.success) {
+        configuredPackages = new Set(result.packages);
+      }
+    } catch (e) {
+      console.error('Failed to load configured packages:', e);
+    }
+  }
+
+  async function goToInstall() {
+    currentView = 'install';
+    packageLocations = [];
+    loadConfigFiles();
+    if (isConfigured && selectedPackage) {
+      try {
+        const result = await window.electronAPI.discoverFindPackage(selectedPackage.pkgname);
+        if (result.success) {
+          packageLocations = result.files;
+          if (result.files.length > 0) {
+            const first = result.files[0];
+            installFile = first.path;
+            const secs = first.sections;
+            if (secs.includes('system')) installType = 'system';
+            else if (secs.includes('homeManager')) installType = 'homeManager';
+            else if (secs.some(s => s.type === 'user')) {
+              installType = 'user';
+              installUser = secs.find(s => s.type === 'user').userName;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to find package:', e);
+      }
+    }
+  }
+
+  function goToDetails() {
+    currentView = 'details';
+    installDiff = '';
+  }
+
+  async function removeFromConfig() {
+    if (!installFile || !installType) return;
+    removing = true;
+    try {
+      const result = await window.electronAPI.discoverRemovePackage({
+        pkgname: selectedPackage.pkgname,
+        filePath: installFile
+      });
+      if (result.success) {
+        await loadConfiguredPackages();
+        const entry = { pkgname: selectedPackage.pkgname, action: 'removed', file: installFile, type: installType, userName: installType === 'user' ? installUser : undefined };
+        auditLog = [{ timestamp: Date.now(), ...entry }, ...auditLog];
+        window.electronAPI.historyAdd(entry);
+        showToast(result.message, 'success', result.diff);
+        window.dispatchEvent(new CustomEvent('history-updated'));
+        window.dispatchEvent(new CustomEvent('pending-changes'));
+        window.dispatchEvent(new CustomEvent('packages-changed'));
+      } else {
+        showToast(result.error || 'Failed to remove package', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'Failed to remove package', 'error');
+    } finally {
+      removing = false;
     }
   }
 
@@ -152,21 +283,12 @@
     selectedCategory = null;
   }
 
-  // Reset nixpkgs search when query changes; debounce button visibility (UX-08)
+  // Reset nixpkgs search when query changes
   $effect(() => {
     const q = searchQuery; // Track changes
     nixpkgsResults = [];
     nixpkgsSearched = false;
     showNixpkgsTab = false;
-    showNixpkgsButton = false;
-    if (_nixpkgsButtonTimer) clearTimeout(_nixpkgsButtonTimer);
-    if (q.trim()) {
-      // Show the button only after 350ms of idle typing
-      _nixpkgsButtonTimer = setTimeout(() => {
-        showNixpkgsButton = true;
-        _nixpkgsButtonTimer = null;
-      }, 350);
-    }
   });
 
   async function searchNixpkgs() {
@@ -177,6 +299,7 @@
     try {
       nixpkgsResults = await window.electronAPI.discoverSearchNixpkgs(q);
       nixpkgsSearched = true;
+      showNixpkgsTab = true;
     } catch (e) {
       console.error('Nixpkgs search failed:', e);
       nixpkgsResults = [];
@@ -187,8 +310,13 @@
 
   async function openModal(pkg) {
     selectedPackage = pkg;
+    currentView = 'details';
     loadingDetails = true;
     packageDetails = null;
+    installDiff = '';
+    installFile = '';
+    installType = 'system';
+    nixpkgsValid = true;
 
     try {
       packageDetails = await window.electronAPI.discoverGetDetails(pkg.pkgname);
@@ -197,6 +325,8 @@
     } finally {
       loadingDetails = false;
     }
+
+    loadConfigFiles();
   }
 
   function closeModal() {
@@ -267,6 +397,78 @@
     pendingTryPackage = null;
   }
 
+  // Add to configuration
+  async function loadConfigFiles() {
+    if (configFilesLoaded) return;
+    try {
+      const result = await window.electronAPI.discoverGetConfigFiles();
+      if (result.success) {
+        configFiles = result.files;
+        const allUsers = [...new Set(result.files.flatMap(f => f.users))];
+        availableUsers = allUsers;
+        installUser = availableUsers[0] || '';
+        autoSelectFile();
+        configFilesLoaded = true;
+      }
+    } catch (e) {
+      console.error('Failed to load config files:', e);
+    }
+  }
+
+  function autoSelectFile() {
+    const f = filteredConfigFiles[0];
+    installFile = f ? f.path : '';
+  }
+
+  async function selectType(type) {
+    installType = type;
+    autoSelectFile();
+
+    if (type === 'homeManager') {
+      checkingNixpkgs = true;
+      nixpkgsValid = false;
+      try {
+        const result = await window.electronAPI.discoverCheckNixpkgsPackage(selectedPackage.pkgname);
+        nixpkgsValid = result.exists;
+      } catch {
+        nixpkgsValid = false;
+      } finally {
+        checkingNixpkgs = false;
+      }
+    } else {
+      nixpkgsValid = true;
+    }
+  }
+
+  async function addToConfig() {
+    if (!installFile || !installType) return;
+    adding = true;
+    try {
+      const result = await window.electronAPI.discoverAddPackage({
+        pkgname: selectedPackage.pkgname,
+        filePath: installFile,
+        packageType: installType,
+        userName: installType === 'user' ? installUser : undefined
+      });
+      if (result.success) {
+        await loadConfiguredPackages();
+        const entry = { pkgname: selectedPackage.pkgname, action: 'added', file: installFile, type: installType, userName: installType === 'user' ? installUser : undefined };
+        auditLog = [{ timestamp: Date.now(), ...entry }, ...auditLog];
+        window.electronAPI.historyAdd(entry);
+        showToast(result.message, 'success', result.diff);
+        window.dispatchEvent(new CustomEvent('history-updated'));
+        window.dispatchEvent(new CustomEvent('pending-changes'));
+        window.dispatchEvent(new CustomEvent('packages-changed'));
+      } else {
+        showToast(result.error || 'Failed to add package', 'error');
+      }
+    } catch (e) {
+      showToast(e.message || 'Failed to add package', 'error');
+    } finally {
+      adding = false;
+    }
+  }
+
   function handleKeydown(e) {
     if (e.key === 'Escape' && selectedPackage) {
       closeModal();
@@ -281,7 +483,7 @@
     <div class="header-top">
       <div>
         <h1>Discover Packages</h1>
-        <p class="subtitle">Browse {stats.totalApps} applications from nixpkgs</p>
+        <p class="subtitle">Browse {stats.totalApps.toLocaleString()} categorized apps — or search all of nixpkgs (140k+)</p>
       </div>
       <button class="refresh-btn" onclick={initDiscover} disabled={loading}>
         {#if loading}<Icon name="Loader" size={14} />{:else}<Icon name="RefreshCw" size={14} />{/if}
@@ -294,22 +496,20 @@
     <span class="search-icon"><Icon name="Search" size={16} /></span>
     <input
       type="text"
-      placeholder="Search applications..."
+      placeholder="Search apps or all of nixpkgs (140k+)..."
       bind:value={searchQuery}
     />
     {#if searchQuery}
       <button class="clear-btn" onclick={() => searchQuery = ''}>×</button>
     {/if}
-    {#if searchQuery && showNixpkgsButton && !showNixpkgsTab && !nixpkgsSearched}
-      <button class="nixpkgs-search-btn" onclick={searchNixpkgs} disabled={searchingNixpkgs}>
-        {#if searchingNixpkgs}
-          <span class="spinner-sm"></span>
-        {:else}
-          <Icon name="Search" size={12} />
-        {/if}
-        nixpkgs
-      </button>
-    {/if}
+    <button class="nixpkgs-search-btn" onclick={searchNixpkgs} disabled={!searchQuery.trim() || searchingNixpkgs || nixpkgsSearched}>
+      {#if searchingNixpkgs}
+        <span class="spinner-sm"></span>
+      {:else}
+        <Icon name="Search" size={12} />
+      {/if}
+      Search Nix Packages
+    </button>
   </div>
 
   <!-- Category Tabs -->
@@ -388,13 +588,16 @@
         {#if showNixpkgsTab}
           <!-- Nixpkgs tab selected - show only nixpkgs results -->
           {#each nixpkgsResults as pkg}
-            <button class="card nixpkgs-card" onclick={() => openModal(pkg)}>
+            <button class="card nixpkgs-card" class:configured={configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
               <div class="card-icon">
                 <span class="placeholder-icon"><Icon name="Package" size={24} /></span>
               </div>
               <div class="card-content">
                 <span class="card-name">
                   {pkg.name}
+                  {#if configuredPackages.has(pkg.pkgname)}
+                    <span class="installed-badge">Installed</span>
+                  {/if}
                   <span class="nixpkgs-badge">nixpkgs</span>
                 </span>
                 <span class="card-summary">{pkg.summary || ''}</span>
@@ -404,7 +607,7 @@
         {:else}
           <!-- Normal view - AppStream packages -->
           {#each (searchQuery || selectedCategory ? filteredPackages : featuredPackages) as pkg}
-            <button class="card" onclick={() => openModal(pkg)}>
+            <button class="card" class:configured={configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
               <div class="card-icon">
                 {#if getIconUrl(pkg)}
                   <img src={getIconUrl(pkg)} alt="" />
@@ -413,7 +616,12 @@
                 {/if}
               </div>
               <div class="card-content">
-                <span class="card-name">{pkg.name}</span>
+                <span class="card-name">
+                  {pkg.name}
+                  {#if configuredPackages.has(pkg.pkgname)}
+                    <span class="installed-badge">Installed</span>
+                  {/if}
+                </span>
                 <span class="card-summary">{pkg.summary || ''}</span>
               </div>
             </button>
@@ -466,65 +674,166 @@
           <span>Loading details...</span>
         </div>
       {:else if packageDetails}
-        <div class="modal-body">
-          {#if packageDetails.nix?.version}
-            <span class="version-badge">{packageDetails.nix.version}</span>
-          {/if}
+        <div class="modal-page-container">
+          {#if currentView === 'details'}
+            <div class="modal-page">
+              {#if isConfigured}
+                <span class="configured-badge">Configured</span>
+              {/if}
 
-          <p class="modal-description">
-            {packageDetails.nix?.description || selectedPackage.summary || 'No description available'}
-          </p>
+              {#if packageDetails.nix?.version}
+                <span class="version-badge">{packageDetails.nix.version}</span>
+              {/if}
 
-          <div class="modal-meta">
-            {#if packageDetails.nix?.license}
-              <div class="meta-item">
-                <span class="meta-label">License</span>
-                <span class="meta-value">{packageDetails.nix.license}</span>
+              <p class="modal-description">
+                {packageDetails.nix?.description || selectedPackage.summary || 'No description available'}
+              </p>
+
+              <div class="modal-meta">
+                {#if packageDetails.nix?.license}
+                  <div class="meta-item">
+                    <span class="meta-label">License</span>
+                    <span class="meta-value">{packageDetails.nix.license}</span>
+                  </div>
+                {/if}
+
+                {#if selectedPackage.categories?.length}
+                  <div class="meta-item">
+                    <span class="meta-label">Categories</span>
+                    <span class="meta-value">{selectedPackage.categories.join(', ')}</span>
+                  </div>
+                {/if}
+
+                {#if packageDetails.nix?.maintainers?.length}
+                  <div class="meta-item">
+                    <span class="meta-label">Maintainers</span>
+                    <div class="meta-badges">
+                      {#each packageDetails.nix.maintainers as m}
+                        <span class="badge">{m}</span>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
               </div>
-            {/if}
 
-            {#if selectedPackage.categories?.length}
-              <div class="meta-item">
-                <span class="meta-label">Categories</span>
-                <span class="meta-value">{selectedPackage.categories.join(', ')}</span>
+              <button class="config-nav-btn" class:configured={isConfigured} onclick={goToInstall}>
+                <span class="config-btn-icon">
+                  {#if isConfigured}
+                    <Icon name="Settings" size={14} />
+                  {:else}
+                    <Icon name="Plus" size={14} />
+                  {/if}
+                </span>
+                {isConfigured ? 'Manage Configuration' : 'Add to Configuration'}
+              </button>
+
+              <div class="modal-actions">
+                <button class="action-btn try" onclick={() => tryPackage(selectedPackage.pkgname)} disabled={trying}>
+                  {#if trying}...{:else}<Icon name="Play" size={14} />{/if} Try
+                </button>
+                {#if packageDetails.appstream?.homepage || packageDetails.nix?.homepage}
+                  <button class="action-btn primary" onclick={() => openUrl(packageDetails.appstream?.homepage || packageDetails.nix?.homepage)}>
+                    <Icon name="Globe" size={14} /> Homepage
+                  </button>
+                {/if}
+                <button class="action-btn" onclick={() => openUrl(`https://search.nixos.org/packages?channel=unstable&show=${selectedPackage.pkgname}&query=${selectedPackage.pkgname}`)}>
+                  <Icon name="Search" size={14} /> NixOS Search
+                </button>
+                {#if packageDetails.appstream?.bugtracker}
+                  <button class="action-btn" onclick={() => openUrl(packageDetails.appstream.bugtracker)}>
+                    <Icon name="Bug" size={14} /> Bug Tracker
+                  </button>
+                {/if}
               </div>
-            {/if}
+            </div>
+          {:else}
+            <div class="modal-page">
+              <button class="back-btn" onclick={goToDetails}>← Back</button>
 
-            {#if packageDetails.nix?.maintainers?.length}
-              <div class="meta-item">
-                <span class="meta-label">Maintainers</span>
-                <div class="meta-badges">
-                  {#each packageDetails.nix.maintainers as m}
-                    <span class="badge">{m}</span>
+              <div class="install-section">
+                <div class="file-list">
+                  <div class="section-label">Config File</div>
+                  {#each filteredConfigFiles as file}
+                    <button class="file-item" class:selected={installFile === file.path}
+                      onclick={() => { installFile = file.path; }}>
+                      <div class="file-info">
+                        <span class="file-path">{file.relativePath}</span>
+                        <div class="file-section-badges">
+                          {#each file.sections as t}
+                            <span class="file-section-badge">{t}</span>
+                          {/each}
+                        </div>
+                      </div>
+                      {#if packageLocations.some(p => p.relativePath === file.relativePath)}
+                        <span class="file-configured-badge">Contains</span>
+                      {/if}
+                    </button>
                   {/each}
+                  {#if filteredConfigFiles.length === 0}
+                    <p class="file-list-empty">No files with this section type</p>
+                  {/if}
                 </div>
+
+                <div class="type-selector">
+                  <button class="type-btn" class:active={installType === 'system'} onclick={() => selectType('system')}>
+                    System
+                  </button>
+                  <button class="type-btn" class:active={installType === 'user'} onclick={() => selectType('user')}
+                    disabled={availableUsers.length === 0}>
+                    User
+                  </button>
+                  <button class="type-btn" class:active={installType === 'homeManager'} onclick={() => selectType('homeManager')}>
+                    Home Manager
+                    {#if checkingNixpkgs}
+                      <span class="type-spinner"></span>
+                    {:else if !nixpkgsValid}
+                      <span class="type-warn" title="No match in nixpkgs">!</span>
+                    {:else}
+                      <span class="type-ok" title="Available in nixpkgs">✓</span>
+                    {/if}
+                  </button>
+                </div>
+
+                {#if installType === 'user' && availableUsers.length > 0}
+                  <div class="install-field">
+                    <select bind:value={installUser} class="install-select">
+                      {#each availableUsers as user}
+                        <option value={user}>{user}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {/if}
+
+                {#if installType === 'homeManager' && !nixpkgsValid && !checkingNixpkgs}
+                  <p class="install-warning">Not available in nixpkgs — may not work with home-manager</p>
+                {/if}
+
+                <code class="install-code">
+                  {installType === 'system' ? 'environment.systemPackages' : ''}
+                  {installType === 'homeManager' ? 'home.packages' : ''}
+                  {installType === 'user' ? `users.users.${installUser || '<user>'}.packages` : ''}
+                  = [ pkgs.{selectedPackage.pkgname} ];
+                </code>
+
+                <button class="install-action-btn" class:add={!isConfigured} class:remove={isConfigured}
+                  onclick={isConfigured ? removeFromConfig : addToConfig}
+                  disabled={adding || removing || !installFile || !installType || (installType === 'homeManager' && !nixpkgsValid) || (isConfigured && !isValidRemoveTarget)}>
+                  {#if adding}
+                    <span class="spinner-sm"></span> Adding...
+                  {:else if removing}
+                    <span class="spinner-sm"></span> Removing...
+                  {:else if isConfigured}
+                    Remove from Configuration
+                  {:else}
+                    Add to Configuration
+                  {/if}
+                </button>
+
+
               </div>
-            {/if}
-          </div>
 
-          <div class="install-box">
-            <span class="install-label">Add to configuration:</span>
-            <code class="install-code">environment.systemPackages = [ pkgs.{selectedPackage.pkgname} ];</code>
-          </div>
-
-          <div class="modal-actions">
-            <button class="action-btn try" onclick={() => tryPackage(selectedPackage.pkgname)} disabled={trying}>
-              {#if trying}...{:else}<Icon name="Play" size={14} />{/if} Try
-            </button>
-            {#if packageDetails.appstream?.homepage || packageDetails.nix?.homepage}
-              <button class="action-btn primary" onclick={() => openUrl(packageDetails.appstream?.homepage || packageDetails.nix?.homepage)}>
-                <Icon name="Globe" size={14} /> Homepage
-              </button>
-            {/if}
-            <button class="action-btn" onclick={() => openUrl(`https://search.nixos.org/packages?channel=unstable&show=${selectedPackage.pkgname}&query=${selectedPackage.pkgname}`)}>
-              <Icon name="Search" size={14} /> NixOS Search
-            </button>
-            {#if packageDetails.appstream?.bugtracker}
-              <button class="action-btn" onclick={() => openUrl(packageDetails.appstream.bugtracker)}>
-                <Icon name="Bug" size={14} /> Bug Tracker
-              </button>
-            {/if}
-          </div>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -546,6 +855,31 @@
         <button class="confirm-btn cancel" onclick={cancelKill}>Cancel</button>
         <button class="confirm-btn kill" onclick={confirmKillAndTry}>Kill & Try</button>
       </div>
+    </div>
+  </div>
+{/if}
+
+<div class="toast-container">
+  {#each toasts as t (t.id)}
+    <div class="toast" class:toast-success={t.type === 'success'} class:toast-error={t.type === 'error'}>
+      <span class="toast-msg">{t.message}</span>
+      <div class="toast-actions">
+        {#if t.diff}
+          <button class="toast-action" onclick={() => diffOverlay = t.diff}>Changes</button>
+        {/if}
+        {#if t.type === 'error'}
+          <button class="toast-action" onclick={() => toasts = toasts.filter(x => x.id !== t.id)}>Dismiss</button>
+        {/if}
+      </div>
+    </div>
+  {/each}
+</div>
+
+{#if diffOverlay}
+  <div class="diff-overlay" onclick={closeDiffOverlay}>
+    <div class="diff-overlay-content" onclick={(e) => e.stopPropagation()}>
+      <button class="diff-overlay-close" onclick={closeDiffOverlay}>✕</button>
+      <pre>{diffOverlay}</pre>
     </div>
   </div>
 {/if}
@@ -679,8 +1013,8 @@
   }
 
   .nixpkgs-search-btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   /* Tabs */
@@ -825,6 +1159,14 @@
     transform: translateY(-2px);
   }
 
+  .card.configured {
+    border-color: rgba(166, 227, 161, 0.25);
+  }
+
+  .card.configured:hover {
+    border-color: rgba(166, 227, 161, 0.4);
+  }
+
   .card-icon {
     width: 48px;
     height: 48px;
@@ -894,6 +1236,7 @@
   }
 
   .modal {
+    position: relative;
     background: #1e1e2e;
     border: 1px solid rgba(69, 71, 90, 0.6);
     border-radius: 16px;
@@ -1002,11 +1345,6 @@
     animation: spin 1s linear infinite;
   }
 
-  .modal-body {
-    padding: 20px;
-    overflow-y: auto;
-  }
-
   .version-badge {
     display: inline-block;
     background: rgba(166, 227, 161, 0.2);
@@ -1064,22 +1402,6 @@
     font-size: 12px;
   }
 
-  .install-box {
-    background: rgba(49, 50, 68, 0.4);
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 16px;
-  }
-
-  .install-label {
-    display: block;
-    font-size: 11px;
-    color: #6c7086;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-  }
-
   .install-code {
     display: block;
     font-family: 'JetBrains Mono', monospace;
@@ -1089,6 +1411,416 @@
     padding: 10px 12px;
     border-radius: 6px;
     overflow-x: auto;
+    margin-bottom: 10px;
+  }
+
+  .install-field {
+    margin-bottom: 10px;
+  }
+
+  .install-select {
+    width: 100%;
+    background: rgba(30, 30, 46, 0.8);
+    border: 1px solid rgba(69, 71, 90, 0.5);
+    border-radius: 6px;
+    color: #cdd6f4;
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .install-select:focus {
+    border-color: rgba(137, 180, 250, 0.5);
+  }
+
+  .type-selector {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .type-btn {
+    flex: 1;
+    padding: 7px 10px;
+    background: rgba(49, 50, 68, 0.4);
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 6px;
+    color: #a6adc8;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .type-btn:hover:not(:disabled) {
+    background: rgba(49, 50, 68, 0.6);
+    color: #cdd6f4;
+  }
+
+  .type-btn.active {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
+    border-color: rgba(137, 180, 250, 0.4);
+    color: #89b4fa;
+  }
+
+  .type-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .type-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(137, 180, 250, 0.2);
+    border-top-color: #89b4fa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+  }
+
+  .type-warn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(249, 226, 175, 0.2);
+    color: #f9e2af;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .type-ok {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(166, 227, 161, 0.2);
+    color: #a6e3a1;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .install-warning {
+    font-size: 11px;
+    color: #f9e2af;
+    margin: 0 0 10px 0;
+    padding: 6px 10px;
+    background: rgba(249, 226, 175, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(249, 226, 175, 0.2);
+  }
+
+  .install-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .install-action-btn.add {
+    background: rgba(166, 227, 161, 0.2);
+    border: 1px solid rgba(166, 227, 161, 0.4);
+    color: #a6e3a1;
+  }
+
+  .install-action-btn.add:hover:not(:disabled) {
+    background: rgba(166, 227, 161, 0.3);
+  }
+
+  .install-action-btn.remove {
+    background: rgba(243, 139, 168, 0.2);
+    border: 1px solid rgba(243, 139, 168, 0.4);
+    color: #f38ba8;
+  }
+
+  .install-action-btn.remove:hover:not(:disabled) {
+    background: rgba(243, 139, 168, 0.3);
+  }
+
+  .install-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .install-result {
+    font-size: 12px;
+    margin: 8px 0 0 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+
+  .install-result.success {
+    color: #a6e3a1;
+    background: rgba(166, 227, 161, 0.1);
+    border: 1px solid rgba(166, 227, 161, 0.2);
+  }
+
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(30, 30, 46, 0.97);
+    border: 1px solid rgba(69, 71, 90, 0.5);
+    border-radius: 10px;
+    font-size: 13px;
+    color: #cdd6f4;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    pointer-events: auto;
+    animation: toastSlideIn 0.25s ease-out;
+    max-width: 440px;
+    backdrop-filter: blur(8px);
+  }
+
+  .toast-success {
+    border-color: rgba(166, 227, 161, 0.3);
+  }
+
+  .toast-error {
+    border-color: rgba(243, 139, 168, 0.3);
+  }
+
+  @keyframes toastSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .toast-msg {
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .toast-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .toast-action {
+    padding: 3px 8px;
+    background: rgba(49, 50, 68, 0.6);
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 5px;
+    color: #a6adc8;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  .toast-action:hover {
+    background: rgba(49, 50, 68, 0.8);
+    color: #cdd6f4;
+  }
+
+  .diff-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4000;
+    animation: fadeIn 0.15s ease-out;
+  }
+
+  .diff-overlay-content {
+    position: relative;
+    background: #1e1e2e;
+    border: 1px solid rgba(69, 71, 90, 0.6);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 70vh;
+    overflow: auto;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .diff-overlay-content::-webkit-scrollbar {
+    width: 8px;
+  }
+  .diff-overlay-content::-webkit-scrollbar-track {
+    background: rgba(49, 50, 68, 0.3);
+    border-radius: 4px;
+  }
+  .diff-overlay-content::-webkit-scrollbar-thumb {
+    background: rgba(69, 71, 90, 0.8);
+    border-radius: 4px;
+  }
+
+  .diff-overlay-close {
+    position: sticky;
+    top: 0;
+    float: right;
+    background: rgba(49, 50, 68, 0.8);
+    border: none;
+    color: #a6adc8;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    margin: -8px -8px 8px 8px;
+  }
+
+  .diff-overlay-close:hover {
+    background: rgba(69, 71, 90, 0.8);
+    color: #cdd6f4;
+  }
+
+  .diff-overlay-content pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #a6adc8;
+    white-space: pre;
+    overflow-x: auto;
+    clear: right;
+  }
+
+  .file-list {
+    margin-bottom: 10px;
+    max-height: 140px;
+    overflow-y: auto;
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 6px;
+    background: rgba(30, 30, 46, 0.4);
+  }
+
+  .file-list .section-label {
+    padding: 6px 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c7086;
+    border-bottom: 1px solid rgba(69, 71, 90, 0.2);
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 7px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(69, 71, 90, 0.15);
+    color: #cdd6f4;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: background 0.1s;
+  }
+
+  .file-item:last-child {
+    border-bottom: none;
+  }
+
+  .file-item:hover {
+    background: rgba(49, 50, 68, 0.5);
+  }
+
+  .file-item.selected {
+    background: rgba(137, 180, 250, 0.12);
+    border-left: 2px solid #89b4fa;
+  }
+
+  .file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .file-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #cdd6f4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-section-badges {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+
+  .file-section-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 9px;
+    background: rgba(69, 71, 90, 0.3);
+    border-radius: 3px;
+    color: #a6adc8;
+    text-transform: uppercase;
+  }
+
+  .file-configured-badge {
+    flex-shrink: 0;
+    padding: 2px 6px;
+    font-size: 9px;
+    background: rgba(166, 227, 161, 0.15);
+    border: 1px solid rgba(166, 227, 161, 0.3);
+    border-radius: 4px;
+    color: #a6e3a1;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .file-list-empty {
+    padding: 12px;
+    text-align: center;
+    color: #6c7086;
+    font-size: 12px;
+  }
+
+
+
+  .install-result:not(.success) {
+    color: #f38ba8;
+    background: rgba(243, 139, 168, 0.1);
+    border: 1px solid rgba(243, 139, 168, 0.2);
   }
 
   .modal-actions {
@@ -1139,6 +1871,114 @@
   .action-btn.try:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .modal-page-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .modal-page-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  .modal-page-container::-webkit-scrollbar-track {
+    background: rgba(49, 50, 68, 0.3);
+    border-radius: 4px;
+  }
+  .modal-page-container::-webkit-scrollbar-thumb {
+    background: rgba(69, 71, 90, 0.8);
+    border-radius: 4px;
+  }
+  .modal-page-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(88, 91, 112, 0.8);
+  }
+
+  .file-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  .file-list::-webkit-scrollbar-track {
+    background: rgba(49, 50, 68, 0.2);
+    border-radius: 3px;
+  }
+  .file-list::-webkit-scrollbar-thumb {
+    background: rgba(69, 71, 90, 0.7);
+    border-radius: 3px;
+  }
+
+  .modal-page {
+    padding: 20px;
+  }
+
+  .configured-badge {
+    display: inline-block;
+    background: rgba(166, 227, 161, 0.2);
+    color: #a6e3a1;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+
+  .config-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(137, 180, 250, 0.15);
+    border: 1px solid rgba(137, 180, 250, 0.3);
+    border-radius: 10px;
+    color: #89b4fa;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 16px;
+  }
+
+  .config-nav-btn:hover {
+    background: rgba(137, 180, 250, 0.25);
+    border-color: rgba(137, 180, 250, 0.5);
+  }
+
+  .config-nav-btn.configured {
+    background: rgba(166, 227, 161, 0.15);
+    border-color: rgba(166, 227, 161, 0.3);
+    color: #a6e3a1;
+  }
+
+  .config-nav-btn.configured:hover {
+    background: rgba(166, 227, 161, 0.25);
+    border-color: rgba(166, 227, 161, 0.5);
+  }
+
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    margin-bottom: 14px;
+    background: rgba(49, 50, 68, 0.4);
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 6px;
+    color: #a6adc8;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .back-btn:hover {
+    background: rgba(49, 50, 68, 0.6);
+    color: #cdd6f4;
+  }
+
+  .install-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
 
   /* States */
@@ -1207,6 +2047,19 @@
     display: inline-block;
     background: rgba(180, 190, 254, 0.2);
     color: #b4befe;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .installed-badge {
+    display: inline-block;
+    background: rgba(166, 227, 161, 0.2);
+    color: #a6e3a1;
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 9px;

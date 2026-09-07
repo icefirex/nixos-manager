@@ -5,7 +5,7 @@
     Zap, Rocket, FlaskConical, CheckCircle,
     Film, Music, Video, Code, GraduationCap, Gamepad2, Palette,
     Globe, FileText, Microscope, Monitor, Wrench,
-    Search, Loader, RefreshCw, AlertTriangle, Bug, Play,
+    Search, Loader, RefreshCw, AlertTriangle, Bug, Play, Plus,
     ChevronDown, ChevronRight,
     GitBranch, FolderGit, ArrowUp, ArrowDown, User, Download, Check, Circle,
     Snowflake
@@ -17,7 +17,7 @@
     Zap, Rocket, FlaskConical, CheckCircle,
     Film, Music, Video, Code, GraduationCap, Gamepad2, Palette,
     Globe, FileText, Microscope, Monitor, Wrench,
-    Search, Loader, RefreshCw, AlertTriangle, Bug, Play,
+    Search, Loader, RefreshCw, AlertTriangle, Bug, Play, Plus,
     ChevronDown, ChevronRight,
     GitBranch, FolderGit, ArrowUp, ArrowDown, User, Download, Check, Circle,
     Snowflake
