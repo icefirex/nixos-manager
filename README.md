@@ -47,6 +47,9 @@
 ### Installed Packages
 - View packages from system config, user profile, and home-manager
 - Toggle between config-defined and live system views
+- Cross-file duplicate detection with consolidation suggestions
+- Not-in-config panel for transitive dependencies
+- Auto-selection when search narrows to one result
 - Expand any package for metadata (version, license, binaries, source location)
 - Links to NixOS Search and nixpkgs source
 
@@ -60,6 +63,7 @@
 ### Generation Management
 - List all system generations with diffs between them
 - See added, removed, and changed packages per generation
+- Visual treatment for version changes (strikethrough old, green new, size badge)
 - Search across all generations for specific package changes
 - Switch to, boot into, or delete any generation
 - View NixOS version, kernel, and closure size per generation
@@ -78,6 +82,11 @@
 - View all flake inputs with age indicators
 - Update individual inputs or all at once
 - Switch between specializations (multi-profile support)
+
+### Config Drift Detection
+- See which config files have been modified since last rebuild
+- View pending packages that were added or removed through the app
+- Timestamp comparison between rebuild and config modification
 
 ## Requirements
 
@@ -140,7 +149,7 @@ Then enable the NixOS module in your configuration:
 
   programs.nixos-manager = {
     enable = true;
-    package = inputs.nixos-manager.packages.${pkgs.system}.default;
+    package = inputs.nixos-manager.packages.${pkgs.stdenv.hostPlatform.system}.default;
   };
 
   environment.variables = {
@@ -175,6 +184,64 @@ npm run dev
 
 This starts both the Vite dev server and Electron with hot reload.
 
+## Testing
+
+Tests use [Vitest](https://vitest.dev) and are co-located with source files:
+
+```
+src/main/
+├── constants.test.js          # 3 tests — all exports and thresholds
+├── parse.test.js              # 36 tests — nix code parser
+├── nix-packages.test.js       # 65 tests — shared module (string stripping,
+│                              #   list extraction, scanning, duplicates)
+├── utils.test.js              # 10 tests — flake dir detection, runCmd,
+│                              #   build status, spawn env, error messages
+└── handlers/
+    ├── discover.test.js       # Export smoke tests for all 11 IPC handler
+    ├── flake.test.js          #   modules. The handlers themselves are
+    ├── generations.test.js    #   Electron IPC wiring exercised only when
+    ├── git.test.js            #   running inside the full Electron app.
+    ├── notifications.test.js
+    ├── options.test.js
+    ├── packages.test.js
+    ├── rebuild.test.js
+    ├── specializations.test.js
+    ├── system.test.js
+    └── history.test.js
+└── mocks/
+    └── electron.js            # Vitest mock (avoids electron binary dependency in tests)
+```
+
+### Running
+
+```bash
+# Enter the dev shell (provides Node.js + Electron)
+nix-shell
+
+# Run all tests
+node ./node_modules/.bin/vitest run
+
+# Run with coverage
+node ./node_modules/.bin/vitest run --coverage
+
+# Watch mode
+node ./node_modules/.bin/vitest
+
+# Single test file
+node ./node_modules/.bin/vitest run src/main/parse.test.js
+```
+
+### Coverage (testable layer)
+
+| Module           | Stmts  | Branch | Funcs  | Lines  |
+|------------------|--------|--------|--------|--------|
+| `constants`      |  100%  |  100%  |  100%  |  100%  |
+| `parse`          |  100%  | 95.5%  |  100%  |  100%  |
+| `utils`          |  100%  | 60%    |  100%  |  100%  |
+| `nix-packages`   |  90.5% | 78.8%  |  84%   |  93.3% |
+
+The core parsing and utility modules are well-covered. Handler coverage is low (~5%) because they are Electron IPC stubs that depend on `ipcMain` at load time — they are exercised only within the running Electron app. An `electron` mock allows the handler stubs to run without a real electron binary.
+
 ## Configuration
 
 ### Environment Variables
@@ -202,6 +269,7 @@ The bundled fallback script (`nixos-manager-rebuild`) is always present as a las
 - **Electron** — Desktop runtime
 - **Svelte 5** — Reactive UI framework (runes mode)
 - **Vite** — Build tool
+- **Vitest** — Test runner with v8 coverage
 - **Lucide** — SVG icon library
 - **xterm.js** — Terminal emulator for build output
 - **highlight.js** — Nix syntax highlighting
@@ -213,9 +281,11 @@ The bundled fallback script (`nixos-manager-rebuild`) is always present as a las
 src/
 ├── App.svelte                 # Root component, routing
 ├── lib/                       # UI components
-│   ├── Dashboard.svelte       # Rebuild actions + progress
-│   ├── Discover.svelte        # AppStream package browser
+│   ├── Dashboard.svelte       # Rebuild actions + progress + drift banner
+│   ├── Discover.svelte        # Package search (AppStream + nixpkgs)
 │   ├── Packages.svelte        # Installed package viewer
+│   ├── Changes.svelte         # Pending config changes
+│   ├── History.svelte         # Package change log
 │   ├── Options.svelte         # NixOS options viewer
 │   ├── Generations.svelte     # Generation management
 │   ├── GitModal.svelte        # Git operations
@@ -223,19 +293,40 @@ src/
 │   ├── HeaderStrip.svelte     # System status bar
 │   └── ...                    # Supporting components
 ├── main/
-│   ├── window.js              # Electron window setup
+│   ├── constants.js           # Centralised constants
+│   ├── constants.test.js      #
+│   ├── parse.js               # Nix code parsers
+│   ├── parse.test.js          #
+│   ├── nix-packages.js        # Shared Nix package scanner
+│   ├── nix-packages.test.js   #
 │   ├── utils.js               # Shared utilities
+│   ├── utils.test.js          #
+│   ├── window.js              # Electron window setup
 │   └── handlers/              # IPC handler modules
-│       ├── system.js           # System info
-│       ├── rebuild.js          # NixOS rebuild
-│       ├── generations.js      # Generation management
-│       ├── packages.js         # Package parsing
-│       ├── options.js          # Option parsing
-│       ├── discover.js         # AppStream integration
-│       ├── git.js              # Git operations
-│       ├── flake.js            # Flake input management
-│       ├── specializations.js  # Profile switching
-│       └── notifications.js    # System alerts
+│       ├── system.js           #
+│       ├── system.test.js      #
+│       ├── rebuild.js          #
+│       ├── rebuild.test.js     #
+│       ├── generations.js      #
+│       ├── generations.test.js #
+│       ├── packages.js         #
+│       ├── packages.test.js    #
+│       ├── options.js          #
+│       ├── options.test.js     #
+│       ├── discover.js         #
+│       ├── discover.test.js    #
+│       ├── git.js              #
+│       ├── git.test.js         #
+│       ├── flake.js            #
+│       ├── flake.test.js       #
+│       ├── specializations.js  #
+│       ├── specializations.test.js #
+│       ├── notifications.js    #
+│       ├── notifications.test.js #
+│       ├── history.js          # Change log handler
+│       └── history.test.js     #
+│   └── mocks/
+│       └── electron.js        # Vitest mock for handler tests
 scripts/
 │   ├── nixos-manager-rebuild  # Bundled generic rebuild fallback
 │   └── nixos-manager-eval     # Bundled generic eval fallback
