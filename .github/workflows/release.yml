@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Cache Nix store
+        uses: cachix/cachix-action@v13
+        with:
+          name: nixos-manager-icefire
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build NixOS Manager
+        run: |
+          nix build .#nixos-manager --print-build-logs
+
+      - name: Package release
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          mkdir -p dist
+          cp -r result/lib/nixos-manager/* dist/
+          cp result/share dist/ -r
+          tar -czf "nixos-manager-${VERSION}-linux-x86_64.tar.gz" dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: nixos-manager-*.tar.gz
+          generate_release_notes: true
