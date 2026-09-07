@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPackages: () => ipcRenderer.invoke('get-packages'),
   getLivePackages: () => ipcRenderer.invoke('get-live-packages'),
   getPackageInfo: (name) => ipcRenderer.invoke('get-package-info', name),
+  packagesGetDuplicates: () => ipcRenderer.invoke('packages-get-duplicates'),
+  getPendingChanges: () => ipcRenderer.invoke('get-pending-changes'),
 
   // Options
   getOptions: () => ipcRenderer.invoke('get-options'),
@@ -57,6 +59,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discoverTryPackage: (pkgname) => ipcRenderer.invoke('discover-try-package', pkgname),
   discoverIsTrying: () => ipcRenderer.invoke('discover-is-trying'),
   discoverKillTry: () => ipcRenderer.invoke('discover-kill-try'),
+  discoverFindPackage: (pkgname) => ipcRenderer.invoke('discover-find-package', pkgname),
+  discoverGetConfigFiles: () => ipcRenderer.invoke('discover-get-config-files'),
+  discoverCheckNixpkgsPackage: (pkgname) => ipcRenderer.invoke('discover-check-nixpkgs-package', pkgname),
+  discoverAddPackage: (options) => ipcRenderer.invoke('discover-add-package', options),
+  discoverGetConfigured: () => ipcRenderer.invoke('discover-get-configured'),
+  discoverRemovePackage: (options) => ipcRenderer.invoke('discover-remove-package', options),
+
+  // History (persistent audit log)
+  historyGet: () => ipcRenderer.invoke('history-get'),
+  historyAdd: (entry) => ipcRenderer.invoke('history-add', entry),
 
   // Build output listener — returns a cleanup function to remove the listener
   onBuildOutput: (callback) => {

@@ -3,20 +3,31 @@
 
   let { currentPage = $bindable("dashboard") } = $props();
 
+  let hasDrift = $state(false);
+
+  $effect(() => {
+    function onPendingChanges(e) {
+      hasDrift = e.detail.hasDrift;
+    }
+    window.addEventListener('pending-changes', onPendingChanges);
+    return () => window.removeEventListener('pending-changes', onPendingChanges);
+  });
+
   const navItems = [
     { id: "dashboard", icon: "Home", tooltip: "Dashboard" },
     { id: "discover", icon: "Compass", tooltip: "Discover" },
     { id: "packages", icon: "Package", tooltip: "Packages" },
     { id: "options", icon: "SlidersHorizontal", tooltip: "Options" },
     { id: "generations", icon: "History", tooltip: "Generations" },
-    { id: "rebuild", icon: "Hammer", tooltip: "Rebuild" },
+    { id: "rebuild", icon: "Hammer", tooltip: "Rebuild", comingSoon: true },
     { id: "updates", icon: "ArrowDownToLine", tooltip: "Updates", comingSoon: true },
     { id: "profiles", icon: "Users", tooltip: "Profiles", comingSoon: true },
   ];
 
   const secondaryItems = [
+    { id: "changes", icon: "FileText", tooltip: "Changes" },
     { id: "cleanup", icon: "Trash2", tooltip: "Cleanup", comingSoon: true },
-    { id: "history", icon: "ScrollText", tooltip: "History", comingSoon: true },
+    { id: "history", icon: "ScrollText", tooltip: "History" },
   ];
 
   function navigate(pageId) {
@@ -30,7 +41,7 @@
       class="nav-btn"
       class:active={currentPage === item.id}
       class:coming-soon={item.comingSoon}
-      onclick={() => navigate(item.id)}
+      onclick={item.comingSoon ? undefined : () => navigate(item.id)}
     >
       <Icon name={item.icon} size={20} />
       <span class="tooltip">{item.tooltip}{item.comingSoon ? ' (coming soon)' : ''}</span>
@@ -44,9 +55,12 @@
       class="nav-btn"
       class:active={currentPage === item.id}
       class:coming-soon={item.comingSoon}
-      onclick={() => navigate(item.id)}
+      onclick={item.comingSoon ? undefined : () => navigate(item.id)}
     >
       <Icon name={item.icon} size={20} />
+      {#if item.id === 'changes' && hasDrift}
+        <span class="drift-dot"></span>
+      {/if}
       <span class="tooltip">{item.tooltip}{item.comingSoon ? ' (coming soon)' : ''}</span>
     </button>
   {/each}
@@ -54,7 +68,7 @@
   <div class="sidebar-footer">
     <button
       class="nav-btn coming-soon"
-      onclick={() => navigate("settings")}
+      onclick={undefined}
     >
       <Icon name="Settings" size={20} />
       <span class="tooltip">Settings (coming soon)</span>
@@ -91,6 +105,17 @@
     background: transparent;
     border: none;
     color: inherit;
+  }
+
+  .drift-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f9e2af;
+    box-shadow: 0 0 6px rgba(249, 226, 175, 0.5);
   }
 
   .nav-btn:hover {

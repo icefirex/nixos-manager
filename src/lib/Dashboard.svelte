@@ -2,14 +2,43 @@
   import ActionCard from "./ActionCard.svelte";
   import ProgressCard from "./ProgressCard.svelte";
   import SidePanel from "./SidePanel.svelte";
+  import Icon from "./Icon.svelte";
 
   let { systemInfo = {} } = $props();
 
   let updateInputs = $state(false);
-
   let isBuilding = $state(false);
   let currentAction = $state(null);
   let buildError = $state(null);
+  let pendingChanges = $state(null);
+
+  function getDriftSummary() {
+    if (!pendingChanges) return '';
+    if (pendingChanges.lastRebuild && pendingChanges.lastConfigChange) {
+      const rebuild = new Date(pendingChanges.lastRebuild).toLocaleString();
+      const config = new Date(pendingChanges.lastConfigChange).toLocaleString();
+      return `Last rebuild: ${rebuild} · Config modified: ${config}`;
+    }
+    return 'Config may have unapplied changes';
+  }
+
+  $effect(() => {
+    window.electronAPI.getPendingChanges().then(data => {
+      pendingChanges = data;
+      window.dispatchEvent(new CustomEvent('pending-changes', { detail: data }));
+    }).catch(() => {});
+  });
+
+  $effect(() => {
+    const handler = (e) => {
+      if (e.detail) return; // ignore our own dispatch
+      window.electronAPI.getPendingChanges().then(data => {
+        pendingChanges = data;
+      }).catch(() => {});
+    };
+    window.addEventListener('pending-changes', handler);
+    return () => window.removeEventListener('pending-changes', handler);
+  });
 
   // Progress tracking
   let buildProgress = $state({
@@ -146,6 +175,16 @@
 </script>
 
 <div class="dashboard">
+  {#if pendingChanges?.hasDrift}
+    <div class="drift-banner" onclick={() => window.dispatchEvent(new CustomEvent('navigate-to-changes'))}>
+      <Icon name="AlertTriangle" size={16} />
+      <div class="drift-banner-content">
+        <strong>Unapplied config changes detected</strong>
+        <span>{getDriftSummary()}</span>
+      </div>
+      <span class="drift-banner-action">Review →</span>
+    </div>
+  {/if}
   <div class="actions-section">
     <div class="section-title">Quick Actions</div>
     <div class="action-grid">
@@ -208,6 +247,56 @@
 </div>
 
 <style>
+  .drift-banner {
+    align-self: start;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    background: rgba(249, 226, 175, 0.08);
+    border: 1px solid rgba(249, 226, 175, 0.25);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #f9e2af;
+  }
+
+  .drift-banner:hover {
+    background: rgba(249, 226, 175, 0.14);
+  }
+
+  .drift-banner-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .drift-banner-content strong {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .drift-banner-content span {
+    font-size: 12px;
+    opacity: 0.85;
+  }
+
+  .drift-banner-action {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 4px 10px;
+    background: rgba(249, 226, 175, 0.15);
+    border: 1px solid rgba(249, 226, 175, 0.3);
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+
+  .drift-banner:hover .drift-banner-action {
+    background: rgba(249, 226, 175, 0.25);
+  }
+
   .dashboard {
     flex: 1;
     padding: 24px;

@@ -4,6 +4,7 @@ const path = require('path');
 const os = require('os');
 const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
+const { getAllPackages, findDuplicates } = require('../nix-packages');
 
 /**
  * Register package management IPC handlers
@@ -15,114 +16,7 @@ function register() {
     if (!flakeDir) {
       throw new Error(flakeDirNotFoundMsg());
     }
-
-    const packages = {
-      system: [],
-      user: [],
-      homeManager: []
-    };
-
-    // Helper to extract package names from nix expressions
-    function extractPackages(content) {
-      const pkgs = [];
-      const pkgMatches = content.matchAll(/(?:pkgs|pkgs-stable|pkgs-[a-z]+)\.([a-zA-Z0-9_-]+)/g);
-      for (const match of pkgMatches) {
-        if (!pkgs.includes(match[1])) {
-          pkgs.push(match[1]);
-        }
-      }
-      return pkgs;
-    }
-
-    // Recursively find all .nix files
-    function findNixFiles(dir, files = []) {
-      try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-            findNixFiles(fullPath, files);
-          } else if (entry.isFile() && entry.name.endsWith('.nix')) {
-            files.push(fullPath);
-          }
-        }
-      } catch (e) {}
-      return files;
-    }
-
-    const nixFiles = findNixFiles(flakeDir);
-
-    for (const nixFile of nixFiles) {
-      try {
-        const content = fs.readFileSync(nixFile, 'utf8');
-
-        // Extract environment.systemPackages
-        const systemMatch = content.match(/environment\.systemPackages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
-        if (systemMatch) {
-          const pkgBlock = systemMatch[1];
-          const extracted = extractPackages(pkgBlock);
-
-          const bareNames = pkgBlock.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
-          if (bareNames) {
-            for (const name of bareNames) {
-              const trimmed = name.trim();
-              if (trimmed && !extracted.includes(trimmed) && !trimmed.includes('.')) {
-                extracted.push(trimmed);
-              }
-            }
-          }
-
-          packages.system.push(...extracted.filter(p => !packages.system.includes(p)));
-        }
-
-        // Extract home.packages
-        const homeMatch = content.match(/home\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
-        if (homeMatch) {
-          const pkgBlock = homeMatch[1];
-          const extracted = extractPackages(pkgBlock);
-
-          const bareNames = pkgBlock.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
-          if (bareNames) {
-            for (const name of bareNames) {
-              const trimmed = name.trim();
-              if (trimmed && !extracted.includes(trimmed) && !trimmed.includes('.')) {
-                extracted.push(trimmed);
-              }
-            }
-          }
-
-          packages.homeManager.push(...extracted.filter(p => !packages.homeManager.includes(p)));
-        }
-
-        // Extract users.users.*.packages
-        const userPkgMatches = content.matchAll(/users\.users\.[^.]+\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/gs);
-        for (const match of userPkgMatches) {
-          const pkgBlock = match[1];
-          const extracted = extractPackages(pkgBlock);
-
-          const bareNames = pkgBlock.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
-          if (bareNames) {
-            for (const name of bareNames) {
-              const trimmed = name.trim();
-              if (trimmed && !extracted.includes(trimmed) && !trimmed.includes('.')) {
-                extracted.push(trimmed);
-              }
-            }
-          }
-
-          packages.user.push(...extracted.filter(p => !packages.user.includes(p)));
-        }
-      } catch (e) {
-        console.error(`Failed to parse ${nixFile}:`, e.message);
-      }
-    }
-
-    // Sort all lists
-    packages.system.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    packages.user.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    packages.homeManager.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-
-    return packages;
+    return getAllPackages();
   });
 
   // Get package metadata from nixpkgs
@@ -197,29 +91,15 @@ function register() {
       }
     } catch (e) {}
 
-    // Find where package is defined in config
+    // Find where package is defined in config (actual package list declarations only)
     if (flakeDir) {
-      // Only match actual package references:
-      // 1. pkgs.packageName (not followed by more identifier chars, so pkgs.zsh doesn't match pkgs.zsh-powerlevel10k)
-      // 2. pkgs-stable.packageName or other pkgs-* variants
-      // 3. Bare package name on its own line (for "with pkgs;" blocks)
-      const grepResult = await runCmd(
-        `grep -rn --include="*.nix" -E "(pkgs\\.${packageName}([^a-zA-Z0-9_-]|$)|pkgs-[a-z]+\\.${packageName}([^a-zA-Z0-9_-]|$)|^[[:space:]]*${packageName}[[:space:]]*(#.*)?$)" "${flakeDir}" 2>/dev/null | head -10`,
-        CMD_TIMEOUT_FAST
-      );
-
-      if (grepResult) {
-        const lines = grepResult.split('\n').filter(Boolean);
-        for (const line of lines) {
-          const match = line.match(/^([^:]+):(\d+):/);
-          if (match) {
-            const filePath = match[1];
-            const lineNum = match[2];
-            const relativePath = path.relative(flakeDir, filePath);
-            const loc = `${relativePath}:${lineNum}`;
-            if (!info.configLocations.includes(loc)) {
-              info.configLocations.push(loc);
-            }
+      const { findPackage } = require('../nix-packages');
+      const results = findPackage(packageName);
+      for (const r of results) {
+        for (const line of r.lines) {
+          const loc = `${r.relativePath}:${line}`;
+          if (!info.configLocations.includes(loc)) {
+            info.configLocations.push(loc);
           }
         }
       }
@@ -250,19 +130,26 @@ function register() {
     }
 
     // Build queries based on what paths exist
-    const hmProfilePath = `/home/${username}/.nix-profile`;
     const userProfilePath = `/etc/profiles/per-user/${username}`;
 
     // Run all queries in parallel (async)
-    const [systemOutput, hmOutput, userOutput] = await Promise.all([
+    const [systemOutput, hmRawOutput] = await Promise.all([
       runCmd(`nix-store -q --references ${NIX_CURRENT_SYSTEM}/sw 2>/dev/null`, CMD_TIMEOUT_NETWORK),
-      fs.existsSync(hmProfilePath)
-        ? runCmd(`nix-store -q --references ${hmProfilePath} 2>/dev/null`, CMD_TIMEOUT_NETWORK)
-        : Promise.resolve(''),
       fs.existsSync(userProfilePath)
         ? runCmd(`nix-store -q --references ${userProfilePath} 2>/dev/null`, CMD_TIMEOUT_NETWORK)
         : Promise.resolve('')
     ]);
+
+    // Home-manager: follow the home-manager-path reference
+    let hmOutput = '';
+    if (hmRawOutput) {
+      const hmPathLine = hmRawOutput.split('\n').find(l => l.includes('home-manager-path'));
+      if (hmPathLine) {
+        hmOutput = await runCmd(`nix-store -q --references ${hmPathLine.trim()} 2>/dev/null`, CMD_TIMEOUT_NETWORK);
+      } else {
+        hmOutput = hmRawOutput;
+      }
+    }
 
     // Process system packages
     for (const ref of parseRefs(systemOutput)) {
@@ -280,20 +167,122 @@ function register() {
       }
     }
 
-    // Process user packages
-    for (const ref of parseRefs(userOutput)) {
-      const name = extractPackageName(ref);
-      if (name && !packages.user.includes(name)) {
-        packages.user.push(name);
-      }
-    }
-
     // Sort all lists
     packages.system.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     packages.user.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     packages.homeManager.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
     return packages;
+  });
+
+  // Find packages defined in multiple files within the same scope
+  ipcMain.handle('packages-get-duplicates', async () => {
+    const flakeDir = findFlakeDir();
+    if (!flakeDir) {
+      return { success: false, error: 'Flake directory not found' };
+    }
+    const duplicates = findDuplicates();
+    return { success: true, duplicates };
+  });
+
+  ipcMain.handle('get-pending-changes', async () => {
+    const flakeDir = findFlakeDir();
+    if (!flakeDir) {
+      return { hasDrift: false, pendingInstall: [], pendingRemove: [], lastRebuild: null, lastConfigChange: null };
+    }
+
+    // Get last rebuild time (from system profile symlink modification time)
+    let lastRebuild = null;
+    try {
+      const sysProfile = '/nix/var/nix/profiles/system';
+      if (fs.existsSync(sysProfile)) {
+        const lstat = fs.lstatSync(sysProfile);
+        if (lstat) lastRebuild = lstat.mtime.toISOString();
+      }
+    } catch (e) {}
+
+    // Get last config file modification time
+    let lastConfigChange = null;
+    try {
+      function findNewestNix(dir) {
+        let newest = null;
+        let entries;
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+            const sub = findNewestNix(fullPath);
+            if (sub && (!newest || sub > newest)) newest = sub;
+          } else if (entry.isFile() && entry.name.endsWith('.nix')) {
+            try {
+              const mtime = fs.statSync(fullPath).mtime.getTime();
+              if (!newest || mtime > newest) newest = mtime;
+            } catch {}
+          }
+        }
+        return newest;
+      }
+      const newestMs = findNewestNix(flakeDir);
+      if (newestMs) lastConfigChange = new Date(newestMs).toISOString();
+    } catch (e) {}
+
+    const hasDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
+
+    // If drift, check history for app-initiated changes since last rebuild
+    let pendingInstall = [];
+    let pendingRemove = [];
+    if (hasDrift && lastRebuild) {
+      try {
+        const { getDb } = require('./history');
+        const db = getDb();
+        const rebuildMs = new Date(lastRebuild).getTime();
+        const rows = db.prepare(
+          "SELECT pkgname, action FROM history WHERE timestamp > ? ORDER BY timestamp ASC"
+        ).all(rebuildMs);
+        const added = new Set();
+        const removed = new Set();
+        for (const row of rows) {
+          if (row.action === 'added') {
+            added.add(row.pkgname);
+            removed.delete(row.pkgname);
+          } else if (row.action === 'removed') {
+            removed.add(row.pkgname);
+            added.delete(row.pkgname);
+          }
+        }
+        pendingInstall = [...added].sort();
+        // Verify removes: exclude packages still present in any config file
+        const flakeDir = findFlakeDir();
+        if (flakeDir) {
+          const { findPackage } = require('../nix-packages');
+          pendingRemove = [...removed].filter(pkg => {
+            const locs = findPackage(pkg, flakeDir);
+            return locs.length === 0;
+          });
+        } else {
+          pendingRemove = [...removed];
+        }
+
+        // Verify against live system: exclude packages that are no longer installed
+        if (pendingRemove.length > 0) {
+          const liveBins = new Set();
+          try { for (const n of fs.readdirSync('/nix/var/nix/profiles/system/sw/bin')) liveBins.add(n); } catch (e) {}
+          const username = os.userInfo().username;
+          const hmDir = path.join('/etc/profiles/per-user', username, 'bin');
+          if (fs.existsSync(hmDir)) {
+            try { for (const n of fs.readdirSync(hmDir)) liveBins.add(n); } catch (e) {}
+          }
+          pendingRemove = pendingRemove.filter(pkg => {
+            if (liveBins.has(pkg)) return true;
+            if (pkg.endsWith('-bin') && liveBins.has(pkg.slice(0, -4))) return true;
+            return false;
+          });
+        }
+        pendingRemove = pendingRemove.sort();
+      } catch (e) {}
+    }
+
+    return { hasDrift, pendingInstall, pendingRemove, lastRebuild, lastConfigChange };
   });
 }
 

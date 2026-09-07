@@ -6,13 +6,15 @@
   import Packages from "./lib/Packages.svelte";
   import Options from "./lib/Options.svelte";
   import Generations from "./lib/Generations.svelte";
+  import History from "./lib/History.svelte";
+  import Changes from "./lib/Changes.svelte";
   import SystemInfoModal from "./lib/SystemInfoModal.svelte";
   import NotificationsModal from "./lib/NotificationsModal.svelte";
   import GitModal from "./lib/GitModal.svelte";
   import TerminalOverlay from "./lib/TerminalOverlay.svelte";
   import FlakeInfoModal from "./lib/FlakeInfoModal.svelte";
 
-  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations']);
+  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes']);
   // UX-09: restore last active tab; fall back to dashboard for unknown values
   const _savedPage = localStorage.getItem('nixos-manager:active-tab');
   let currentPage = $state(VALID_PAGES.has(_savedPage) ? _savedPage : 'dashboard');
@@ -25,6 +27,26 @@
   let showNotifications = $state(false);
   let showGit = $state(false);
   let showFlakeInfo = $state(false);
+
+  $effect(() => {
+    function onSelectPackage() {
+      currentPage = 'packages';
+    }
+    window.addEventListener('select-package', onSelectPackage);
+    function onNavigateToPackages() {
+      currentPage = 'packages';
+    }
+    window.addEventListener('navigate-to-packages', onNavigateToPackages);
+    function onNavigateToChanges() {
+      currentPage = 'changes';
+    }
+    window.addEventListener('navigate-to-changes', onNavigateToChanges);
+    return () => {
+      window.removeEventListener('select-package', onSelectPackage);
+      window.removeEventListener('navigate-to-packages', onNavigateToPackages);
+      window.removeEventListener('navigate-to-changes', onNavigateToChanges);
+    };
+  });
   let notificationCount = $state(0);
   let systemInfo = $state({
     profile: "",
@@ -128,22 +150,29 @@
     <div class="content">
       <HeaderStrip {systemInfo} {notificationCount} onSystemInfoClick={() => showSystemInfo = true} onNotificationsClick={() => showNotifications = true} onGitClick={() => showGit = true} onFlakeInfoClick={() => showFlakeInfo = true} />
 
-      {#if currentPage === "dashboard"}
-        <Dashboard {systemInfo} />
-      {:else if currentPage === "discover"}
-        <Discover />
-      {:else if currentPage === "packages"}
-        <Packages />
-      {:else if currentPage === "options"}
-        <Options />
-      {:else if currentPage === "generations"}
-        <Generations />
-      {:else}
-        <div class="placeholder-page">
-          <h2>{currentPage}</h2>
-          <p>Coming soon...</p>
+      <div class="page-container">
+        <div class="page" class:hidden={currentPage !== "dashboard"}>
+          <Dashboard {systemInfo} />
         </div>
-      {/if}
+        <div class="page" class:hidden={currentPage !== "discover"}>
+          <Discover />
+        </div>
+        <div class="page" class:hidden={currentPage !== "packages"}>
+          <Packages />
+        </div>
+        <div class="page" class:hidden={currentPage !== "options"}>
+          <Options />
+        </div>
+        <div class="page" class:hidden={currentPage !== "generations"}>
+          <Generations />
+        </div>
+        <div class="page" class:hidden={currentPage !== "history"}>
+          <History />
+        </div>
+        <div class="page" class:hidden={currentPage !== "changes"}>
+          <Changes />
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -159,6 +188,39 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+  }
+
+  .page-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .page::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .page::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .page::-webkit-scrollbar-thumb {
+    background: #45475a;
+    border-radius: 4px;
+  }
+
+  .page::-webkit-scrollbar-thumb:hover {
+    background: #585b70;
+  }
+
+  .page.hidden {
+    display: none;
   }
 
   :global(html),
