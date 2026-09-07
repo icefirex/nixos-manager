@@ -173,6 +173,15 @@ nix build github:icefirex/nixos-manager
 nix run github:icefirex/nixos-manager
 ```
 
+### Binary Cache (Cachix)
+
+Pre-built binaries are available via [Cachix](https://cachix.org). Add to your `flake.nix` or `configuration.nix`:
+
+```nix
+nix.settings.trusted-substituters = [ "https://nixos-manager-icefire.cachix.org" ];
+nix.settings.trusted-public-keys = [ "nixos-manager-icefire.cachix.org-1:eUCn5EOD2Y8bKQpGbFEAfQc8TxOjQ+te/n3up5A4LOA=" ];
+```
+
 ### Development
 
 ```bash
