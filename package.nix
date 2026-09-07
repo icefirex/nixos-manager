@@ -10,7 +10,7 @@
 
 let
   pname = "nixos-manager";
-  version = "1.6.0";
+  version = "1.8.0";
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -28,7 +28,7 @@ in buildNpmPackage {
 
   src = ./.;
 
-  npmDepsHash = "sha256-sLlj8IfLSmQUyrPflBk926W2x7+H+TADq2cMyquO7UI=";
+  npmDepsHash = "sha256-kiXHinjbwIjmmDCBpOd3ZckE5g5tdSjdyE6PWzbEnFU=";
 
   nativeBuildInputs = [
     makeWrapper
@@ -44,6 +44,10 @@ in buildNpmPackage {
   # Build only the Svelte frontend (not electron-builder)
   buildPhase = ''
     runHook preBuild
+
+    # Run unit tests (exclude handler stubs that require electron binary)
+    node ./node_modules/.bin/vitest run --exclude 'src/main/handlers/**'
+
     npm run build:svelte
     runHook postBuild
   '';
