@@ -18,15 +18,18 @@
     "dev:electron": "wait-on http://localhost:5173 && ELECTRON_ENABLE_LOGGING=true electron .",
     "build": "vite build && electron-builder",
     "build:svelte": "vite build",
-    "start": "electron ."
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^4.1.9",
     "concurrently": "^9.0.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "svelte": "^5.0.0",
+    "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vitest": "^4.1.9",
     "wait-on": "^8.0.0"
