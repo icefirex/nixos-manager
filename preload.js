@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOptions: () => ipcRenderer.invoke('get-options'),
   getLiveOptions: () => ipcRenderer.invoke('get-live-options'),
   getOptionInfo: (path) => ipcRenderer.invoke('get-option-info', path),
+  setOptionValue: (payload) => ipcRenderer.invoke('set-option-value', payload),
+  revertOptionFromGit: (payload) => ipcRenderer.invoke('revert-option-from-git', payload),
+  optionsListFiles: () => ipcRenderer.invoke('options-list-files'),
+  searchOptionsCatalog: (query, opts) => ipcRenderer.invoke('search-options-catalog', query, opts),
 
   // Generations
   getGenerations: () => ipcRenderer.invoke('get-generations'),
@@ -69,6 +73,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // History (persistent audit log)
   historyGet: () => ipcRenderer.invoke('history-get'),
   historyAdd: (entry) => ipcRenderer.invoke('history-add', entry),
+  historyAddOption: (entry) => ipcRenderer.invoke('history-add-option', entry),
 
   // Build output listener — returns a cleanup function to remove the listener
   onBuildOutput: (callback) => {

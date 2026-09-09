@@ -20,6 +20,13 @@
   let searchQuery = $state("");
   let activeTab = $state("services");
   let sourceMode = $state("config"); // "config" or "live"
+  let savingOption = $state(false);
+  let editingOptionKey = $state(null);
+  let editDraftValue = $state("");
+  let catalogSearching = $state(false);
+  let catalogSearched = $state("");
+  let catalogResults = $state([]);
+  let catalogError = $state(null);
 
   // Option detail state
   let selectedOption = $state(null);
@@ -159,6 +166,151 @@
     return value;
   }
 
+  function stripHtml(value) {
+    if (!value) return '';
+    return String(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function parseBoolValue(value) {
+    const v = normalizeValue(value).toLowerCase();
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    return null;
+  }
+
+  function normalizeValue(value) {
+    if (!value) return '';
+    return String(value).trim().replace(/;$/, '').trim();
+  }
+
+  function isBooleanOption() {
+    if (!optionInfo) return false;
+    const t = (optionInfo.type || '').toLowerCase();
+    if (t.includes('bool')) return true;
+    return parseBoolValue(optionInfo.currentValue) !== null;
+  }
+
+  function canInlineEdit() {
+    return !!optionInfo && sourceMode === 'config' && !savingOption;
+  }
+
+  function startInlineEdit() {
+    if (!optionInfo) return;
+    editingOptionKey = optionInfo.path;
+    editDraftValue = isBlockValue(optionInfo.currentValue)
+      ? String(optionInfo.currentValue || '')
+      : normalizeValue(optionInfo.currentValue);
+  }
+
+  function cancelInlineEdit() {
+    editingOptionKey = null;
+    editDraftValue = '';
+  }
+
+  async function saveOptionValue(optionPath, newValue, filePath = null) {
+    savingOption = true;
+    try {
+      const result = await window.electronAPI.setOptionValue({
+        optionPath,
+        newValue,
+        filePath: filePath || undefined,
+        preferredFile: filePath || undefined
+      });
+      if (!result.success) {
+        alert(result.error || 'Failed to save option value');
+        return false;
+      }
+      window.dispatchEvent(new CustomEvent('history-updated'));
+      window.dispatchEvent(new CustomEvent('pending-changes'));
+      window.dispatchEvent(new CustomEvent('packages-changed'));
+      await loadOptions();
+      return true;
+    } catch (e) {
+      alert(e.message || 'Failed to save option value');
+      return false;
+    } finally {
+      savingOption = false;
+    }
+  }
+
+  async function saveInlineEdit() {
+    if (!optionInfo) return;
+    const value = isBlockValue(optionInfo.currentValue)
+      ? String(editDraftValue || '').trim()
+      : normalizeValue(editDraftValue);
+    if (!value) {
+      alert('Value cannot be empty');
+      return;
+    }
+    const ok = await saveOptionValue(optionInfo.path, value, optionInfo.currentFile || null);
+    if (ok) {
+      editingOptionKey = null;
+      editDraftValue = '';
+      await selectOption({
+        path: optionInfo.path,
+        file: optionInfo.currentFile || optionInfo.configLocations?.[0] || '',
+        line: optionInfo.currentLine,
+        value
+      });
+    }
+  }
+
+  async function toggleBooleanOption() {
+    if (!optionInfo) return;
+    const current = parseBoolValue(optionInfo.currentValue);
+    if (current === null) return;
+    const nextValue = current ? 'false' : 'true';
+    const ok = await saveOptionValue(optionInfo.path, nextValue, optionInfo.currentFile || null);
+    if (ok) {
+      await selectOption({
+        path: optionInfo.path,
+        file: optionInfo.currentFile || optionInfo.configLocations?.[0] || '',
+        line: optionInfo.currentLine,
+        value: nextValue
+      });
+    }
+  }
+
+  function getSuggestedValue(result) {
+    const type = (result?.type || '').toLowerCase();
+    if (type.includes('bool')) return 'true';
+    if (result?.example) return normalizeValue(stripHtml(result.example));
+    if (result?.default) return normalizeValue(stripHtml(result.default));
+    return 'null';
+  }
+
+  async function runCatalogSearch() {
+    const q = searchQuery.trim();
+    if (!q || sourceMode !== 'config') return;
+    catalogSearching = true;
+    catalogError = null;
+    catalogSearched = q;
+    catalogResults = [];
+    try {
+      const result = await window.electronAPI.searchOptionsCatalog(q, { limit: 25, channel: 'unstable' });
+      if (!result.success) {
+        catalogError = result.error || 'Search failed';
+        return;
+      }
+      catalogResults = result.results || [];
+    } catch (e) {
+      catalogError = e.message || 'Search failed';
+    } finally {
+      catalogSearching = false;
+    }
+  }
+
+  async function addOptionFromCatalog(result) {
+    if (!result?.path) return;
+    const value = getSuggestedValue(result);
+    const ok = await saveOptionValue(result.path, value, null);
+    if (ok) {
+      searchQuery = result.path;
+      catalogResults = [];
+      catalogSearched = '';
+    }
+  }
+
   function isBlockValue(value) {
     if (!value) return false;
     // Any structured value (blocks, lists) or multi-line content
@@ -183,6 +335,7 @@
         .replace(/>/g, '&gt;');
     }
   }
+
 </script>
 
 <div class="options-page">
@@ -319,6 +472,40 @@
       <div class="search-results-info">
         {totalMatches} matching option{totalMatches !== 1 ? 's' : ''} across all categories
       </div>
+
+      {#if sourceMode === 'config' && totalMatches === 0}
+        <div class="catalog-search-box">
+          <div class="catalog-search-header">
+            <span>Option not found in current config or live scan.</span>
+            <button class="catalog-search-btn" onclick={runCatalogSearch} disabled={catalogSearching}>
+              <Icon name="Search" size={12} /> {catalogSearching ? 'Searching...' : 'Search NixOS options'}
+            </button>
+          </div>
+          {#if catalogError}
+            <p class="catalog-error">{catalogError}</p>
+          {/if}
+          {#if catalogResults.length > 0}
+            <div class="catalog-results">
+              {#each catalogResults as result}
+                <div class="catalog-row">
+                  <div class="catalog-main">
+                    <span class="catalog-path">{result.path}</span>
+                    <span class="catalog-type">{result.type || 'unknown type'}</span>
+                    {#if result.description}
+                      <span class="catalog-desc">{formatValue(stripHtml(result.description))}</span>
+                    {/if}
+                  </div>
+                  <button class="catalog-add-btn" onclick={() => addOptionFromCatalog(result)} disabled={savingOption}>
+                    <Icon name="Plus" size={12} /> Add with suggested value
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {:else if !catalogSearching && catalogSearched}
+            <p class="catalog-empty">No option matches found in NixOS search for "{catalogSearched}"</p>
+          {/if}
+        </div>
+      {/if}
     {/if}
   {/if}
 </div>
@@ -351,15 +538,45 @@
         {/if}
       </div>
 
-      <div class="detail-grid">
-        <div class="detail-field full-width">
-          <span class="field-label">Current Value</span>
-          {#if isBlockValue(optionInfo.currentValue)}
-            <pre class="block-value">{@html highlightNix(optionInfo.currentValue)}</pre>
-          {:else}
-            <span class="field-value mono">{@html highlightNix(optionInfo.currentValue || 'not set')}</span>
-          {/if}
-        </div>
+        <div class="detail-grid">
+          <div class="detail-field full-width">
+            <span class="field-label">Current Value</span>
+            {#if sourceMode === 'config' && isBooleanOption()}
+              {@const currentBool = parseBoolValue(optionInfo.currentValue)}
+              <div class="bool-editor">
+                <button class="value-toggle" class:active={currentBool === true} onclick={toggleBooleanOption} disabled={savingOption}>
+                  <span class="toggle-knob"></span>
+                </button>
+                <span class="bool-label">{currentBool === true ? 'true' : 'false'}</span>
+              </div>
+            {:else if sourceMode === 'config' && editingOptionKey === optionInfo.path}
+              <div class="inline-edit">
+                {#if isBlockValue(optionInfo.currentValue)}
+                  <textarea class="edit-input edit-block" bind:value={editDraftValue}></textarea>
+                {:else}
+                  <input class="edit-input" bind:value={editDraftValue} />
+                {/if}
+                <div class="edit-actions">
+                  <button class="save-btn" onclick={saveInlineEdit} disabled={savingOption}>
+                    <Icon name="Check" size={12} /> Save changes
+                  </button>
+                  <button class="discard-btn" onclick={cancelInlineEdit} disabled={savingOption}>
+                    Discard
+                  </button>
+                </div>
+              </div>
+            {:else if isBlockValue(optionInfo.currentValue)}
+              <button class="inline-value-btn editable block-edit-btn" onclick={startInlineEdit}>
+                <pre class="block-value">{@html highlightNix(optionInfo.currentValue)}</pre>
+                <span class="edit-hint">Click to edit</span>
+              </button>
+            {:else}
+              <button class="inline-value-btn" class:editable={canInlineEdit()} onclick={canInlineEdit() ? startInlineEdit : undefined}>
+                <span class="field-value mono">{@html highlightNix(optionInfo.currentValue || 'not set')}</span>
+                {#if canInlineEdit()}<span class="edit-hint">Click to edit</span>{/if}
+              </button>
+            {/if}
+          </div>
 
         {#if optionInfo.default}
           <div class="detail-field">
@@ -1059,5 +1276,206 @@
     font-size: 12px;
     color: #6c7086;
     text-align: center;
+  }
+
+  .catalog-search-box {
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(49, 50, 68, 0.2);
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .catalog-search-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    color: #a6adc8;
+  }
+
+  .catalog-search-btn,
+  .catalog-add-btn,
+  .save-btn,
+  .discard-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(69, 71, 90, 0.35);
+    background: rgba(49, 50, 68, 0.5);
+    color: #cdd6f4;
+    font-size: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .catalog-search-btn:hover,
+  .catalog-add-btn:hover,
+  .save-btn:hover,
+  .discard-btn:hover {
+    background: rgba(49, 50, 68, 0.75);
+  }
+
+  .catalog-results {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .catalog-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(30, 30, 46, 0.55);
+    border: 1px solid rgba(69, 71, 90, 0.3);
+    border-radius: 6px;
+  }
+
+  .catalog-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .catalog-path {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 12px;
+    color: #cdd6f4;
+  }
+
+  .catalog-type {
+    font-size: 11px;
+    color: #89b4fa;
+  }
+
+  .catalog-desc {
+    font-size: 11px;
+    color: #a6adc8;
+  }
+
+  .catalog-error,
+  .catalog-empty {
+    margin: 0;
+    font-size: 12px;
+    color: #f38ba8;
+  }
+
+  .inline-value-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    color: inherit;
+    padding: 6px 8px;
+    cursor: default;
+  }
+
+  .inline-value-btn.editable {
+    cursor: pointer;
+    border-color: rgba(69, 71, 90, 0.3);
+    background: rgba(30, 30, 46, 0.35);
+  }
+
+  .inline-value-btn.editable:hover {
+    border-color: rgba(137, 180, 250, 0.35);
+  }
+
+  .edit-hint {
+    font-size: 11px;
+    color: #89b4fa;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
+
+  .inline-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .edit-input {
+    border-radius: 6px;
+    border: 1px solid rgba(69, 71, 90, 0.4);
+    background: rgba(30, 30, 46, 0.7);
+    color: #cdd6f4;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .edit-input.edit-block {
+    min-height: 180px;
+    resize: vertical;
+    line-height: 1.5;
+    white-space: pre;
+  }
+
+  .edit-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .bool-editor {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .value-toggle {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    border-radius: 20px;
+    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(49, 50, 68, 0.6);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+  }
+
+  .value-toggle.active {
+    background: rgba(166, 227, 161, 0.2);
+    border-color: rgba(166, 227, 161, 0.5);
+  }
+
+  .value-toggle .toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6c7086;
+    transition: left 0.2s, background 0.2s;
+  }
+
+  .value-toggle.active .toggle-knob {
+    left: 27px;
+    background: #a6e3a1;
+  }
+
+  .bool-label {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 12px;
+    color: #a6adc8;
+  }
+
+  .block-edit-btn {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
   }
 </style>
