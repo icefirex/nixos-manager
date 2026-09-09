@@ -188,7 +188,15 @@ function register() {
   ipcMain.handle('get-pending-changes', async () => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
-      return { hasDrift: false, pendingInstall: [], pendingRemove: [], lastRebuild: null, lastConfigChange: null };
+      return {
+        hasDrift: false,
+        pendingInstall: [],
+        pendingRemove: [],
+        optionChanges: [],
+        changedFiles: [],
+        lastRebuild: null,
+        lastConfigChange: null
+      };
     }
 
     // Get last rebuild time (from system profile symlink modification time)
@@ -226,42 +234,87 @@ function register() {
       if (newestMs) lastConfigChange = new Date(newestMs).toISOString();
     } catch (e) {}
 
-    const hasDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
+    const mtimeDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
+
+    const normalizeFile = (filePath) => {
+      if (!filePath) return '';
+      if (path.isAbsolute(filePath)) {
+        try {
+          const rel = path.relative(flakeDir, filePath);
+          if (!rel.startsWith('..')) return rel;
+        } catch (e) {}
+      }
+      return filePath;
+    };
+
+    // Collect generic git working-tree signals (includes external/manual edits)
+    let changedFiles = [];
+    let optionDiffSummary = { added: [], removed: [], changed: [] };
+    try {
+      const fileOut = await runCmd(`git -C "${flakeDir}" diff --name-only`);
+      changedFiles = (fileOut || '')
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .filter(name => name.endsWith('.nix'));
+    } catch (e) {}
+
+    try {
+      const diffOut = await runCmd(`git -C "${flakeDir}" diff --unified=20 -- '*.nix'`);
+      optionDiffSummary = parseOptionDiffSummary(diffOut, flakeDir);
+    } catch (e) {}
+
+    const hasDrift = mtimeDrift || changedFiles.length > 0;
 
     // If drift, check history for app-initiated changes since last rebuild
     let pendingInstall = [];
     let pendingRemove = [];
+    let optionChanges = [];
+    const optionChangesByKey = new Map();
     if (hasDrift && lastRebuild) {
       try {
         const { getDb } = require('./history');
         const db = getDb();
         const rebuildMs = new Date(lastRebuild).getTime();
         const rows = db.prepare(
-          "SELECT pkgname, action FROM history WHERE timestamp > ? ORDER BY timestamp ASC"
+          "SELECT pkgname, action, file FROM history WHERE timestamp > ? ORDER BY timestamp ASC"
         ).all(rebuildMs);
-        const added = new Set();
-        const removed = new Set();
+        const added = new Map();
+        const removed = new Map();
         for (const row of rows) {
+          const key = `${row.file || ''}::${row.pkgname}`;
           if (row.action === 'added') {
-            added.add(row.pkgname);
-            removed.delete(row.pkgname);
+            added.set(key, row);
+            removed.delete(key);
           } else if (row.action === 'removed') {
-            removed.add(row.pkgname);
-            added.delete(row.pkgname);
+            removed.set(key, row);
+            added.delete(key);
           }
         }
-        pendingInstall = [...added].sort();
+        // Verify installs: exclude packages no longer present in config files
+        // (e.g. user manually reverted the add in an editor)
+        pendingInstall = [];
+
         // Verify removes: exclude packages still present in any config file
         const flakeDir = findFlakeDir();
         if (flakeDir) {
           const { findPackage } = require('../nix-packages');
-          pendingRemove = [...removed].filter(pkg => {
+          pendingInstall = [...added.values()].filter(entry => {
+            const pkg = entry.pkgname;
+            const targetFile = entry.file;
             const locs = findPackage(pkg, flakeDir);
-            return locs.length === 0;
+            return locs.some(loc => path.resolve(loc.file) === path.resolve(targetFile));
           });
+          pendingRemove = [...removed.values()].filter(entry => {
+            const locs = findPackage(entry.pkgname, flakeDir);
+            return locs.length === 0;
+          }).map(entry => entry.pkgname);
         } else {
-          pendingRemove = [...removed];
+          pendingInstall = [...added.values()];
+          pendingRemove = [...removed.values()].map(entry => entry.pkgname);
         }
+        pendingInstall = pendingInstall.map(entry => entry.pkgname);
+        pendingInstall = pendingInstall.sort();
 
         // Verify against live system: exclude packages that are no longer installed
         if (pendingRemove.length > 0) {
@@ -279,11 +332,312 @@ function register() {
           });
         }
         pendingRemove = pendingRemove.sort();
+
+        // Aggregate option-level changes since last rebuild
+        const optionRows = db.prepare(
+          'SELECT option_path, action, old_value, new_value, file FROM option_history WHERE timestamp > ? ORDER BY timestamp ASC'
+        ).all(rebuildMs);
+
+        const byOption = new Map();
+        for (const row of optionRows) {
+          const key = `${row.option_path}::${row.file}`;
+          const current = byOption.get(key);
+          if (!current) {
+            byOption.set(key, {
+              optionPath: row.option_path,
+              action: row.action,
+              oldValue: row.old_value,
+              newValue: row.new_value,
+              file: row.file,
+              edits: 1
+            });
+            continue;
+          }
+
+          current.edits += 1;
+          current.action = row.action;
+          if (current.oldValue == null) current.oldValue = row.old_value;
+          current.newValue = row.new_value;
+        }
+        optionChanges = [...byOption.values()].sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+        for (const change of optionChanges) {
+          const file = normalizeFile(change.file);
+          const key = `${file}::${change.optionPath}`;
+          optionChangesByKey.set(key, {
+            ...change,
+            file,
+            source: 'sqlite'
+          });
+        }
+
       } catch (e) {}
     }
 
-    return { hasDrift, pendingInstall, pendingRemove, lastRebuild, lastConfigChange };
+    // Merge git-derived option deltas (authoritative current file state) over sqlite tracking
+    const gitPaths = new Set([
+      ...optionDiffSummary.changed.map(c => c.optionPath),
+      ...optionDiffSummary.added.map(c => c.optionPath),
+      ...optionDiffSummary.removed.map(c => c.optionPath)
+    ]);
+
+    if (gitPaths.size > 0) {
+      for (const [existingKey, existing] of optionChangesByKey.entries()) {
+        const overlaps = [...gitPaths].some(gitPath => (
+          existing.optionPath === gitPath ||
+          existing.optionPath.startsWith(`${gitPath}.`) ||
+          gitPath.startsWith(`${existing.optionPath}.`)
+        ));
+        if (overlaps) optionChangesByKey.delete(existingKey);
+      }
+    }
+
+    function upsertGitOptionChange(action, change) {
+      const file = normalizeFile(change.file);
+
+      // Remove overlapping sqlite-style aggregate entries in same file
+      for (const [existingKey, existing] of optionChangesByKey.entries()) {
+        if (normalizeFile(existing.file) !== file) continue;
+        if (
+          existing.optionPath === change.optionPath ||
+          existing.optionPath.startsWith(`${change.optionPath}.`) ||
+          change.optionPath.startsWith(`${existing.optionPath}.`)
+        ) {
+          optionChangesByKey.delete(existingKey);
+        }
+      }
+
+      const key = `${file}::${change.optionPath}`;
+      optionChangesByKey.set(key, {
+        optionPath: change.optionPath,
+        action,
+        oldValue: action === 'added' ? null : change.from,
+        newValue: action === 'removed' ? null : change.to,
+        file: file || '(unknown file)',
+        edits: 1,
+        source: 'git'
+      });
+    }
+
+    for (const change of optionDiffSummary.changed) upsertGitOptionChange('set', change);
+    for (const change of optionDiffSummary.added) upsertGitOptionChange('added', change);
+    for (const change of optionDiffSummary.removed) upsertGitOptionChange('removed', change);
+
+    // Remove stale sqlite-only entries that no longer exist in current git diff
+    const changedFileSet = new Set(changedFiles.map(normalizeFile));
+    const gitPathsByFile = new Map();
+    for (const group of [optionDiffSummary.changed, optionDiffSummary.added, optionDiffSummary.removed]) {
+      for (const c of group) {
+        const f = normalizeFile(c.file);
+        if (!gitPathsByFile.has(f)) gitPathsByFile.set(f, new Set());
+        gitPathsByFile.get(f).add(c.optionPath);
+      }
+    }
+
+    for (const [k, entry] of optionChangesByKey.entries()) {
+      if (entry.source !== 'sqlite') continue;
+      const file = normalizeFile(entry.file);
+
+      // If file is no longer changed at all, drop sqlite pending entry
+      if (!changedFileSet.has(file)) {
+        optionChangesByKey.delete(k);
+        continue;
+      }
+
+      // If git parsed option paths for this file, keep sqlite only when overlapping
+      const gitPathsInFile = gitPathsByFile.get(file);
+      if (gitPathsInFile && gitPathsInFile.size > 0) {
+        const overlaps = [...gitPathsInFile].some(gitPath => (
+          entry.optionPath === gitPath ||
+          entry.optionPath.startsWith(`${gitPath}.`) ||
+          gitPath.startsWith(`${entry.optionPath}.`)
+        ));
+        if (!overlaps) {
+          optionChangesByKey.delete(k);
+        }
+      }
+    }
+
+    optionChanges = [...optionChangesByKey.values()].sort((a, b) => {
+      const pathCmp = a.optionPath.localeCompare(b.optionPath);
+      if (pathCmp !== 0) return pathCmp;
+      return String(a.file || '').localeCompare(String(b.file || ''));
+    });
+
+    return {
+      hasDrift,
+      pendingInstall,
+      pendingRemove,
+      optionChanges,
+      changedFiles,
+      optionDiffSummary,
+      lastRebuild,
+      lastConfigChange
+    };
   });
 }
 
-module.exports = { register };
+function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFileSync(p, 'utf8')) {
+  const lineMap = new Map();
+  let currentFile = null;
+  let braceDepth = 0;
+  const scopeStack = [];
+  const assignment = /^([+-])\s*([a-zA-Z0-9._-]+)\s*=\s*(.*?);\s*(?:#.*)?$/;
+  const absoluteRoots = new Set([
+    'services', 'programs', 'hardware', 'networking', 'boot', 'system',
+    'virtualisation', 'security', 'users', 'fonts', 'environment', 'nixpkgs', 'nix', 'home'
+  ]);
+  const fileScopedKeyCache = new Map();
+
+  function countChar(str, ch) {
+    let count = 0;
+    for (const c of str) if (c === ch) count++;
+    return count;
+  }
+
+  function resolveScopePath(paths) {
+    let full = '';
+    for (const p of paths) {
+      if (!p) continue;
+      const root = p.split('.')[0];
+      const isAbsolute = absoluteRoots.has(root);
+      if (isAbsolute) {
+        full = p;
+      } else if (full) {
+        full = `${full}.${p}`;
+      } else {
+        full = p;
+      }
+    }
+    return full;
+  }
+
+  function currentScopePath() {
+    if (scopeStack.length === 0) return null;
+    return resolveScopePath(scopeStack.map(s => s.path));
+  }
+
+  function getScopedKeyMap(relFile) {
+    if (!relFile) return new Map();
+    if (fileScopedKeyCache.has(relFile)) return fileScopedKeyCache.get(relFile);
+
+    const result = new Map();
+    const absFile = path.join(flakeDir, relFile);
+    let content = '';
+    try {
+      content = readFile(absFile);
+    } catch (e) {
+      fileScopedKeyCache.set(relFile, result);
+      return result;
+    }
+
+    const lines = content.split('\n');
+    let depth = 0;
+    const stack = [];
+
+    for (const line of lines) {
+      const code = line.replace(/#.*$/, '');
+      const scopeMatch = code.match(/^\s*([a-zA-Z0-9._-]+)\s*=\s*.*\{\s*$/);
+      if (scopeMatch) {
+        stack.push({ path: scopeMatch[1], depth });
+      }
+
+      const assignMatch = code.match(/^\s*([a-zA-Z0-9._-]+)\s*=\s*/);
+      if (assignMatch) {
+        const lhs = assignMatch[1];
+        const root = lhs.split('.')[0];
+        const looksAbsolute = absoluteRoots.has(root);
+        const scopePath = resolveScopePath(stack.map(s => s.path));
+        if (!looksAbsolute && scopePath && !lhs.startsWith(`${scopePath}.`) && lhs !== scopePath) {
+          result.set(lhs, `${scopePath}.${lhs}`);
+        }
+      }
+
+      depth += countChar(code, '{');
+      depth -= countChar(code, '}');
+      while (stack.length > 0 && depth <= stack[stack.length - 1].depth) {
+        stack.pop();
+      }
+    }
+
+    fileScopedKeyCache.set(relFile, result);
+    return result;
+  }
+
+  for (const line of (diffOut || '').split('\n')) {
+    if (line.startsWith('+++ b/')) {
+      currentFile = line.slice(6).trim();
+      braceDepth = 0;
+      scopeStack.length = 0;
+      continue;
+    }
+    if (line.startsWith('+++') || line.startsWith('---')) continue;
+    if (line.startsWith('@@')) continue;
+    if (!line || line.startsWith('\\')) continue;
+
+    const prefix = line[0];
+    if (![' ', '+', '-'].includes(prefix)) continue;
+    const raw = line.slice(1);
+
+    const scopeMatch = raw.match(/^\s*([a-zA-Z0-9._-]+)\s*=\s*.*\{\s*(?:#.*)?$/);
+    if (scopeMatch) {
+      scopeStack.push({ path: scopeMatch[1], depth: braceDepth });
+    }
+
+    const opens = countChar(raw, '{');
+    const closes = countChar(raw, '}');
+
+    const m = line.match(assignment);
+    if (m) {
+      const sign = m[1];
+      let optionPath = m[2];
+      const value = m[3].trim();
+
+      const scopePath = currentScopePath();
+      const root = optionPath.split('.')[0];
+      const looksAbsolute = absoluteRoots.has(root);
+      if (scopePath && !looksAbsolute) {
+        if (!optionPath.startsWith(`${scopePath}.`) && optionPath !== scopePath) {
+          optionPath = `${scopePath}.${optionPath}`;
+        }
+      } else if (!looksAbsolute && currentFile) {
+        const scopedMap = getScopedKeyMap(currentFile);
+        const inferred = scopedMap.get(optionPath);
+        if (inferred) optionPath = inferred;
+      }
+
+      const key = `${currentFile || ''}::${optionPath}`;
+      if (!lineMap.has(key)) {
+        lineMap.set(key, { optionPath, file: currentFile, added: null, removed: null });
+      }
+      const entry = lineMap.get(key);
+      if (sign === '+') entry.added = value;
+      if (sign === '-') entry.removed = value;
+    }
+
+    braceDepth += opens;
+    braceDepth -= closes;
+    while (scopeStack.length > 0 && braceDepth <= scopeStack[scopeStack.length - 1].depth) {
+      scopeStack.pop();
+    }
+  }
+
+  const optionDiffSummary = { added: [], removed: [], changed: [] };
+  for (const [, delta] of lineMap.entries()) {
+    if (delta.added != null && delta.removed != null) {
+      optionDiffSummary.changed.push({ optionPath: delta.optionPath, file: delta.file, from: delta.removed, to: delta.added });
+    } else if (delta.added != null) {
+      optionDiffSummary.added.push({ optionPath: delta.optionPath, file: delta.file, to: delta.added });
+    } else if (delta.removed != null) {
+      optionDiffSummary.removed.push({ optionPath: delta.optionPath, file: delta.file, from: delta.removed });
+    }
+  }
+  optionDiffSummary.added.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+  optionDiffSummary.removed.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+  optionDiffSummary.changed.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+  return optionDiffSummary;
+}
+
+module.exports = {
+  register,
+  parseOptionDiffSummary,
+};
