@@ -64,3 +64,5 @@ describe('discover handler', () => {
   });
 
 });
+
+export {};

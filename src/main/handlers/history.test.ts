@@ -39,3 +39,5 @@ describe('history handler', () => {
     expect(execSpy).not.toHaveBeenCalled();
   });
 });
+
+export {};

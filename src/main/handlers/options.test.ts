@@ -142,3 +142,5 @@ describe('options handler', () => {
   });
 
 });
+
+export {};

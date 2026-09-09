@@ -37,3 +37,5 @@ describe('rebuild handler', () => {
   });
 
 });
+
+export {};
