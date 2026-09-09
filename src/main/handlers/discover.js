@@ -882,58 +882,14 @@ function register() {
       return { success: false, error: flakeDirNotFoundMsg() };
     }
 
-    const allPackages = [];
-    function extractPkgs(content) {
-      const pkgs = [];
-      const matches = content.matchAll(/(?:pkgs|pkgs-stable|pkgs-[a-z]+)\.([a-zA-Z0-9_-]+)/g);
-      for (const m of matches) {
-        if (!pkgs.includes(m[1])) pkgs.push(m[1]);
-      }
-      const bareMatches = content.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
-      if (bareMatches) {
-        for (const name of bareMatches) {
-          const t = name.trim();
-          if (t && !t.includes('.') && !pkgs.includes(t)) pkgs.push(t);
-        }
-      }
-      return pkgs;
-    }
-    function scanDir(dir) {
-      let entries;
-      try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          scanDir(fullPath);
-        } else if (entry.isFile() && entry.name.endsWith('.nix')) {
-          let content;
-          try {
-            content = fs.readFileSync(fullPath, 'utf8');
-          } catch {
-            continue;
-          }
-          // Extract pkgs.xxx patterns from system, home, and user package sections
-          const systemMatch = content.match(/environment\.systemPackages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
-          const homeMatch = content.match(/home\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
-          const userMatches = content.matchAll(/users\.users\.[^.]+\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/gs);
-          for (const section of [systemMatch?.[1], homeMatch?.[1]].filter(Boolean)) {
-            for (const p of extractPkgs(section)) {
-              if (!allPackages.includes(p)) allPackages.push(p);
-            }
-          }
-          for (const m of userMatches) {
-            for (const p of extractPkgs(m[1])) {
-              if (!allPackages.includes(p)) allPackages.push(p);
-            }
-          }
-        }
-      }
-    }
-    scanDir(flakeDir);
+    const { getAllPackages } = require('../nix-packages');
+    const scoped = getAllPackages();
+    const allPackages = [...new Set([
+      ...(scoped.system || []),
+      ...(scoped.user || []),
+      ...(scoped.homeManager || [])
+    ])].sort((a, b) => a.localeCompare(b));
+
     return { success: true, packages: allPackages };
   });
 
@@ -1112,4 +1068,16 @@ function cleanup() {
   }
 }
 
-module.exports = { register, cleanup };
+module.exports = {
+  register,
+  cleanup,
+  isTTYError,
+  parseAppStreamXML,
+  extractTag,
+  extractDescription,
+  extractCategories,
+  extractIcon,
+  extractUrl,
+  extractScreenshots,
+  decodeXmlEntities,
+};

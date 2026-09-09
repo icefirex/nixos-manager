@@ -35,6 +35,7 @@
   let auditLog = $state([]);
   let toasts = $state([]);
   let diffOverlay = $state(null);
+  let installFilter = $state('all'); // all | installed
 
   function showToast(message, type, diff) {
     const id = Date.now() + Math.random();
@@ -51,6 +52,12 @@
   }
 
   let isConfigured = $derived(selectedPackage ? configuredPackages.has(selectedPackage.pkgname) : false);
+
+  function matchesInstallFilter(pkg) {
+    const installed = configuredPackages.has(pkg.pkgname);
+    if (installFilter === 'installed') return installed;
+    return true;
+  }
 
   let filteredConfigFiles = $derived.by(() => {
     const files = configFiles.filter(f => f.sections.includes(installType));
@@ -97,11 +104,11 @@
   };
 
   // Filtered packages based on search and category
-  let filteredPackages = $derived.by(() => {
+  let baseFilteredPackages = $derived.by(() => {
     const q = searchQuery.trim().toLowerCase();
     let results = allPackages;
 
-    if (selectedCategory) {
+    if (selectedCategory && installFilter !== 'installed') {
       results = results.filter(pkg => pkg.categories?.includes(selectedCategory));
     }
 
@@ -113,6 +120,37 @@
     }
 
     return results;
+  });
+
+  let filteredPackages = $derived.by(() => {
+    return baseFilteredPackages.filter(matchesInstallFilter);
+  });
+
+  let filteredNixpkgsResults = $derived.by(() => {
+    return nixpkgsResults.filter(matchesInstallFilter);
+  });
+
+  let featuredFilteredPackages = $derived.by(() => {
+    return featuredPackages.filter(matchesInstallFilter);
+  });
+
+  let visibleAppstreamPackages = $derived.by(() => {
+    if (installFilter === 'installed') {
+      return filteredPackages;
+    }
+    return (searchQuery || selectedCategory) ? filteredPackages : featuredFilteredPackages;
+  });
+
+  let installFilterCounts = $derived.by(() => {
+    const list = showNixpkgsTab ? nixpkgsResults : baseFilteredPackages;
+    let installed = 0;
+    for (const pkg of list) {
+      if (configuredPackages.has(pkg.pkgname)) installed += 1;
+    }
+    return {
+      all: list.length,
+      installed
+    };
   });
 
   // Category counts
@@ -128,6 +166,7 @@
           return searchable.includes(q);
         });
       }
+      pkgs = pkgs.filter(matchesInstallFilter);
       counts[cat] = pkgs.length;
     }
     return counts;
@@ -136,10 +175,10 @@
   // Total count for "All" tab
   let totalCount = $derived.by(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return allPackages.length;
+    if (!q) return allPackages.filter(matchesInstallFilter).length;
     return allPackages.filter(pkg => {
       const searchable = `${pkg.name} ${pkg.summary || ''} ${pkg.pkgname}`.toLowerCase();
-      return searchable.includes(q);
+      return searchable.includes(q) && matchesInstallFilter(pkg);
     }).length;
   });
 
@@ -319,6 +358,9 @@
     nixpkgsValid = true;
 
     try {
+      if (pkg.icon?.name && !iconCache[pkg.icon.name]) {
+        loadIcon(pkg.icon.name);
+      }
       packageDetails = await window.electronAPI.discoverGetDetails(pkg.pkgname);
     } catch (e) {
       console.error('Failed to load details:', e);
@@ -341,7 +383,7 @@
 
   // Load icons for visible packages
   $effect(() => {
-    const pkgsToShow = selectedCategory || searchQuery ? filteredPackages : featuredPackages;
+    const pkgsToShow = showNixpkgsTab ? filteredNixpkgsResults : visibleAppstreamPackages;
     for (const pkg of pkgsToShow.slice(0, 50)) {
       if (pkg.icon?.name && !iconCache[pkg.icon.name]) {
         loadIcon(pkg.icon.name);
@@ -516,27 +558,45 @@
   <div class="tabs">
     <button
       class="tab"
-      class:active={!selectedCategory && !showNixpkgsTab}
-      onclick={() => { selectedCategory = null; showNixpkgsTab = false; }}
+      class:active={!selectedCategory && !showNixpkgsTab && installFilter === 'all'}
+      onclick={() => { selectedCategory = null; showNixpkgsTab = false; installFilter = 'all'; }}
     >
       All
       <span class="count">{totalCount}</span>
     </button>
-    {#each categories as cat}
-      {@const count = categoryCounts[cat] || 0}
-      {#if count > 0 || !searchQuery}
-        <button
-          class="tab"
-          class:active={selectedCategory === cat && !showNixpkgsTab}
-          onclick={() => selectCategory(cat)}
-        >
-          <span class="cat-icon"><Icon name={categoryMeta[cat]?.icon || 'Package'} size={12} /></span>
-          {categoryMeta[cat]?.name || cat}
-          <span class="count">{count}</span>
-        </button>
-      {/if}
-    {/each}
-    {#if nixpkgsResults.length > 0}
+    <button
+      class="tab installed-tab"
+      class:active={installFilter === 'installed'}
+      onclick={() => {
+        const next = installFilter === 'installed' ? 'all' : 'installed';
+        installFilter = next;
+        if (next === 'installed') {
+          selectedCategory = null;
+          showNixpkgsTab = false;
+        }
+      }}
+    >
+      <span class="cat-icon"><Icon name="CheckCircle" size={12} /></span>
+      Installed
+      <span class="count">{installFilterCounts.installed}</span>
+    </button>
+    {#if installFilter !== 'installed'}
+      {#each categories as cat}
+        {@const count = categoryCounts[cat] || 0}
+        {#if count > 0 || !searchQuery}
+          <button
+            class="tab"
+            class:active={selectedCategory === cat && !showNixpkgsTab}
+            onclick={() => selectCategory(cat)}
+          >
+            <span class="cat-icon"><Icon name={categoryMeta[cat]?.icon || 'Package'} size={12} /></span>
+            {categoryMeta[cat]?.name || cat}
+            <span class="count">{count}</span>
+          </button>
+        {/if}
+      {/each}
+    {/if}
+    {#if installFilter !== 'installed' && nixpkgsResults.length > 0}
       <button
         class="tab nixpkgs-tab"
         class:active={showNixpkgsTab}
@@ -577,9 +637,9 @@
         </h2>
         <span class="info">
           {#if showNixpkgsTab}
-            {nixpkgsResults.length} packages
+            {filteredNixpkgsResults.length} packages
           {:else}
-            {searchQuery || selectedCategory ? filteredPackages.length : featuredPackages.length} applications
+            {visibleAppstreamPackages.length} applications
           {/if}
         </span>
       </div>
@@ -587,27 +647,27 @@
       <div class="card-grid">
         {#if showNixpkgsTab}
           <!-- Nixpkgs tab selected - show only nixpkgs results -->
-          {#each nixpkgsResults as pkg}
-            <button class="card nixpkgs-card" class:configured={configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
+          {#each filteredNixpkgsResults as pkg}
+            <button class="card nixpkgs-card" class:configured={installFilter === 'installed' || configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
               <div class="card-icon">
                 <span class="placeholder-icon"><Icon name="Package" size={24} /></span>
               </div>
               <div class="card-content">
                 <span class="card-name">
-                  {pkg.name}
-                  {#if configuredPackages.has(pkg.pkgname)}
-                    <span class="installed-badge">Installed</span>
-                  {/if}
-                  <span class="nixpkgs-badge">nixpkgs</span>
+                  <span class="card-title-text">{pkg.name}</span>
                 </span>
                 <span class="card-summary">{pkg.summary || ''}</span>
               </div>
+              <span class="nixpkgs-badge card-corner-badge source">nixpkgs</span>
+              {#if installFilter === 'installed' || configuredPackages.has(pkg.pkgname)}
+                <span class="installed-badge card-corner-badge installed">Installed</span>
+              {/if}
             </button>
           {/each}
         {:else}
           <!-- Normal view - AppStream packages -->
-          {#each (searchQuery || selectedCategory ? filteredPackages : featuredPackages) as pkg}
-            <button class="card" class:configured={configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
+          {#each visibleAppstreamPackages as pkg}
+            <button class="card" class:configured={installFilter === 'installed' || configuredPackages.has(pkg.pkgname)} onclick={() => openModal(pkg)}>
               <div class="card-icon">
                 {#if getIconUrl(pkg)}
                   <img src={getIconUrl(pkg)} alt="" />
@@ -617,13 +677,13 @@
               </div>
               <div class="card-content">
                 <span class="card-name">
-                  {pkg.name}
-                  {#if configuredPackages.has(pkg.pkgname)}
-                    <span class="installed-badge">Installed</span>
-                  {/if}
+                  <span class="card-title-text">{pkg.name}</span>
                 </span>
                 <span class="card-summary">{pkg.summary || ''}</span>
               </div>
+              {#if installFilter === 'installed' || configuredPackages.has(pkg.pkgname)}
+                <span class="installed-badge card-corner-badge installed">Installed</span>
+              {/if}
             </button>
           {/each}
 
@@ -632,7 +692,7 @@
             <div class="empty-with-action">
               <p>No applications found in AppStream catalog</p>
             </div>
-          {:else if !searchQuery && !selectedCategory && featuredPackages.length === 0}
+          {:else if !searchQuery && !selectedCategory && featuredFilteredPackages.length === 0}
             <div class="empty">No applications found</div>
           {/if}
         {/if}
@@ -1073,6 +1133,27 @@
     color: #b4befe;
   }
 
+  .tab.installed-tab {
+    border-color: rgba(166, 227, 161, 0.3);
+    color: #a6e3a1;
+  }
+
+  .tab.installed-tab:hover {
+    border-color: rgba(166, 227, 161, 0.5);
+    color: #b8efb4;
+  }
+
+  .tab.installed-tab.active {
+    background: linear-gradient(135deg, rgba(166, 227, 161, 0.2) 0%, rgba(137, 180, 250, 0.2) 100%);
+    border-color: rgba(166, 227, 161, 0.45);
+    color: #a6e3a1;
+  }
+
+  .tab.installed-tab .count {
+    background: rgba(166, 227, 161, 0.2);
+    color: #a6e3a1;
+  }
+
   .tab.nixpkgs-tab:hover {
     border-color: rgba(180, 190, 254, 0.5);
   }
@@ -1140,6 +1221,7 @@
   }
 
   .card {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1195,12 +1277,20 @@
     flex-direction: column;
     gap: 4px;
     width: 100%;
+    align-items: center;
   }
 
   .card-name {
+    width: 100%;
     font-size: 13px;
     font-weight: 500;
     color: #cdd6f4;
+    text-align: center;
+  }
+
+  .card-title-text {
+    display: block;
+    width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2044,7 +2134,8 @@
   }
 
   .nixpkgs-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     background: rgba(180, 190, 254, 0.2);
     color: #b4befe;
     padding: 1px 6px;
@@ -2052,12 +2143,11 @@
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
-    margin-left: 6px;
-    vertical-align: middle;
   }
 
   .installed-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     background: rgba(166, 227, 161, 0.2);
     color: #a6e3a1;
     padding: 1px 6px;
@@ -2065,8 +2155,32 @@
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
-    margin-left: 6px;
-    vertical-align: middle;
+  }
+
+  .card-corner-badge {
+    position: absolute;
+    top: -1px;
+    right: 10px;
+    border-radius: 0 0 6px 6px;
+    border: 1px solid;
+    border-top: none;
+    z-index: 1;
+  }
+
+  .card-corner-badge.source {
+    top: -1px;
+    right: 10px;
+    border-color: rgba(180, 190, 254, 0.35);
+  }
+
+  .card-corner-badge.installed {
+    top: -1px;
+    right: 10px;
+    border-color: rgba(166, 227, 161, 0.35);
+  }
+
+  .card-corner-badge.source + .card-corner-badge.installed {
+    right: 72px;
   }
 
   .empty-with-action {
