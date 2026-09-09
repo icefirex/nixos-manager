@@ -440,463 +440,504 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
 /**
  * Register options management IPC handlers
  */
-function register() {
-  // Get options from flake configuration files
-  ipcMain.handle('get-options', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      throw new Error(flakeDirNotFoundMsg());
-    }
+function createOptionsHandlers(deps = {}) {
+  const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
+  const depsRunCmd = deps.runCmd || runCmd;
+  const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
+  const depsAddOptionHistoryEntry = deps.addOptionHistoryEntry || addOptionHistoryEntry;
+  const depsSearchOptionCatalog = deps.searchOptionCatalog || searchOptionCatalog;
 
-    const options = {
-      services: [],
-      programs: [],
-      hardware: [],
-      networking: [],
-      boot: [],
-      system: [],
-      other: []
-    };
-
-    const nixFiles = findNixFiles(flakeDir);
-
-    // Helper to extract multi-line block/list from source
-    function extractMultilineValue(lines, startIdx, startValue) {
-      // Count initial brackets
-      let braceCount = 0;
-      let bracketCount = 0;
-      for (const char of startValue) {
-        if (char === '{') braceCount++;
-        if (char === '}') braceCount--;
-        if (char === '[') bracketCount++;
-        if (char === ']') bracketCount--;
+  return {
+    // Get options from flake configuration files
+    getOptions: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        throw new Error(depsFlakeDirNotFoundMsg());
       }
 
-      // If already balanced, return as-is
-      if (braceCount === 0 && bracketCount === 0) {
-        return startValue;
-      }
+      const options = {
+        services: [],
+        programs: [],
+        hardware: [],
+        networking: [],
+        boot: [],
+        system: [],
+        other: []
+      };
 
-      // Extract lines until balanced
-      let result = [startValue];
-      let i = startIdx;
-      const maxLines = 50;
+      const nixFiles = findNixFiles(flakeDir);
 
-      while (i < lines.length && (braceCount > 0 || bracketCount > 0) && result.length < maxLines) {
-        const line = lines[i];
-        result.push(line);
-
-        for (const char of line) {
+      // Helper to extract multi-line block/list from source
+      function extractMultilineValue(lines, startIdx, startValue) {
+        // Count initial brackets
+        let braceCount = 0;
+        let bracketCount = 0;
+        for (const char of startValue) {
           if (char === '{') braceCount++;
           if (char === '}') braceCount--;
           if (char === '[') bracketCount++;
           if (char === ']') bracketCount--;
         }
-        i++;
-      }
 
-      // Format the result
-      let formatted = result.join('\n');
+        // If already balanced, return as-is
+        if (braceCount === 0 && bracketCount === 0) {
+          return startValue;
+        }
 
-      // If we hit the limit, add truncation indicator
-      if (result.length >= maxLines && (braceCount > 0 || bracketCount > 0)) {
-        formatted += '\n  # ...';
-      }
+        // Extract lines until balanced
+        let result = [startValue];
+        let i = startIdx;
+        const maxLines = 50;
 
-      return formatted;
-    }
+        while (i < lines.length && (braceCount > 0 || bracketCount > 0) && result.length < maxLines) {
+          const line = lines[i];
+          result.push(line);
 
-    for (const nixFile of nixFiles) {
-      try {
-        const content = fs.readFileSync(nixFile, 'utf8');
-        const lines = content.split('\n');
-        const relativePath = path.relative(flakeDir, nixFile);
-
-        // Parse each line for option assignments
-        lines.forEach((line, idx) => {
-          const lineNum = idx + 1;
-
-          // Match patterns like: services.foo.enable = true;
-          // Also match: programs.git.enable = true;
-          // Also match: hardware.opengl.enable = true;
-          const optionMatch = line.match(/^\s*(services|programs|hardware|networking|boot|system|virtualisation|security|users|fonts|environment|nixpkgs|nix|home)\.([a-zA-Z0-9._-]+)\s*=\s*(.+?);?\s*$/);
-
-          if (optionMatch) {
-            const category = optionMatch[1];
-            const optionPath = `${category}.${optionMatch[2]}`;
-            let value = optionMatch[3].trim().replace(/;$/, '');
-
-            // If value contains unbalanced brackets, extract multi-line content
-            if (value.includes('{') || value.includes('[')) {
-              const extracted = extractMultilineValue(lines, idx + 1, value);
-              if (extracted !== value) {
-                value = extracted;
-              }
-            }
-
-            const optionEntry = {
-              path: optionPath,
-              value: value,
-              file: relativePath,
-              line: lineNum
-            };
-
-            // Categorize the option
-            if (category === 'services') {
-              if (!options.services.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.services.push(optionEntry);
-              }
-            } else if (category === 'programs') {
-              if (!options.programs.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.programs.push(optionEntry);
-              }
-            } else if (category === 'hardware') {
-              if (!options.hardware.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.hardware.push(optionEntry);
-              }
-            } else if (category === 'networking') {
-              if (!options.networking.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.networking.push(optionEntry);
-              }
-            } else if (category === 'boot') {
-              if (!options.boot.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.boot.push(optionEntry);
-              }
-            } else if (category === 'system') {
-              if (!options.system.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.system.push(optionEntry);
-              }
-            } else {
-              if (!options.other.find(o => o.path === optionPath && o.file === relativePath)) {
-                options.other.push(optionEntry);
-              }
-            }
+          for (const char of line) {
+            if (char === '{') braceCount++;
+            if (char === '}') braceCount--;
+            if (char === '[') bracketCount++;
+            if (char === ']') bracketCount--;
           }
-        });
+          i++;
+        }
+
+        // Format the result
+        let formatted = result.join('\n');
+
+        // If we hit the limit, add truncation indicator
+        if (result.length >= maxLines && (braceCount > 0 || bracketCount > 0)) {
+          formatted += '\n  # ...';
+        }
+
+        return formatted;
+      }
+
+      for (const nixFile of nixFiles) {
+        try {
+          const content = fs.readFileSync(nixFile, 'utf8');
+          const lines = content.split('\n');
+          const relativePath = path.relative(flakeDir, nixFile);
+
+          // Parse each line for option assignments
+          lines.forEach((line, idx) => {
+            const lineNum = idx + 1;
+
+            // Match patterns like: services.foo.enable = true;
+            // Also match: programs.git.enable = true;
+            // Also match: hardware.opengl.enable = true;
+            const optionMatch = line.match(/^\s*(services|programs|hardware|networking|boot|system|virtualisation|security|users|fonts|environment|nixpkgs|nix|home)\.([a-zA-Z0-9._-]+)\s*=\s*(.+?);?\s*$/);
+
+            if (optionMatch) {
+              const category = optionMatch[1];
+              const optionPath = `${category}.${optionMatch[2]}`;
+              let value = optionMatch[3].trim().replace(/;$/, '');
+
+              // If value contains unbalanced brackets, extract multi-line content
+              if (value.includes('{') || value.includes('[')) {
+                const extracted = extractMultilineValue(lines, idx + 1, value);
+                if (extracted !== value) {
+                  value = extracted;
+                }
+              }
+
+              const optionEntry = {
+                path: optionPath,
+                value: value,
+                file: relativePath,
+                line: lineNum
+              };
+
+              // Categorize the option
+              if (category === 'services') {
+                if (!options.services.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.services.push(optionEntry);
+                }
+              } else if (category === 'programs') {
+                if (!options.programs.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.programs.push(optionEntry);
+                }
+              } else if (category === 'hardware') {
+                if (!options.hardware.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.hardware.push(optionEntry);
+                }
+              } else if (category === 'networking') {
+                if (!options.networking.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.networking.push(optionEntry);
+                }
+              } else if (category === 'boot') {
+                if (!options.boot.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.boot.push(optionEntry);
+                }
+              } else if (category === 'system') {
+                if (!options.system.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.system.push(optionEntry);
+                }
+              } else {
+                if (!options.other.find(o => o.path === optionPath && o.file === relativePath)) {
+                  options.other.push(optionEntry);
+                }
+              }
+            }
+          });
+        } catch (e) {
+          console.error(`Failed to parse ${nixFile}:`, e.message);
+        }
+      }
+
+      // Sort all lists by option path
+      for (const category of Object.keys(options)) {
+        options[category].sort((a, b) => a.path.localeCompare(b.path));
+      }
+
+      return options;
+    },
+
+    // Get option info from NixOS options
+    getOptionInfo: async (optionPath) => {
+      const flakeDir = depsFindFlakeDir();
+
+      const info = {
+        path: optionPath,
+        description: null,
+        type: null,
+        default: null,
+        example: null,
+        declared: null,
+        configLocations: []
+      };
+
+      // Try to get option info from nixos-option
+      try {
+        const optionJson = await depsRunCmd(
+          `nixos-option --json ${optionPath} 2>/dev/null || echo "{}"`,
+          15000
+        );
+
+        if (optionJson && optionJson.trim() !== '{}') {
+          const parsed = JSON.parse(optionJson);
+          info.description = parsed.description || null;
+          info.type = parsed.type || null;
+          info.default = parsed.default !== undefined ? JSON.stringify(parsed.default) : null;
+          info.example = parsed.example !== undefined ? JSON.stringify(parsed.example) : null;
+
+          if (parsed.declarations && parsed.declarations.length > 0) {
+            info.declared = parsed.declarations[0];
+          }
+        }
       } catch (e) {
-        console.error(`Failed to parse ${nixFile}:`, e.message);
+        console.error(`Failed to get nixos-option info for ${optionPath}:`, e.message);
       }
-    }
 
-    // Sort all lists by option path
-    for (const category of Object.keys(options)) {
-      options[category].sort((a, b) => a.path.localeCompare(b.path));
-    }
+      // Find where option is set in config
+      if (flakeDir) {
+        // Escape dots for grep regex
+        const escapedPath = optionPath.replace(/\./g, '\\.');
+        const grepResult = await depsRunCmd(
+          `grep -rn --include="*.nix" "${escapedPath}\\s*=" "${flakeDir}" 2>/dev/null | head -10`,
+          10000
+        );
 
-    return options;
-  });
-
-  // Get option info from NixOS options
-  ipcMain.handle('get-option-info', async (event, optionPath) => {
-    const flakeDir = findFlakeDir();
-
-    const info = {
-      path: optionPath,
-      description: null,
-      type: null,
-      default: null,
-      example: null,
-      declared: null,
-      configLocations: []
-    };
-
-    // Try to get option info from nixos-option
-    try {
-      const optionJson = await runCmd(
-        `nixos-option --json ${optionPath} 2>/dev/null || echo "{}"`,
-        15000
-      );
-
-      if (optionJson && optionJson.trim() !== '{}') {
-        const parsed = JSON.parse(optionJson);
-        info.description = parsed.description || null;
-        info.type = parsed.type || null;
-        info.default = parsed.default !== undefined ? JSON.stringify(parsed.default) : null;
-        info.example = parsed.example !== undefined ? JSON.stringify(parsed.example) : null;
-
-        if (parsed.declarations && parsed.declarations.length > 0) {
-          info.declared = parsed.declarations[0];
-        }
-      }
-    } catch (e) {
-      console.error(`Failed to get nixos-option info for ${optionPath}:`, e.message);
-    }
-
-    // Find where option is set in config
-    if (flakeDir) {
-      // Escape dots for grep regex
-      const escapedPath = optionPath.replace(/\./g, '\\.');
-      const grepResult = await runCmd(
-        `grep -rn --include="*.nix" "${escapedPath}\\s*=" "${flakeDir}" 2>/dev/null | head -10`,
-        10000
-      );
-
-      if (grepResult) {
-        const lines = grepResult.split('\n').filter(Boolean);
-        for (const line of lines) {
-          const match = line.match(/^([^:]+):(\d+):/);
-          if (match) {
-            const filePath = match[1];
-            const lineNum = match[2];
-            const relativePath = path.relative(flakeDir, filePath);
-            const loc = `${relativePath}:${lineNum}`;
-            if (!info.configLocations.includes(loc)) {
-              info.configLocations.push(loc);
+        if (grepResult) {
+          const lines = grepResult.split('\n').filter(Boolean);
+          for (const line of lines) {
+            const match = line.match(/^([^:]+):(\d+):/);
+            if (match) {
+              const filePath = match[1];
+              const lineNum = match[2];
+              const relativePath = path.relative(flakeDir, filePath);
+              const loc = `${relativePath}:${lineNum}`;
+              if (!info.configLocations.includes(loc)) {
+                info.configLocations.push(loc);
+              }
             }
           }
         }
       }
-    }
 
-    return info;
-  });
+      return info;
+    },
 
-  ipcMain.handle('options-list-files', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
-    const files = findNixFiles(flakeDir).map(filePath => ({
-      path: filePath,
-      relativePath: path.relative(flakeDir, filePath)
-    }));
-    return { success: true, files };
-  });
+    optionsListFiles: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
+      const files = findNixFiles(flakeDir).map(filePath => ({
+        path: filePath,
+        relativePath: path.relative(flakeDir, filePath)
+      }));
+      return { success: true, files };
+    },
 
-  ipcMain.handle('set-option-value', async (event, payload) => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
-    const optionPath = payload?.optionPath;
-    if (!optionPath || typeof optionPath !== 'string') {
-      return { success: false, error: 'optionPath is required' };
-    }
-    const newValue = payload?.newValue;
-    if (typeof newValue !== 'string' || !newValue.trim()) {
-      return { success: false, error: 'newValue is required' };
-    }
+    setOptionValue: async (payload) => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
+      const optionPath = payload?.optionPath;
+      if (!optionPath || typeof optionPath !== 'string') {
+        return { success: false, error: 'optionPath is required' };
+      }
+      const newValue = payload?.newValue;
+      if (typeof newValue !== 'string' || !newValue.trim()) {
+        return { success: false, error: 'newValue is required' };
+      }
 
-    let targetFile = null;
-    if (payload?.filePath) {
-      targetFile = resolveTargetFilePath(flakeDir, payload.filePath);
+      let targetFile = null;
+      if (payload?.filePath) {
+        targetFile = resolveTargetFilePath(flakeDir, payload.filePath);
+        if (!targetFile) {
+          return { success: false, error: `File not found: ${payload.filePath}` };
+        }
+      } else {
+        targetFile = chooseOptionFile(flakeDir, payload?.preferredFile || null);
+      }
+
       if (!targetFile) {
-        return { success: false, error: `File not found: ${payload.filePath}` };
+        return { success: false, error: 'No .nix file found to store this option' };
       }
-    } else {
-      targetFile = chooseOptionFile(flakeDir, payload?.preferredFile || null);
-    }
 
-    if (!targetFile) {
-      return { success: false, error: 'No .nix file found to store this option' };
-    }
-
-    try {
-      const result = updateOptionInFile(targetFile, optionPath, newValue, payload?.allowCreate !== false);
-      const relPath = path.relative(flakeDir, targetFile);
-      let diff = '';
       try {
-        diff = await runCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-      } catch (e) {}
-      addOptionHistoryEntry({
-        optionPath,
-        action: result.action,
-        oldValue: result.oldValue,
-        newValue: result.newValue,
-        file: targetFile
-      });
-      return {
-        success: true,
-        action: result.action,
-        file: targetFile,
-        relativePath: relPath,
-        oldValue: result.oldValue,
-        newValue: result.newValue,
-        diff: diff || null
-      };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+        const result = updateOptionInFile(targetFile, optionPath, newValue, payload?.allowCreate !== false);
+        const relPath = path.relative(flakeDir, targetFile);
+        let diff = '';
+        try {
+          diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
+        } catch (e) {}
+        depsAddOptionHistoryEntry({
+          optionPath,
+          action: result.action,
+          oldValue: result.oldValue,
+          newValue: result.newValue,
+          file: targetFile
+        });
+        return {
+          success: true,
+          action: result.action,
+          file: targetFile,
+          relativePath: relPath,
+          oldValue: result.oldValue,
+          newValue: result.newValue,
+          diff: diff || null
+        };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
 
-  ipcMain.handle('revert-option-from-git', async (event, payload) => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
+    revertOptionFromGit: async (payload) => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
 
-    const optionPath = payload?.optionPath;
-    if (!optionPath || typeof optionPath !== 'string') {
-      return { success: false, error: 'optionPath is required' };
-    }
+      const optionPath = payload?.optionPath;
+      if (!optionPath || typeof optionPath !== 'string') {
+        return { success: false, error: 'optionPath is required' };
+      }
 
-    const targetFile = resolveTargetFilePath(flakeDir, payload?.filePath);
-    if (!targetFile) {
-      return { success: false, error: `File not found: ${payload?.filePath || '(missing)'}` };
-    }
+      const targetFile = resolveTargetFilePath(flakeDir, payload?.filePath);
+      if (!targetFile) {
+        return { success: false, error: `File not found: ${payload?.filePath || '(missing)'}` };
+      }
 
-    const gitCtx = await resolveGitContext(targetFile, flakeDir);
-    if (!gitCtx) {
-      return { success: false, error: `Could not locate git repository for ${payload?.filePath || targetFile}` };
-    }
+      const gitCtx = await resolveGitContext(targetFile, flakeDir);
+      if (!gitCtx) {
+        return { success: false, error: `Could not locate git repository for ${payload?.filePath || targetFile}` };
+      }
 
-    const relPath = gitCtx.relPath;
-    const gitBlob = await runCmd(`git -C "${gitCtx.root}" show "HEAD:${relPath}"`);
-    if (!gitBlob || !gitBlob.trim()) {
-      return { success: false, error: `Could not read committed version of ${relPath}` };
-    }
+      const relPath = gitCtx.relPath;
+      const gitBlob = await depsRunCmd(`git -C "${gitCtx.root}" show "HEAD:${relPath}"`);
+      if (!gitBlob || !gitBlob.trim()) {
+        return { success: false, error: `Could not read committed version of ${relPath}` };
+      }
 
-    let committedValue = extractOptionValueFromContent(gitBlob, optionPath);
-    if (committedValue == null && typeof payload?.fallbackValue === 'string' && payload.fallbackValue.trim()) {
-      committedValue = normalizeOptionValue(payload.fallbackValue);
-    }
-    if (committedValue == null) {
-      return { success: false, error: `Option '${optionPath}' not found in committed file` };
-    }
+      let committedValue = extractOptionValueFromContent(gitBlob, optionPath);
+      if (committedValue == null && typeof payload?.fallbackValue === 'string' && payload.fallbackValue.trim()) {
+        committedValue = normalizeOptionValue(payload.fallbackValue);
+      }
+      if (committedValue == null) {
+        return { success: false, error: `Option '${optionPath}' not found in committed file` };
+      }
 
-    try {
-      const result = updateOptionInFile(targetFile, optionPath, committedValue, false);
-      addOptionHistoryEntry({
-        optionPath,
-        action: 'reverted',
-        oldValue: result.oldValue,
-        newValue: committedValue,
-        file: targetFile
-      });
-
-      let diff = '';
       try {
-        diff = await runCmd(`git -C "${gitCtx.root}" diff "${relPath}"`);
-      } catch (e) {}
+        const result = updateOptionInFile(targetFile, optionPath, committedValue, false);
+        depsAddOptionHistoryEntry({
+          optionPath,
+          action: 'reverted',
+          oldValue: result.oldValue,
+          newValue: committedValue,
+          file: targetFile
+        });
 
-      return {
-        success: true,
-        action: 'reverted',
-        file: targetFile,
-        relativePath: relPath,
-        oldValue: result.oldValue,
-        newValue: committedValue,
-        diff: diff || null
+        let diff = '';
+        try {
+          diff = await depsRunCmd(`git -C "${gitCtx.root}" diff "${relPath}"`);
+        } catch (e) {}
+
+        return {
+          success: true,
+          action: 'reverted',
+          file: targetFile,
+          relativePath: relPath,
+          oldValue: result.oldValue,
+          newValue: committedValue,
+          diff: diff || null
+        };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
+
+    searchOptionsCatalog: async (query, opts = {}) => {
+      if (!query || typeof query !== 'string' || !query.trim()) {
+        return { success: true, results: [] };
+      }
+      try {
+        const results = await depsSearchOptionCatalog(query.trim(), opts.channel || 'unstable', opts.limit || 20);
+        return { success: true, results };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
+
+    // Get live system options (enabled services, programs, etc.)
+    getLiveOptions: async () => {
+      const options = {
+        services: [],
+        programs: [],
+        hardware: [],
+        networking: [],
+        boot: [],
+        system: [],
+        other: []
       };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
 
-  ipcMain.handle('search-options-catalog', async (event, query, opts = {}) => {
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return { success: true, results: [] };
-    }
-    try {
-      const results = await searchOptionCatalog(query.trim(), opts.channel || 'unstable', opts.limit || 20);
-      return { success: true, results };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  });
+      // Get enabled systemd services
+      try {
+        const servicesOutput = await depsRunCmd(
+          `systemctl list-unit-files --type=service --state=enabled --no-pager --no-legend 2>/dev/null | head -100`,
+          15000
+        );
 
-  // Get live system options (enabled services, programs, etc.)
-  ipcMain.handle('get-live-options', async () => {
-    const options = {
-      services: [],
-      programs: [],
-      hardware: [],
-      networking: [],
-      boot: [],
-      system: [],
-      other: []
-    };
-
-    // Get enabled systemd services
-    try {
-      const servicesOutput = await runCmd(
-        `systemctl list-unit-files --type=service --state=enabled --no-pager --no-legend 2>/dev/null | head -100`,
-        15000
-      );
-
-      if (servicesOutput) {
-        const lines = servicesOutput.split('\n').filter(Boolean);
-        for (const line of lines) {
-          const match = line.match(/^([^\s]+)\.service/);
-          if (match) {
-            const serviceName = match[1];
-            // Skip internal systemd services
-            if (!serviceName.startsWith('systemd-') &&
-                !serviceName.startsWith('dbus') &&
-                !serviceName.startsWith('getty') &&
-                !serviceName.startsWith('user@')) {
-              options.services.push({
-                path: `services.${serviceName}`,
-                value: 'enabled',
-                source: 'systemd'
-              });
+        if (servicesOutput) {
+          const lines = servicesOutput.split('\n').filter(Boolean);
+          for (const line of lines) {
+            const match = line.match(/^([^\s]+)\.service/);
+            if (match) {
+              const serviceName = match[1];
+              // Skip internal systemd services
+              if (!serviceName.startsWith('systemd-') &&
+                  !serviceName.startsWith('dbus') &&
+                  !serviceName.startsWith('getty') &&
+                  !serviceName.startsWith('user@')) {
+                options.services.push({
+                  path: `services.${serviceName}`,
+                  value: 'enabled',
+                  source: 'systemd'
+                });
+              }
             }
           }
         }
+      } catch (e) {
+        console.error('Failed to get enabled services:', e.message);
       }
-    } catch (e) {
-      console.error('Failed to get enabled services:', e.message);
-    }
 
-    // Get some key system info
-    try {
-      // Check if some common programs are available
-      const programs = ['git', 'vim', 'nvim', 'zsh', 'bash', 'fish', 'tmux', 'htop', 'firefox', 'chromium'];
-      for (const prog of programs) {
-        const exists = await runCmd(`which ${prog} 2>/dev/null`);
-        if (exists && exists.trim()) {
-          options.programs.push({
-            path: `programs.${prog}`,
-            value: exists.trim(),
-            source: 'which'
+      // Get some key system info
+      try {
+        // Check if some common programs are available
+        const programs = ['git', 'vim', 'nvim', 'zsh', 'bash', 'fish', 'tmux', 'htop', 'firefox', 'chromium'];
+        for (const prog of programs) {
+          const exists = await depsRunCmd(`which ${prog} 2>/dev/null`);
+          if (exists && exists.trim()) {
+            options.programs.push({
+              path: `programs.${prog}`,
+              value: exists.trim(),
+              source: 'which'
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to check programs:', e.message);
+      }
+
+      // Get networking info
+      try {
+        const hostname = await depsRunCmd('hostname 2>/dev/null');
+        if (hostname) {
+          options.networking.push({
+            path: 'networking.hostName',
+            value: hostname.trim(),
+            source: 'hostname'
           });
         }
-      }
-    } catch (e) {
-      console.error('Failed to check programs:', e.message);
-    }
 
-    // Get networking info
-    try {
-      const hostname = await runCmd('hostname 2>/dev/null');
-      if (hostname) {
+        const fwStatus = await depsRunCmd('systemctl is-active firewall.service 2>/dev/null || echo "inactive"');
         options.networking.push({
-          path: 'networking.hostName',
-          value: hostname.trim(),
-          source: 'hostname'
+          path: 'networking.firewall',
+          value: fwStatus.trim() === 'active' ? 'enabled' : 'disabled',
+          source: 'systemd'
         });
+      } catch (e) {
+        console.error('Failed to get networking info:', e.message);
       }
 
-      const fwStatus = await runCmd('systemctl is-active firewall.service 2>/dev/null || echo "inactive"');
-      options.networking.push({
-        path: 'networking.firewall',
-        value: fwStatus.trim() === 'active' ? 'enabled' : 'disabled',
-        source: 'systemd'
-      });
-    } catch (e) {
-      console.error('Failed to get networking info:', e.message);
-    }
-
-    // Get boot info
-    try {
-      const kernelVersion = await runCmd('uname -r 2>/dev/null');
-      if (kernelVersion) {
-        options.boot.push({
-          path: 'boot.kernelPackages',
-          value: kernelVersion.trim(),
-          source: 'uname'
-        });
+      // Get boot info
+      try {
+        const kernelVersion = await depsRunCmd('uname -r 2>/dev/null');
+        if (kernelVersion) {
+          options.boot.push({
+            path: 'boot.kernelPackages',
+            value: kernelVersion.trim(),
+            source: 'uname'
+          });
+        }
+      } catch (e) {
+        console.error('Failed to get boot info:', e.message);
       }
-    } catch (e) {
-      console.error('Failed to get boot info:', e.message);
-    }
 
-    // Sort all lists
-    for (const category of Object.keys(options)) {
-      options[category].sort((a, b) => a.path.localeCompare(b.path));
-    }
+      // Sort all lists
+      for (const category of Object.keys(options)) {
+        options[category].sort((a, b) => a.path.localeCompare(b.path));
+      }
 
-    return options;
+      return options;
+    }
+  };
+}
+
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createOptionsHandlers(deps);
+
+  depsIpcMain.handle('get-options', async () => {
+    return handlers.getOptions();
+  });
+
+  depsIpcMain.handle('get-option-info', async (_event, optionPath) => {
+    return handlers.getOptionInfo(optionPath);
+  });
+
+  depsIpcMain.handle('options-list-files', async () => {
+    return handlers.optionsListFiles();
+  });
+
+  depsIpcMain.handle('set-option-value', async (_event, payload) => {
+    return handlers.setOptionValue(payload);
+  });
+
+  depsIpcMain.handle('revert-option-from-git', async (_event, payload) => {
+    return handlers.revertOptionFromGit(payload);
+  });
+
+  depsIpcMain.handle('search-options-catalog', async (_event, query, opts = {}) => {
+    return handlers.searchOptionsCatalog(query, opts);
+  });
+
+  depsIpcMain.handle('get-live-options', async () => {
+    return handlers.getLiveOptions();
   });
 }
 
@@ -908,4 +949,5 @@ module.exports = {
   resolveTargetFilePath,
   updateOptionInFile,
   extractOptionValueFromContent,
+  createOptionsHandlers,
 };

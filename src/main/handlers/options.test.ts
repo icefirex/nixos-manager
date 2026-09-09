@@ -141,6 +141,42 @@ describe('options handler', () => {
     expect(value).toBeNull();
   });
 
+  it('supports DI-lite via createOptionsHandlers for setOptionValue flow', async () => {
+    const mod = require('./options');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-di-lite-'));
+    fs.writeFileSync(path.join(dir, 'flake.nix'), '{ }\n');
+    const filePath = path.join(dir, 'configuration.nix');
+    fs.writeFileSync(filePath, '{\n  services.openssh.enable = true;\n}\n');
+
+    const runCmdCalls: string[] = [];
+    const historyCalls: Array<{ action?: string }> = [];
+    const handlers = mod.createOptionsHandlers({
+      findFlakeDir: () => dir,
+      flakeDirNotFoundMsg: () => 'missing flake dir',
+      runCmd: async (cmd) => {
+        runCmdCalls.push(cmd);
+        return cmd.includes(' diff ') ? 'diff --git a/configuration.nix b/configuration.nix' : '';
+      },
+      addOptionHistoryEntry: (entry) => historyCalls.push(entry)
+    });
+
+    const result = await handlers.setOptionValue({
+      optionPath: 'services.openssh.enable',
+      newValue: 'false',
+      filePath
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.action).toBe('set');
+    expect(result.oldValue).toBe('true');
+    expect(result.newValue).toBe('false');
+    expect(runCmdCalls.some(cmd => cmd.includes('git -C'))).toBe(true);
+    expect(historyCalls).toHaveLength(1);
+    expect(historyCalls[0].action).toBe('set');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
 });
 
 export {};
