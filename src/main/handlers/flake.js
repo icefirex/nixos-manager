@@ -351,4 +351,4 @@ function register() {
   });
 }
 
-module.exports = { register, getInputUpdateStatus };
+module.exports = { register, getInputUpdateStatus, relativeTime, runUpdateChecks };

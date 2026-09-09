@@ -179,4 +179,9 @@ function register() {
   });
 }
 
-module.exports = { register };
+module.exports = {
+  register,
+  commandExists,
+  resolveRebuildCommand,
+  resolveEvalCommand,
+};

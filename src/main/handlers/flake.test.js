@@ -9,4 +9,17 @@ describe('flake handler', () => {
     const { getInputUpdateStatus } = require('./flake');
     expect(getInputUpdateStatus()).toEqual({});
   });
+
+  it('relativeTime formats recent and old timestamps', () => {
+    const { relativeTime } = require('./flake');
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    expect(relativeTime(now - 10 * 60 * 1000)).toBe('just now');
+    expect(relativeTime(now - 3 * 60 * 60 * 1000)).toBe('3h ago');
+    expect(relativeTime(now - 2 * 24 * 60 * 60 * 1000)).toBe('2 days ago');
+
+    nowSpy.mockRestore();
+  });
+
 });
