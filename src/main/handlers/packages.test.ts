@@ -167,6 +167,53 @@ index 1234567..89abcde 100644
     fs.rmSync(flakeDir, { recursive: true, force: true });
   });
 
+  it('supports DI-lite via createPackagesHandlers for pending changes flow', async () => {
+    const mod = require('./packages');
+    const flakeDir = makeTempFlake({
+      'configuration.nix': '{\n  services.demo.enable = false;\n}\n'
+    });
+
+    const handlers = mod.createPackagesHandlers({
+      findFlakeDir: () => flakeDir,
+      runCmd: async (cmd) => {
+        if (cmd.includes('diff --name-only')) return 'configuration.nix\n';
+        if (cmd.includes("diff --unified=20 -- '*.nix'")) {
+          return `
+diff --git a/configuration.nix b/configuration.nix
+--- a/configuration.nix
++++ b/configuration.nix
+@@ -1,3 +1,3 @@
+ {
+-  services.demo.enable = false;
++  services.demo.enable = true;
+ }
+`;
+        }
+        return '';
+      }
+    });
+
+    const result = await handlers.getPendingChanges();
+    expect(result.hasDrift).toBe(true);
+    expect(result.changedFiles).toEqual(['configuration.nix']);
+    expect(result.optionChanges).toContainEqual(expect.objectContaining({
+      optionPath: 'services.demo.enable',
+      action: 'set',
+      oldValue: 'false',
+      newValue: 'true',
+      source: 'git'
+    }));
+
+    fs.rmSync(flakeDir, { recursive: true, force: true });
+  });
+
+  it('returns flake-not-found payload from DI-lite getDuplicates', async () => {
+    const mod = require('./packages');
+    const handlers = mod.createPackagesHandlers({ findFlakeDir: () => null });
+    const result = await handlers.getDuplicates();
+    expect(result).toEqual({ success: false, error: 'Flake directory not found' });
+  });
+
 });
 
 export {};

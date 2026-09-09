@@ -6,21 +6,328 @@ const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 const { getAllPackages, findDuplicates } = require('../nix-packages');
 
+function createPackagesHandlers(deps = {}) {
+  const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
+  const depsRunCmd = deps.runCmd || runCmd;
+  const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
+  const depsGetAllPackages = deps.getAllPackages || getAllPackages;
+  const depsFindDuplicates = deps.findDuplicates || findDuplicates;
+  const depsFindPackage = deps.findPackage || ((pkg, flake) => require('../nix-packages').findPackage(pkg, flake));
+  const depsGetDb = deps.getDb || (() => require('./history').getDb());
+  const depsFs = deps.fs || fs;
+  const depsOs = deps.os || os;
+
+  return {
+    getPackages: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        throw new Error(depsFlakeDirNotFoundMsg());
+      }
+      return depsGetAllPackages();
+    },
+
+    getDuplicates: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: 'Flake directory not found' };
+      }
+      const duplicates = depsFindDuplicates();
+      return { success: true, duplicates };
+    },
+
+    getPendingChanges: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return {
+          hasDrift: false,
+          pendingInstall: [],
+          pendingRemove: [],
+          optionChanges: [],
+          changedFiles: [],
+          lastRebuild: null,
+          lastConfigChange: null
+        };
+      }
+
+      // Get last rebuild time (from system profile symlink modification time)
+      let lastRebuild = null;
+      try {
+        const sysProfile = '/nix/var/nix/profiles/system';
+        if (depsFs.existsSync(sysProfile)) {
+          const lstat = depsFs.lstatSync(sysProfile);
+          if (lstat) lastRebuild = lstat.mtime.toISOString();
+        }
+      } catch (e) {}
+
+      // Get last config file modification time
+      let lastConfigChange = null;
+      try {
+        function findNewestNix(dir) {
+          let newest = null;
+          let entries;
+          try { entries = depsFs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+              const sub = findNewestNix(fullPath);
+              if (sub && (!newest || sub > newest)) newest = sub;
+            } else if (entry.isFile() && entry.name.endsWith('.nix')) {
+              try {
+                const mtime = depsFs.statSync(fullPath).mtime.getTime();
+                if (!newest || mtime > newest) newest = mtime;
+              } catch {}
+            }
+          }
+          return newest;
+        }
+        const newestMs = findNewestNix(flakeDir);
+        if (newestMs) lastConfigChange = new Date(newestMs).toISOString();
+      } catch (e) {}
+
+      const mtimeDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
+
+      const normalizeFile = (filePath) => {
+        if (!filePath) return '';
+        if (path.isAbsolute(filePath)) {
+          try {
+            const rel = path.relative(flakeDir, filePath);
+            if (!rel.startsWith('..')) return rel;
+          } catch (e) {}
+        }
+        return filePath;
+      };
+
+      // Collect generic git working-tree signals (includes external/manual edits)
+      let changedFiles = [];
+      let optionDiffSummary = { added: [], removed: [], changed: [] };
+      try {
+        const fileOut = await depsRunCmd(`git -C "${flakeDir}" diff --name-only`);
+        changedFiles = (fileOut || '')
+          .split('\n')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .filter(name => name.endsWith('.nix'));
+      } catch (e) {}
+
+      try {
+        const diffOut = await depsRunCmd(`git -C "${flakeDir}" diff --unified=20 -- '*.nix'`);
+        optionDiffSummary = parseOptionDiffSummary(diffOut, flakeDir);
+      } catch (e) {}
+
+      const hasDrift = mtimeDrift || changedFiles.length > 0;
+
+      // If drift, check history for app-initiated changes since last rebuild
+      let pendingInstall = [];
+      let pendingRemove = [];
+      let optionChanges = [];
+      const optionChangesByKey = new Map();
+      if (hasDrift && lastRebuild) {
+        try {
+          const db = depsGetDb();
+          const rebuildMs = new Date(lastRebuild).getTime();
+          const rows = db.prepare(
+            "SELECT pkgname, action, file FROM history WHERE timestamp > ? ORDER BY timestamp ASC"
+          ).all(rebuildMs);
+          const added = new Map();
+          const removed = new Map();
+          for (const row of rows) {
+            const key = `${row.file || ''}::${row.pkgname}`;
+            if (row.action === 'added') {
+              added.set(key, row);
+              removed.delete(key);
+            } else if (row.action === 'removed') {
+              removed.set(key, row);
+              added.delete(key);
+            }
+          }
+          pendingInstall = [];
+
+          if (flakeDir) {
+            pendingInstall = [...added.values()].filter(entry => {
+              const pkg = entry.pkgname;
+              const targetFile = entry.file;
+              const locs = depsFindPackage(pkg, flakeDir);
+              return locs.some(loc => path.resolve(loc.file) === path.resolve(targetFile));
+            });
+            pendingRemove = [...removed.values()].filter(entry => {
+              const locs = depsFindPackage(entry.pkgname, flakeDir);
+              return locs.length === 0;
+            }).map(entry => entry.pkgname);
+          } else {
+            pendingInstall = [...added.values()];
+            pendingRemove = [...removed.values()].map(entry => entry.pkgname);
+          }
+          pendingInstall = pendingInstall.map(entry => entry.pkgname);
+          pendingInstall = pendingInstall.sort();
+
+          if (pendingRemove.length > 0) {
+            const liveBins = new Set();
+            try { for (const n of depsFs.readdirSync('/nix/var/nix/profiles/system/sw/bin')) liveBins.add(n); } catch (e) {}
+            const username = depsOs.userInfo().username;
+            const hmDir = path.join('/etc/profiles/per-user', username, 'bin');
+            if (depsFs.existsSync(hmDir)) {
+              try { for (const n of depsFs.readdirSync(hmDir)) liveBins.add(n); } catch (e) {}
+            }
+            pendingRemove = pendingRemove.filter(pkg => {
+              if (liveBins.has(pkg)) return true;
+              if (pkg.endsWith('-bin') && liveBins.has(pkg.slice(0, -4))) return true;
+              return false;
+            });
+          }
+          pendingRemove = pendingRemove.sort();
+
+          const optionRows = db.prepare(
+            'SELECT option_path, action, old_value, new_value, file FROM option_history WHERE timestamp > ? ORDER BY timestamp ASC'
+          ).all(rebuildMs);
+
+          const byOption = new Map();
+          for (const row of optionRows) {
+            const key = `${row.option_path}::${row.file}`;
+            const current = byOption.get(key);
+            if (!current) {
+              byOption.set(key, {
+                optionPath: row.option_path,
+                action: row.action,
+                oldValue: row.old_value,
+                newValue: row.new_value,
+                file: row.file,
+                edits: 1
+              });
+              continue;
+            }
+
+            current.edits += 1;
+            current.action = row.action;
+            if (current.oldValue == null) current.oldValue = row.old_value;
+            current.newValue = row.new_value;
+          }
+          optionChanges = [...byOption.values()].sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+          for (const change of optionChanges) {
+            const file = normalizeFile(change.file);
+            const key = `${file}::${change.optionPath}`;
+            optionChangesByKey.set(key, {
+              ...change,
+              file,
+              source: 'sqlite'
+            });
+          }
+
+        } catch (e) {}
+      }
+
+      const gitPaths = new Set([
+        ...optionDiffSummary.changed.map(c => c.optionPath),
+        ...optionDiffSummary.added.map(c => c.optionPath),
+        ...optionDiffSummary.removed.map(c => c.optionPath)
+      ]);
+
+      if (gitPaths.size > 0) {
+        for (const [existingKey, existing] of optionChangesByKey.entries()) {
+          const overlaps = [...gitPaths].some(gitPath => (
+            existing.optionPath === gitPath ||
+            existing.optionPath.startsWith(`${gitPath}.`) ||
+            gitPath.startsWith(`${existing.optionPath}.`)
+          ));
+          if (overlaps) optionChangesByKey.delete(existingKey);
+        }
+      }
+
+      function upsertGitOptionChange(action, change) {
+        const file = normalizeFile(change.file);
+
+        for (const [existingKey, existing] of optionChangesByKey.entries()) {
+          if (normalizeFile(existing.file) !== file) continue;
+          if (
+            existing.optionPath === change.optionPath ||
+            existing.optionPath.startsWith(`${change.optionPath}.`) ||
+            change.optionPath.startsWith(`${existing.optionPath}.`)
+          ) {
+            optionChangesByKey.delete(existingKey);
+          }
+        }
+
+        const key = `${file}::${change.optionPath}`;
+        optionChangesByKey.set(key, {
+          optionPath: change.optionPath,
+          action,
+          oldValue: action === 'added' ? null : change.from,
+          newValue: action === 'removed' ? null : change.to,
+          file: file || '(unknown file)',
+          edits: 1,
+          source: 'git'
+        });
+      }
+
+      for (const change of optionDiffSummary.changed) upsertGitOptionChange('set', change);
+      for (const change of optionDiffSummary.added) upsertGitOptionChange('added', change);
+      for (const change of optionDiffSummary.removed) upsertGitOptionChange('removed', change);
+
+      const changedFileSet = new Set(changedFiles.map(normalizeFile));
+      const gitPathsByFile = new Map();
+      for (const group of [optionDiffSummary.changed, optionDiffSummary.added, optionDiffSummary.removed]) {
+        for (const c of group) {
+          const f = normalizeFile(c.file);
+          if (!gitPathsByFile.has(f)) gitPathsByFile.set(f, new Set());
+          gitPathsByFile.get(f).add(c.optionPath);
+        }
+      }
+
+      for (const [k, entry] of optionChangesByKey.entries()) {
+        if (entry.source !== 'sqlite') continue;
+        const file = normalizeFile(entry.file);
+
+        if (!changedFileSet.has(file)) {
+          optionChangesByKey.delete(k);
+          continue;
+        }
+
+        const gitPathsInFile = gitPathsByFile.get(file);
+        if (gitPathsInFile && gitPathsInFile.size > 0) {
+          const overlaps = [...gitPathsInFile].some(gitPath => (
+            entry.optionPath === gitPath ||
+            entry.optionPath.startsWith(`${gitPath}.`) ||
+            gitPath.startsWith(`${entry.optionPath}.`)
+          ));
+          if (!overlaps) {
+            optionChangesByKey.delete(k);
+          }
+        }
+      }
+
+      optionChanges = [...optionChangesByKey.values()].sort((a, b) => {
+        const pathCmp = a.optionPath.localeCompare(b.optionPath);
+        if (pathCmp !== 0) return pathCmp;
+        return String(a.file || '').localeCompare(String(b.file || ''));
+      });
+
+      return {
+        hasDrift,
+        pendingInstall,
+        pendingRemove,
+        optionChanges,
+        changedFiles,
+        optionDiffSummary,
+        lastRebuild,
+        lastConfigChange
+      };
+    }
+  };
+}
+
 /**
  * Register package management IPC handlers
  */
-function register() {
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createPackagesHandlers(deps);
+
   // Get packages from flake configuration
-  ipcMain.handle('get-packages', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      throw new Error(flakeDirNotFoundMsg());
-    }
-    return getAllPackages();
+  depsIpcMain.handle('get-packages', async () => {
+    return handlers.getPackages();
   });
 
   // Get package metadata from nixpkgs
-  ipcMain.handle('get-package-info', async (event, packageName) => {
+  depsIpcMain.handle('get-package-info', async (event, packageName) => {
     const flakeDir = findFlakeDir();
 
     const info = {
@@ -109,7 +416,7 @@ function register() {
   });
 
   // Get packages from live system state
-  ipcMain.handle('get-live-packages', async () => {
+  depsIpcMain.handle('get-live-packages', async () => {
     const username = os.userInfo().username;
 
     const packages = {
@@ -176,303 +483,12 @@ function register() {
   });
 
   // Find packages defined in multiple files within the same scope
-  ipcMain.handle('packages-get-duplicates', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: 'Flake directory not found' };
-    }
-    const duplicates = findDuplicates();
-    return { success: true, duplicates };
+  depsIpcMain.handle('packages-get-duplicates', async () => {
+    return handlers.getDuplicates();
   });
 
-  ipcMain.handle('get-pending-changes', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return {
-        hasDrift: false,
-        pendingInstall: [],
-        pendingRemove: [],
-        optionChanges: [],
-        changedFiles: [],
-        lastRebuild: null,
-        lastConfigChange: null
-      };
-    }
-
-    // Get last rebuild time (from system profile symlink modification time)
-    let lastRebuild = null;
-    try {
-      const sysProfile = '/nix/var/nix/profiles/system';
-      if (fs.existsSync(sysProfile)) {
-        const lstat = fs.lstatSync(sysProfile);
-        if (lstat) lastRebuild = lstat.mtime.toISOString();
-      }
-    } catch (e) {}
-
-    // Get last config file modification time
-    let lastConfigChange = null;
-    try {
-      function findNewestNix(dir) {
-        let newest = null;
-        let entries;
-        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-            const sub = findNewestNix(fullPath);
-            if (sub && (!newest || sub > newest)) newest = sub;
-          } else if (entry.isFile() && entry.name.endsWith('.nix')) {
-            try {
-              const mtime = fs.statSync(fullPath).mtime.getTime();
-              if (!newest || mtime > newest) newest = mtime;
-            } catch {}
-          }
-        }
-        return newest;
-      }
-      const newestMs = findNewestNix(flakeDir);
-      if (newestMs) lastConfigChange = new Date(newestMs).toISOString();
-    } catch (e) {}
-
-    const mtimeDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
-
-    const normalizeFile = (filePath) => {
-      if (!filePath) return '';
-      if (path.isAbsolute(filePath)) {
-        try {
-          const rel = path.relative(flakeDir, filePath);
-          if (!rel.startsWith('..')) return rel;
-        } catch (e) {}
-      }
-      return filePath;
-    };
-
-    // Collect generic git working-tree signals (includes external/manual edits)
-    let changedFiles = [];
-    let optionDiffSummary = { added: [], removed: [], changed: [] };
-    try {
-      const fileOut = await runCmd(`git -C "${flakeDir}" diff --name-only`);
-      changedFiles = (fileOut || '')
-        .split('\n')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .filter(name => name.endsWith('.nix'));
-    } catch (e) {}
-
-    try {
-      const diffOut = await runCmd(`git -C "${flakeDir}" diff --unified=20 -- '*.nix'`);
-      optionDiffSummary = parseOptionDiffSummary(diffOut, flakeDir);
-    } catch (e) {}
-
-    const hasDrift = mtimeDrift || changedFiles.length > 0;
-
-    // If drift, check history for app-initiated changes since last rebuild
-    let pendingInstall = [];
-    let pendingRemove = [];
-    let optionChanges = [];
-    const optionChangesByKey = new Map();
-    if (hasDrift && lastRebuild) {
-      try {
-        const { getDb } = require('./history');
-        const db = getDb();
-        const rebuildMs = new Date(lastRebuild).getTime();
-        const rows = db.prepare(
-          "SELECT pkgname, action, file FROM history WHERE timestamp > ? ORDER BY timestamp ASC"
-        ).all(rebuildMs);
-        const added = new Map();
-        const removed = new Map();
-        for (const row of rows) {
-          const key = `${row.file || ''}::${row.pkgname}`;
-          if (row.action === 'added') {
-            added.set(key, row);
-            removed.delete(key);
-          } else if (row.action === 'removed') {
-            removed.set(key, row);
-            added.delete(key);
-          }
-        }
-        // Verify installs: exclude packages no longer present in config files
-        // (e.g. user manually reverted the add in an editor)
-        pendingInstall = [];
-
-        // Verify removes: exclude packages still present in any config file
-        const flakeDir = findFlakeDir();
-        if (flakeDir) {
-          const { findPackage } = require('../nix-packages');
-          pendingInstall = [...added.values()].filter(entry => {
-            const pkg = entry.pkgname;
-            const targetFile = entry.file;
-            const locs = findPackage(pkg, flakeDir);
-            return locs.some(loc => path.resolve(loc.file) === path.resolve(targetFile));
-          });
-          pendingRemove = [...removed.values()].filter(entry => {
-            const locs = findPackage(entry.pkgname, flakeDir);
-            return locs.length === 0;
-          }).map(entry => entry.pkgname);
-        } else {
-          pendingInstall = [...added.values()];
-          pendingRemove = [...removed.values()].map(entry => entry.pkgname);
-        }
-        pendingInstall = pendingInstall.map(entry => entry.pkgname);
-        pendingInstall = pendingInstall.sort();
-
-        // Verify against live system: exclude packages that are no longer installed
-        if (pendingRemove.length > 0) {
-          const liveBins = new Set();
-          try { for (const n of fs.readdirSync('/nix/var/nix/profiles/system/sw/bin')) liveBins.add(n); } catch (e) {}
-          const username = os.userInfo().username;
-          const hmDir = path.join('/etc/profiles/per-user', username, 'bin');
-          if (fs.existsSync(hmDir)) {
-            try { for (const n of fs.readdirSync(hmDir)) liveBins.add(n); } catch (e) {}
-          }
-          pendingRemove = pendingRemove.filter(pkg => {
-            if (liveBins.has(pkg)) return true;
-            if (pkg.endsWith('-bin') && liveBins.has(pkg.slice(0, -4))) return true;
-            return false;
-          });
-        }
-        pendingRemove = pendingRemove.sort();
-
-        // Aggregate option-level changes since last rebuild
-        const optionRows = db.prepare(
-          'SELECT option_path, action, old_value, new_value, file FROM option_history WHERE timestamp > ? ORDER BY timestamp ASC'
-        ).all(rebuildMs);
-
-        const byOption = new Map();
-        for (const row of optionRows) {
-          const key = `${row.option_path}::${row.file}`;
-          const current = byOption.get(key);
-          if (!current) {
-            byOption.set(key, {
-              optionPath: row.option_path,
-              action: row.action,
-              oldValue: row.old_value,
-              newValue: row.new_value,
-              file: row.file,
-              edits: 1
-            });
-            continue;
-          }
-
-          current.edits += 1;
-          current.action = row.action;
-          if (current.oldValue == null) current.oldValue = row.old_value;
-          current.newValue = row.new_value;
-        }
-        optionChanges = [...byOption.values()].sort((a, b) => a.optionPath.localeCompare(b.optionPath));
-        for (const change of optionChanges) {
-          const file = normalizeFile(change.file);
-          const key = `${file}::${change.optionPath}`;
-          optionChangesByKey.set(key, {
-            ...change,
-            file,
-            source: 'sqlite'
-          });
-        }
-
-      } catch (e) {}
-    }
-
-    // Merge git-derived option deltas (authoritative current file state) over sqlite tracking
-    const gitPaths = new Set([
-      ...optionDiffSummary.changed.map(c => c.optionPath),
-      ...optionDiffSummary.added.map(c => c.optionPath),
-      ...optionDiffSummary.removed.map(c => c.optionPath)
-    ]);
-
-    if (gitPaths.size > 0) {
-      for (const [existingKey, existing] of optionChangesByKey.entries()) {
-        const overlaps = [...gitPaths].some(gitPath => (
-          existing.optionPath === gitPath ||
-          existing.optionPath.startsWith(`${gitPath}.`) ||
-          gitPath.startsWith(`${existing.optionPath}.`)
-        ));
-        if (overlaps) optionChangesByKey.delete(existingKey);
-      }
-    }
-
-    function upsertGitOptionChange(action, change) {
-      const file = normalizeFile(change.file);
-
-      // Remove overlapping sqlite-style aggregate entries in same file
-      for (const [existingKey, existing] of optionChangesByKey.entries()) {
-        if (normalizeFile(existing.file) !== file) continue;
-        if (
-          existing.optionPath === change.optionPath ||
-          existing.optionPath.startsWith(`${change.optionPath}.`) ||
-          change.optionPath.startsWith(`${existing.optionPath}.`)
-        ) {
-          optionChangesByKey.delete(existingKey);
-        }
-      }
-
-      const key = `${file}::${change.optionPath}`;
-      optionChangesByKey.set(key, {
-        optionPath: change.optionPath,
-        action,
-        oldValue: action === 'added' ? null : change.from,
-        newValue: action === 'removed' ? null : change.to,
-        file: file || '(unknown file)',
-        edits: 1,
-        source: 'git'
-      });
-    }
-
-    for (const change of optionDiffSummary.changed) upsertGitOptionChange('set', change);
-    for (const change of optionDiffSummary.added) upsertGitOptionChange('added', change);
-    for (const change of optionDiffSummary.removed) upsertGitOptionChange('removed', change);
-
-    // Remove stale sqlite-only entries that no longer exist in current git diff
-    const changedFileSet = new Set(changedFiles.map(normalizeFile));
-    const gitPathsByFile = new Map();
-    for (const group of [optionDiffSummary.changed, optionDiffSummary.added, optionDiffSummary.removed]) {
-      for (const c of group) {
-        const f = normalizeFile(c.file);
-        if (!gitPathsByFile.has(f)) gitPathsByFile.set(f, new Set());
-        gitPathsByFile.get(f).add(c.optionPath);
-      }
-    }
-
-    for (const [k, entry] of optionChangesByKey.entries()) {
-      if (entry.source !== 'sqlite') continue;
-      const file = normalizeFile(entry.file);
-
-      // If file is no longer changed at all, drop sqlite pending entry
-      if (!changedFileSet.has(file)) {
-        optionChangesByKey.delete(k);
-        continue;
-      }
-
-      // If git parsed option paths for this file, keep sqlite only when overlapping
-      const gitPathsInFile = gitPathsByFile.get(file);
-      if (gitPathsInFile && gitPathsInFile.size > 0) {
-        const overlaps = [...gitPathsInFile].some(gitPath => (
-          entry.optionPath === gitPath ||
-          entry.optionPath.startsWith(`${gitPath}.`) ||
-          gitPath.startsWith(`${entry.optionPath}.`)
-        ));
-        if (!overlaps) {
-          optionChangesByKey.delete(k);
-        }
-      }
-    }
-
-    optionChanges = [...optionChangesByKey.values()].sort((a, b) => {
-      const pathCmp = a.optionPath.localeCompare(b.optionPath);
-      if (pathCmp !== 0) return pathCmp;
-      return String(a.file || '').localeCompare(String(b.file || ''));
-    });
-
-    return {
-      hasDrift,
-      pendingInstall,
-      pendingRemove,
-      optionChanges,
-      changedFiles,
-      optionDiffSummary,
-      lastRebuild,
-      lastConfigChange
-    };
+  depsIpcMain.handle('get-pending-changes', async () => {
+    return handlers.getPendingChanges();
   });
 }
 
@@ -639,5 +655,6 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
 
 module.exports = {
   register,
+  createPackagesHandlers,
   parseOptionDiffSummary,
 };
