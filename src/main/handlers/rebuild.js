@@ -3,9 +3,6 @@ const { spawn, execSync } = require('child_process');
 const { findFlakeDir, updateBuildStatus, getSpawnEnv, flakeDirNotFoundMsg } = require('../utils');
 const { getMainWindow } = require('../window');
 
-// Track currently running rebuild process so it can be cancelled
-let runningRebuildProcess = null;
-
 /**
  * Check if a command exists on PATH within the given environment.
  */
@@ -57,24 +54,91 @@ function resolveEvalCommand(spawnEnv) {
 }
 
 /**
- * Register NixOS rebuild IPC handlers
+ * Create rebuild handlers with dependency injection support.
  */
-function register() {
-  ipcMain.handle('nixos-rebuild', async (event, { action, updateInputs }) => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      throw new Error(flakeDirNotFoundMsg());
-    }
+function createRebuildHandlers(deps = {}) {
+  const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
+  const depsUpdateBuildStatus = deps.updateBuildStatus || updateBuildStatus;
+  const depsGetSpawnEnv = deps.getSpawnEnv || getSpawnEnv;
+  const depsGetMainWindow = deps.getMainWindow || getMainWindow;
+  const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
+  const depsSpawn = deps.spawn || spawn;
+  const depsResolveRebuildCommand = deps.resolveRebuildCommand || resolveRebuildCommand;
+  const depsResolveEvalCommand = deps.resolveEvalCommand || resolveEvalCommand;
 
-    const mainWindow = getMainWindow();
-    const spawnEnv = getSpawnEnv();
+  let runningRebuildProcess = null;
 
-    // For evaluate (dry-build), use eval command
-    if (action === 'dry-build') {
-      const [evalCmd, ...evalArgs] = resolveEvalCommand(spawnEnv);
-      mainWindow?.webContents.send('terminal-show', { title: 'Evaluating Configuration' });
+  return {
+    nixosRebuild: async ({ action, updateInputs }) => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        throw new Error(depsFlakeDirNotFoundMsg());
+      }
+
+      const mainWindow = depsGetMainWindow();
+      const spawnEnv = depsGetSpawnEnv();
+
+      // For evaluate (dry-build), use eval command
+      if (action === 'dry-build') {
+        const [evalCmd, ...evalArgs] = depsResolveEvalCommand(spawnEnv);
+        mainWindow?.webContents.send('terminal-show', { title: 'Evaluating Configuration' });
+        return new Promise((resolve, reject) => {
+          const proc = depsSpawn(evalCmd, evalArgs, {
+            env: spawnEnv,
+            cwd: flakeDir
+          });
+
+          runningRebuildProcess = proc;
+
+          let output = '';
+          proc.stdout.on('data', (data) => {
+            output += data.toString();
+            mainWindow?.webContents.send('build-output', data.toString());
+          });
+
+          proc.stderr.on('data', (data) => {
+            output += data.toString();
+            mainWindow?.webContents.send('build-output', data.toString());
+          });
+
+          proc.on('close', (code) => {
+            if (runningRebuildProcess === proc) runningRebuildProcess = null;
+            mainWindow?.webContents.send('build-complete', { success: code === 0 });
+            if (code === 0) {
+              depsUpdateBuildStatus(true, 'Evaluation successful');
+              resolve({ success: true, output });
+            } else {
+              depsUpdateBuildStatus(false, 'Evaluation failed');
+              reject(new Error(`Evaluation failed with code ${code}`));
+            }
+          });
+
+          proc.on('error', (err) => {
+            if (runningRebuildProcess === proc) runningRebuildProcess = null;
+            mainWindow?.webContents.send('build-complete', { success: false });
+            depsUpdateBuildStatus(false, err.message);
+            reject(err);
+          });
+        });
+      }
+
+      // For switch / boot / test, use rebuild command
+      const [rebuildCmd, ...baseArgs] = depsResolveRebuildCommand(spawnEnv);
+      const args = [...baseArgs, action, '.'];
+
+      if (updateInputs) {
+        args.push('--update');
+      }
+
+      const actionTitles = {
+        'switch': 'Switching Configuration',
+        'boot': 'Building for Next Boot',
+        'test': 'Testing Configuration'
+      };
+      mainWindow?.webContents.send('terminal-show', { title: actionTitles[action] || 'Building' });
+
       return new Promise((resolve, reject) => {
-        const proc = spawn(evalCmd, evalArgs, {
+        const proc = depsSpawn(rebuildCmd, args, {
           env: spawnEnv,
           cwd: flakeDir
         });
@@ -86,96 +150,56 @@ function register() {
           output += data.toString();
           mainWindow?.webContents.send('build-output', data.toString());
         });
-
         proc.stderr.on('data', (data) => {
           output += data.toString();
           mainWindow?.webContents.send('build-output', data.toString());
         });
 
         proc.on('close', (code) => {
-          // Guard: only clear the module-level ref if it still points to THIS process.
-          // Prevents a cancelled process's close event from nulling a subsequently
-          // started process.
           if (runningRebuildProcess === proc) runningRebuildProcess = null;
           mainWindow?.webContents.send('build-complete', { success: code === 0 });
           if (code === 0) {
-            updateBuildStatus(true, 'Evaluation successful');
-            resolve({ success: true, output });
+            depsUpdateBuildStatus(true, `${action} completed successfully`);
+            resolve(output);
           } else {
-            updateBuildStatus(false, 'Evaluation failed');
-            reject(new Error(`Evaluation failed with code ${code}`));
+            depsUpdateBuildStatus(false, `${action} failed with code ${code}`);
+            reject(new Error(`Build failed with code ${code}`));
           }
         });
 
         proc.on('error', (err) => {
           if (runningRebuildProcess === proc) runningRebuildProcess = null;
           mainWindow?.webContents.send('build-complete', { success: false });
-          updateBuildStatus(false, err.message);
+          depsUpdateBuildStatus(false, err.message);
           reject(err);
         });
       });
+    },
+
+    cancelRebuild: () => {
+      if (runningRebuildProcess) {
+        runningRebuildProcess.kill('SIGTERM');
+        runningRebuildProcess = null;
+        return true;
+      }
+      return false;
     }
+  };
+}
 
-    // For switch / boot / test, use rebuild command
-    const [rebuildCmd, ...baseArgs] = resolveRebuildCommand(spawnEnv);
-    const args = [...baseArgs, action, '.'];
+/**
+ * Register NixOS rebuild IPC handlers
+ */
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createRebuildHandlers(deps);
 
-    if (updateInputs) {
-      args.push('--update');
-    }
-
-    const actionTitles = {
-      'switch': 'Switching Configuration',
-      'boot': 'Building for Next Boot',
-      'test': 'Testing Configuration'
-    };
-    mainWindow?.webContents.send('terminal-show', { title: actionTitles[action] || 'Building' });
-
-    return new Promise((resolve, reject) => {
-      const proc = spawn(rebuildCmd, args, {
-        env: spawnEnv,
-        cwd: flakeDir
-      });
-
-      runningRebuildProcess = proc;
-
-      let output = '';
-      proc.stdout.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-      proc.stderr.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-
-      proc.on('close', (code) => {
-        if (runningRebuildProcess === proc) runningRebuildProcess = null;
-        mainWindow?.webContents.send('build-complete', { success: code === 0 });
-        if (code === 0) {
-          updateBuildStatus(true, `${action} completed successfully`);
-          resolve(output);
-        } else {
-          updateBuildStatus(false, `${action} failed with code ${code}`);
-          reject(new Error(`Build failed with code ${code}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        if (runningRebuildProcess === proc) runningRebuildProcess = null;
-        mainWindow?.webContents.send('build-complete', { success: false });
-        updateBuildStatus(false, err.message);
-        reject(err);
-      });
-    });
+  depsIpcMain.handle('nixos-rebuild', async (_event, payload) => {
+    return handlers.nixosRebuild(payload);
   });
-  ipcMain.handle('cancel-rebuild', () => {
-    if (runningRebuildProcess) {
-      runningRebuildProcess.kill('SIGTERM');
-      runningRebuildProcess = null;
-      return true;
-    }
-    return false;
+
+  depsIpcMain.handle('cancel-rebuild', () => {
+    return handlers.cancelRebuild();
   });
 }
 
@@ -184,4 +208,5 @@ module.exports = {
   commandExists,
   resolveRebuildCommand,
   resolveEvalCommand,
+  createRebuildHandlers,
 };
