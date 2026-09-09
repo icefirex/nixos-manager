@@ -1,6 +1,9 @@
+// @ts-check
+
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
+/** @type {import('./src/types/ipc').ElectronAPI} */
+const electronAPI = {
   // Window controls
   minimize: () => ipcRenderer.invoke('window-minimize'),
   maximize: () => ipcRenderer.invoke('window-maximize'),
@@ -29,11 +32,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Options
   getOptions: () => ipcRenderer.invoke('get-options'),
   getLiveOptions: () => ipcRenderer.invoke('get-live-options'),
-  getOptionInfo: (path) => ipcRenderer.invoke('get-option-info', path),
+  getOptionInfo: (optionPath) => ipcRenderer.invoke('get-option-info', optionPath),
   setOptionValue: (payload) => ipcRenderer.invoke('set-option-value', payload),
   revertOptionFromGit: (payload) => ipcRenderer.invoke('revert-option-from-git', payload),
   optionsListFiles: () => ipcRenderer.invoke('options-list-files'),
-  searchOptionsCatalog: (query, opts) => ipcRenderer.invoke('search-options-catalog', query, opts),
+  searchOptionsCatalog: (query, opts = {}) => ipcRenderer.invoke('search-options-catalog', query, opts),
 
   // Generations
   getGenerations: () => ipcRenderer.invoke('get-generations'),
@@ -77,21 +80,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Build output listener — returns a cleanup function to remove the listener
   onBuildOutput: (callback) => {
-    const handler = (event, data) => callback(data);
+    const handler = (_event, data) => callback(data);
     ipcRenderer.on('build-output', handler);
     return () => ipcRenderer.removeListener('build-output', handler);
   },
 
   // Build complete listener — returns a cleanup function
   onBuildComplete: (callback) => {
-    const handler = (event, data) => callback(data);
+    const handler = (_event, data) => callback(data);
     ipcRenderer.on('build-complete', handler);
     return () => ipcRenderer.removeListener('build-complete', handler);
   },
 
   // Terminal show listener — returns a cleanup function
   onTerminalShow: (callback) => {
-    const handler = (event, data) => callback(data);
+    const handler = (_event, data) => callback(data);
     ipcRenderer.on('terminal-show', handler);
     return () => ipcRenderer.removeListener('terminal-show', handler);
   },
@@ -112,8 +115,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Flake update check completed — returns a cleanup function
   onFlakeUpdateCheckComplete: (callback) => {
-    const handler = (event, status) => callback(status);
+    const handler = (_event, status) => callback(status);
     ipcRenderer.on('flake-update-check-complete', handler);
     return () => ipcRenderer.removeListener('flake-update-check-complete', handler);
   }
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI);
