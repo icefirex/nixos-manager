@@ -38,6 +38,64 @@ describe('history handler', () => {
 
     expect(execSpy).not.toHaveBeenCalled();
   });
+
+  it('supports DI-lite createHistoryHandlers for history-add', async () => {
+    const mod = require('./history');
+    const runSpy = vi.fn();
+    const fakeDb = {
+      prepare: vi.fn(() => ({ run: runSpy }))
+    };
+    const handlers = mod.createHistoryHandlers({
+      getDb: () => fakeDb,
+      now: () => 1234567890
+    });
+
+    const result = await handlers.historyAdd({
+      pkgname: 'hello',
+      action: 'added',
+      file: 'configuration.nix',
+      type: 'systemPackages',
+      userName: 'ice'
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(fakeDb.prepare).toHaveBeenCalledWith(
+      'INSERT INTO history (timestamp, pkgname, action, file, type, user_name) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    expect(runSpy).toHaveBeenCalledWith(1234567890, 'hello', 'added', 'configuration.nix', 'systemPackages', 'ice');
+  });
+
+  it('supports DI-lite createHistoryHandlers for history-add-option', async () => {
+    const mod = require('./history');
+    const addOptionSpy = vi.fn();
+    const handlers = mod.createHistoryHandlers({ addOptionHistoryEntry: addOptionSpy });
+
+    const entry = {
+      optionPath: 'services.demo.enable',
+      action: 'set',
+      oldValue: 'false',
+      newValue: 'true',
+      file: 'configuration.nix'
+    };
+    const result = await handlers.historyAddOption(entry);
+
+    expect(result).toEqual({ success: true });
+    expect(addOptionSpy).toHaveBeenCalledWith(entry);
+  });
+
+  it('supports DI-lite createHistoryHandlers for history-get', async () => {
+    const mod = require('./history');
+    const rows = [{ timestamp: 1, entry_type: 'package', subject: 'git', action: 'added' }];
+    const fakeDb = {
+      prepare: vi.fn(() => ({ all: () => rows }))
+    };
+    const handlers = mod.createHistoryHandlers({ getDb: () => fakeDb });
+
+    const result = await handlers.historyGet();
+
+    expect(result).toEqual({ success: true, entries: rows });
+    expect(fakeDb.prepare).toHaveBeenCalled();
+  });
 });
 
 export {};

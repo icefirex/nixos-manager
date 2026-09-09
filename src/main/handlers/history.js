@@ -79,47 +79,70 @@ function addOptionHistoryEntry(entry) {
   stmt.run(Date.now(), entry.optionPath, entry.action, entry.oldValue || null, entry.newValue || null, entry.file);
 }
 
-function register() {
-  ipcMain.handle('history-get', async () => {
-    try {
-      const db = getDb();
-      const rows = db.prepare(`
-        SELECT timestamp, 'package' AS entry_type, pkgname AS subject, action, file, type, user_name, NULL AS old_value, NULL AS new_value
-        FROM history
-        UNION ALL
-        SELECT timestamp, 'option' AS entry_type, option_path AS subject, action, file, NULL AS type, NULL AS user_name, old_value, new_value
-        FROM option_history
-        ORDER BY timestamp DESC
-        LIMIT 500
-      `).all();
-      return { success: true, entries: rows };
-    } catch (e) {
-      console.error('Failed to read history:', e);
-      return { success: false, error: e.message };
+function createHistoryHandlers(deps = {}) {
+  const depsGetDb = deps.getDb || getDb;
+  const depsAddOptionHistoryEntry = deps.addOptionHistoryEntry || addOptionHistoryEntry;
+  const depsNow = deps.now || Date.now;
+
+  return {
+    historyGet: async () => {
+      try {
+        const db = depsGetDb();
+        const rows = db.prepare(`
+          SELECT timestamp, 'package' AS entry_type, pkgname AS subject, action, file, type, user_name, NULL AS old_value, NULL AS new_value
+          FROM history
+          UNION ALL
+          SELECT timestamp, 'option' AS entry_type, option_path AS subject, action, file, NULL AS type, NULL AS user_name, old_value, new_value
+          FROM option_history
+          ORDER BY timestamp DESC
+          LIMIT 500
+        `).all();
+        return { success: true, entries: rows };
+      } catch (e) {
+        console.error('Failed to read history:', e);
+        return { success: false, error: e.message };
+      }
+    },
+
+    historyAdd: async (entry) => {
+      try {
+        const db = depsGetDb();
+        const stmt = db.prepare('INSERT INTO history (timestamp, pkgname, action, file, type, user_name) VALUES (?, ?, ?, ?, ?, ?)');
+        stmt.run(depsNow(), entry.pkgname, entry.action, entry.file, entry.type || null, entry.userName || null);
+        return { success: true };
+      } catch (e) {
+        console.error('Failed to add history entry:', e);
+        return { success: false, error: e.message };
+      }
+    },
+
+    historyAddOption: async (entry) => {
+      try {
+        depsAddOptionHistoryEntry(entry);
+        return { success: true };
+      } catch (e) {
+        console.error('Failed to add option history entry:', e);
+        return { success: false, error: e.message };
+      }
     }
+  };
+}
+
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createHistoryHandlers(deps);
+
+  depsIpcMain.handle('history-get', async () => {
+    return handlers.historyGet();
   });
 
-  ipcMain.handle('history-add', async (event, entry) => {
-    try {
-      const db = getDb();
-      const stmt = db.prepare('INSERT INTO history (timestamp, pkgname, action, file, type, user_name) VALUES (?, ?, ?, ?, ?, ?)');
-      stmt.run(Date.now(), entry.pkgname, entry.action, entry.file, entry.type || null, entry.userName || null);
-      return { success: true };
-    } catch (e) {
-      console.error('Failed to add history entry:', e);
-      return { success: false, error: e.message };
-    }
+  depsIpcMain.handle('history-add', async (_event, entry) => {
+    return handlers.historyAdd(entry);
   });
 
-  ipcMain.handle('history-add-option', async (event, entry) => {
-    try {
-      addOptionHistoryEntry(entry);
-      return { success: true };
-    } catch (e) {
-      console.error('Failed to add option history entry:', e);
-      return { success: false, error: e.message };
-    }
+  depsIpcMain.handle('history-add-option', async (_event, entry) => {
+    return handlers.historyAddOption(entry);
   });
 }
 
-module.exports = { register, getDb, addOptionHistoryEntry, ensureOptionHistorySchema };
+module.exports = { register, getDb, addOptionHistoryEntry, ensureOptionHistorySchema, createHistoryHandlers };
