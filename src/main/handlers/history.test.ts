@@ -4,6 +4,32 @@ describe('history handler', () => {
     expect(mod.register).toBeInstanceOf(Function);
   });
 
+  it('registers all expected IPC channels via register(deps)', () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./history');
+
+    mod.register({ ipcMain });
+
+    for (const channel of ['history-get', 'history-add', 'history-add-option']) {
+      expect(typeof ipcMain.__getHandler(channel)).toBe('function');
+    }
+  });
+
+  it('register(deps) forwards injected deps so channels use the factory', async () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./history');
+
+    const rows = [{ timestamp: 1, subject: 'git', action: 'added' }];
+    const fakeDb = { prepare: () => ({ all: () => rows }) };
+    mod.register({ ipcMain, getDb: () => fakeDb });
+
+    const handler = ipcMain.__getHandler('history-get');
+    const result = await handler();
+    expect(result).toEqual({ success: true, entries: rows });
+  });
+
   it('migrates option_history schema to include reverted action', () => {
     const mod = require('./history');
     const execSpy = vi.fn();

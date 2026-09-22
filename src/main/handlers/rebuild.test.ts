@@ -10,6 +10,36 @@ describe('rebuild handler', () => {
     expect(mod.register).toBeInstanceOf(Function);
   });
 
+  it('registers all expected IPC channels via register(deps)', () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./rebuild');
+
+    mod.register({ ipcMain });
+
+    for (const channel of ['nixos-rebuild', 'cancel-rebuild']) {
+      expect(typeof ipcMain.__getHandler(channel)).toBe('function');
+    }
+  });
+
+  it('register(deps) forwards injected deps so channels use the factory', async () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./rebuild');
+
+    mod.register({
+      ipcMain,
+      findFlakeDir: () => null,
+      flakeDirNotFoundMsg: () => 'missing flake'
+    });
+
+    const cancelHandler = ipcMain.__getHandler('cancel-rebuild');
+    expect(cancelHandler()).toBe(false);
+
+    const rebuildHandler = ipcMain.__getHandler('nixos-rebuild');
+    await expect(rebuildHandler({}, { action: 'switch' })).rejects.toThrow('missing flake');
+  });
+
   it('prefers custom rebuild command when env var is set', () => {
     process.env.NIXOS_REBUILD_COMMAND = 'my-rebuild --fast';
     const mod = require('./rebuild');

@@ -18,6 +18,36 @@ describe('packages handler', () => {
     expect(mod.register).toBeInstanceOf(Function);
   });
 
+  it('registers all expected IPC channels via register(deps)', () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./packages');
+
+    mod.register({ ipcMain });
+
+    for (const channel of [
+      'get-packages',
+      'get-package-info',
+      'get-live-packages',
+      'packages-get-duplicates',
+      'get-pending-changes'
+    ]) {
+      expect(typeof ipcMain.__getHandler(channel)).toBe('function');
+    }
+  });
+
+  it('register(deps) forwards injected deps so factory channels use them', async () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./packages');
+
+    mod.register({ ipcMain, findFlakeDir: () => null });
+
+    const handler = ipcMain.__getHandler('packages-get-duplicates');
+    const result = await handler();
+    expect(result).toEqual({ success: false, error: 'Flake directory not found' });
+  });
+
   it('parses nested scoped option changes from git diff', () => {
     const mod = require('./packages');
     const flakeDir = makeTempFlake({

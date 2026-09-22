@@ -15,6 +15,42 @@ describe('options handler', () => {
     expect(mod.register).toBeInstanceOf(Function);
   });
 
+  it('registers all expected IPC channels via register(deps)', () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./options');
+
+    mod.register({ ipcMain });
+
+    for (const channel of [
+      'get-options',
+      'get-option-info',
+      'options-list-files',
+      'set-option-value',
+      'revert-option-from-git',
+      'search-options-catalog',
+      'get-live-options'
+    ]) {
+      expect(typeof ipcMain.__getHandler(channel)).toBe('function');
+    }
+  });
+
+  it('register(deps) forwards injected deps so channels use the factory', async () => {
+    const { ipcMain } = require('../../../tests/mocks/electron');
+    ipcMain.__resetHandlers();
+    const mod = require('./options');
+
+    mod.register({
+      ipcMain,
+      findFlakeDir: () => null,
+      flakeDirNotFoundMsg: () => 'no flake'
+    });
+
+    const handler = ipcMain.__getHandler('options-list-files');
+    const result = await handler();
+    expect(result).toEqual({ success: false, error: 'no flake' });
+  });
+
   it('updates nested attrset assignments via updateOptionInFile', () => {
     const mod = require('./options');
     const { dir, filePath } = makeTempFile(`
