@@ -27,6 +27,78 @@ function getInputUpdateStatus() {
 }
 
 /**
+ * Build the flake input list from a parsed flake.lock.
+ * Pure: no fs/network access.
+ */
+function parseFlakeInputs(lockContent, updateStatus = {}) {
+  const inputs = [];
+  const nodes = lockContent?.nodes || {};
+  const rootInputs = nodes.root?.inputs || {};
+
+  for (const [name, nodeRef] of Object.entries(rootInputs)) {
+    const node = nodes[nodeRef];
+    if (node && node.locked) {
+      const lastModified = node.locked.lastModified;
+      let age = 'unknown';
+      let status = 'fresh';
+
+      if (lastModified) {
+        const ageMs = Date.now() - (lastModified * 1000);
+        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+
+        if (ageDays === 0) {
+          age = 'today';
+        } else if (ageDays === 1) {
+          age = '1 day';
+        } else {
+          age = `${ageDays} days`;
+        }
+
+        if (ageDays > FLAKE_WARN_DAYS) {
+          status = 'stale';
+        }
+      }
+
+      inputs.push({ name, status, age, hasUpdate: updateStatus[name] === true });
+    }
+  }
+
+  return inputs;
+}
+
+/**
+ * Extract lock metadata for the flake info modal from a parsed flake.lock.
+ * Pure: no fs/network access.
+ */
+function parseFlakeLockInfo(lock) {
+  const info = {};
+  const nodes = lock?.nodes || {};
+  const rootInputs = nodes.root?.inputs || {};
+  const inputNames = Object.keys(rootInputs);
+  info.inputCount = inputNames.length;
+  info.inputNames = inputNames;
+
+  // nixpkgs details (only when it's a direct string reference, not a follows path)
+  const npRef = rootInputs['nixpkgs'];
+  if (npRef && typeof npRef === 'string') {
+    const npNode = nodes[npRef];
+    if (npNode?.locked) {
+      info.nixpkgsBranch = npNode.original?.ref || null;
+      info.nixpkgsRev    = npNode.locked.rev?.slice(0, 12) || null;
+      if (npNode.locked.lastModified) {
+        const ms = npNode.locked.lastModified * 1000;
+        info.nixpkgsDate     = new Date(ms).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+        info.nixpkgsRelative = relativeTime(ms);
+      }
+    }
+  }
+
+  return info;
+}
+
+/**
  * Check each GitHub-type flake input for upstream changes using git ls-remote.
  * Writes results into inputUpdateStatus in-place.
  */
@@ -203,39 +275,7 @@ function register() {
 
     try {
       const lockContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-      const inputs = [];
-      const nodes = lockContent.nodes || {};
-      const rootInputs = nodes.root?.inputs || {};
-
-      for (const [name, nodeRef] of Object.entries(rootInputs)) {
-        const node = nodes[nodeRef];
-        if (node && node.locked) {
-          const lastModified = node.locked.lastModified;
-          let age = 'unknown';
-          let status = 'fresh';
-
-          if (lastModified) {
-            const ageMs = Date.now() - (lastModified * 1000);
-            const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-
-            if (ageDays === 0) {
-              age = 'today';
-            } else if (ageDays === 1) {
-              age = '1 day';
-            } else {
-              age = `${ageDays} days`;
-            }
-
-            if (ageDays > FLAKE_WARN_DAYS) {
-              status = 'stale';
-            }
-          }
-
-          inputs.push({ name, status, age, hasUpdate: inputUpdateStatus[name] === true });
-        }
-      }
-
-      return inputs;
+      return parseFlakeInputs(lockContent, inputUpdateStatus);
     } catch (e) {
       console.error('Failed to parse flake.lock:', e);
       return [];
@@ -278,28 +318,7 @@ function register() {
 
       try {
         const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-        const nodes = lock.nodes || {};
-        const rootInputs = nodes.root?.inputs || {};
-        const inputNames = Object.keys(rootInputs);
-        info.inputCount = inputNames.length;
-        info.inputNames = inputNames;
-
-        // nixpkgs details (only when it's a direct string reference, not a follows path)
-        const npRef = rootInputs['nixpkgs'];
-        if (npRef && typeof npRef === 'string') {
-          const npNode = nodes[npRef];
-          if (npNode?.locked) {
-            info.nixpkgsBranch = npNode.original?.ref || null;
-            info.nixpkgsRev    = npNode.locked.rev?.slice(0, 12) || null;
-            if (npNode.locked.lastModified) {
-              const ms = npNode.locked.lastModified * 1000;
-              info.nixpkgsDate     = new Date(ms).toLocaleDateString(undefined, {
-                year: 'numeric', month: 'short', day: 'numeric'
-              });
-              info.nixpkgsRelative = relativeTime(ms);
-            }
-          }
-        }
+        Object.assign(info, parseFlakeLockInfo(lock));
       } catch {}
     }
 
@@ -351,4 +370,4 @@ function register() {
   });
 }
 
-module.exports = { register, getInputUpdateStatus, relativeTime, runUpdateChecks };
+module.exports = { register, getInputUpdateStatus, relativeTime, runUpdateChecks, parseFlakeInputs, parseFlakeLockInfo };
