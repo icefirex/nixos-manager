@@ -43,7 +43,7 @@ function createWindow() {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
+    win.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'));
   }
 
   // DevTools keyboard shortcut — dev builds only (BUG-03)
@@ -96,7 +96,7 @@ function registerWindowHandlers() {
   ipcMain.handle('get-app-version', () => {
     if (cachedVersion) return cachedVersion; // CQ-08: serve from cache
     try {
-      const packagePath = path.join(__dirname, '..', '..', 'package.json');
+      const packagePath = path.join(app.getAppPath(), 'package.json');
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       cachedVersion = packageJson.version;
       return cachedVersion;
