@@ -1,6 +1,6 @@
 {
   "name": "nixos-manager",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "A beautiful GUI for managing NixOS configurations",
   "author": "icefirex",
   "repository": {
