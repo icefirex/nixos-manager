@@ -55,7 +55,7 @@ export function applyTheme(id: ThemeId): ResolvedTheme {
   document.dispatchEvent(new CustomEvent('theme-changed', { detail: { id, resolved } }));
   // Persist for native window background on next launch (best-effort)
   try {
-    window.electronAPI?.setTheme?.(resolved);
+    void window.electronAPI?.setTheme?.(resolved)?.catch(() => {});
   } catch {}
   return resolved;
 }
@@ -66,7 +66,7 @@ export function initTheme(): ResolvedTheme {
   const resolved = resolveTheme(id);
   document.documentElement.dataset.theme = resolved;
   try {
-    window.electronAPI?.setTheme?.(resolved);
+    void window.electronAPI?.setTheme?.(resolved)?.catch(() => {});
   } catch {}
   return resolved;
 }
