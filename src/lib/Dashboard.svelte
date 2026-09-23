@@ -253,16 +253,16 @@
     align-items: center;
     gap: 12px;
     padding: 8px 14px;
-    background: rgba(249, 226, 175, 0.08);
-    border: 1px solid rgba(249, 226, 175, 0.25);
+    background: rgba(var(--yellow-rgb), 0.08);
+    border: 1px solid rgba(var(--yellow-rgb), 0.25);
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s;
-    color: #f9e2af;
+    color: var(--yellow);
   }
 
   .drift-banner:hover {
-    background: rgba(249, 226, 175, 0.14);
+    background: rgba(var(--yellow-rgb), 0.14);
   }
 
   .drift-banner-content {
@@ -287,14 +287,14 @@
     font-weight: 600;
     white-space: nowrap;
     padding: 4px 10px;
-    background: rgba(249, 226, 175, 0.15);
-    border: 1px solid rgba(249, 226, 175, 0.3);
+    background: rgba(var(--yellow-rgb), 0.15);
+    border: 1px solid rgba(var(--yellow-rgb), 0.3);
     border-radius: 6px;
     transition: background 0.15s;
   }
 
   .drift-banner:hover .drift-banner-action {
-    background: rgba(249, 226, 175, 0.25);
+    background: rgba(var(--yellow-rgb), 0.25);
   }
 
   .dashboard {
@@ -315,7 +315,7 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin-bottom: 16px;
     display: flex;
     align-items: center;
@@ -326,7 +326,7 @@
     content: "";
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, rgba(49, 50, 68, 0.8), transparent);
+    background: linear-gradient(90deg, rgba(var(--surface0-rgb), 0.8), transparent);
   }
 
   .action-grid {
@@ -340,9 +340,9 @@
     gap: 16px;
     margin-top: 16px;
     padding: 12px 16px;
-    background: rgba(24, 24, 37, 0.9);
+    background: rgba(var(--mantle-rgb), 0.9);
     border-radius: 12px;
-    border: 1px solid rgba(49, 50, 68, 0.5);
+    border: 1px solid rgba(var(--surface0-rgb), 0.5);
   }
 
   .toggle-item {
@@ -354,20 +354,20 @@
 
   .toggle-label {
     font-size: 12px;
-    color: #a6adc8;
+    color: var(--subtext0);
     transition: color 0.2s;
   }
 
   .toggle-item:hover .toggle-label {
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .toggle-switch {
     position: relative;
     width: 36px;
     height: 20px;
-    background: rgba(49, 50, 68, 0.8);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.25s ease;
@@ -375,12 +375,12 @@
   }
 
   .toggle-switch:hover:not(:disabled) {
-    border-color: rgba(137, 180, 250, 0.5);
+    border-color: rgba(var(--blue-rgb), 0.5);
   }
 
   .toggle-switch.active {
-    background: rgba(137, 180, 250, 0.3);
-    border-color: rgba(137, 180, 250, 0.6);
+    background: rgba(var(--blue-rgb), 0.3);
+    border-color: rgba(var(--blue-rgb), 0.6);
   }
 
   .toggle-switch:disabled {
@@ -394,16 +394,16 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    background: #6c7086;
+    background: var(--overlay0);
     border-radius: 50%;
     transition: all 0.25s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(var(--black-rgb), 0.3);
   }
 
   .toggle-switch.active .toggle-knob {
     left: 18px;
-    background: #89b4fa;
-    box-shadow: 0 0 8px rgba(137, 180, 250, 0.5);
+    background: var(--blue);
+    box-shadow: 0 0 8px rgba(var(--blue-rgb), 0.5);
   }
 
   .progress-section {

@@ -143,7 +143,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(var(--black-rgb), 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -152,15 +152,15 @@
   }
 
   .modal-content {
-    background: #1e1e2e;
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    background: var(--base);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-radius: 20px;
     padding: 0;
     width: 90%;
     max-width: 500px;
     max-height: 80vh;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 64px rgba(var(--black-rgb), 0.5);
   }
 
   .modal-header {
@@ -168,14 +168,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
-    background: rgba(24, 24, 37, 0.9);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
+    background: rgba(var(--mantle-rgb), 0.9);
   }
 
   .modal-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
@@ -187,17 +187,17 @@
   .clear-all-btn {
     padding: 6px 12px;
     border-radius: 6px;
-    border: 1px solid rgba(243, 139, 168, 0.3);
-    background: rgba(243, 139, 168, 0.1);
-    color: #f38ba8;
+    border: 1px solid rgba(var(--red-rgb), 0.3);
+    background: rgba(var(--red-rgb), 0.1);
+    color: var(--red);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .clear-all-btn:hover {
-    background: rgba(243, 139, 168, 0.2);
-    border-color: rgba(243, 139, 168, 0.5);
+    background: rgba(var(--red-rgb), 0.2);
+    border-color: rgba(var(--red-rgb), 0.5);
   }
 
   .close-btn {
@@ -205,8 +205,8 @@
     height: 32px;
     border-radius: 8px;
     border: none;
-    background: rgba(49, 50, 68, 0.8);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--subtext0);
     font-size: 18px;
     cursor: pointer;
     display: flex;
@@ -216,8 +216,8 @@
   }
 
   .close-btn:hover {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   .loading, .empty-state {
@@ -226,14 +226,14 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 3px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -246,9 +246,9 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: rgba(166, 227, 161, 0.15);
-    border: 2px solid rgba(166, 227, 161, 0.3);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.15);
+    border: 2px solid rgba(var(--green-rgb), 0.3);
+    color: var(--green);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -267,9 +267,9 @@
     gap: 12px;
     padding: 14px;
     margin-bottom: 8px;
-    background: rgba(30, 30, 46, 0.8);
+    background: rgba(var(--base-rgb), 0.8);
     border-radius: 12px;
-    border: 1px solid rgba(49, 50, 68, 0.5);
+    border: 1px solid rgba(var(--surface0-rgb), 0.5);
     transition: all 0.2s;
     position: relative;
   }
@@ -279,23 +279,23 @@
   }
 
   .notification-item:hover {
-    border-color: rgba(69, 71, 90, 0.8);
+    border-color: rgba(var(--surface1-rgb), 0.8);
   }
 
   .notification-item.error {
-    border-left: 3px solid #f38ba8;
+    border-left: 3px solid var(--red);
   }
 
   .notification-item.warning {
-    border-left: 3px solid #f9e2af;
+    border-left: 3px solid var(--yellow);
   }
 
   .notification-item.success {
-    border-left: 3px solid #a6e3a1;
+    border-left: 3px solid var(--green);
   }
 
   .notification-item.info {
-    border-left: 3px solid #89b4fa;
+    border-left: 3px solid var(--blue);
   }
 
   .notif-icon {
@@ -311,23 +311,23 @@
   }
 
   .notif-icon.error {
-    background: rgba(243, 139, 168, 0.15);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.15);
+    color: var(--red);
   }
 
   .notif-icon.warning {
-    background: rgba(249, 226, 175, 0.15);
-    color: #f9e2af;
+    background: rgba(var(--yellow-rgb), 0.15);
+    color: var(--yellow);
   }
 
   .notif-icon.success {
-    background: rgba(166, 227, 161, 0.15);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.15);
+    color: var(--green);
   }
 
   .notif-icon.info {
-    background: rgba(137, 180, 250, 0.15);
-    color: #89b4fa;
+    background: rgba(var(--blue-rgb), 0.15);
+    color: var(--blue);
   }
 
   .notif-content {
@@ -338,41 +338,41 @@
   .notif-title {
     font-size: 13px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin-bottom: 4px;
   }
 
   .notif-message {
     font-size: 12px;
-    color: #a6adc8;
+    color: var(--subtext0);
     line-height: 1.4;
   }
 
   .notif-time {
     font-size: 10px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin-top: 6px;
   }
 
   .action-btn {
     padding: 6px 10px;
     border-radius: 6px;
-    border: 1px solid rgba(49, 50, 68, 0.8);
-    background: rgba(24, 24, 37, 0.9);
+    border: 1px solid rgba(var(--surface0-rgb), 0.8);
+    background: rgba(var(--mantle-rgb), 0.9);
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
   }
 
   .action-btn:hover {
-    background: rgba(49, 50, 68, 0.8);
-    border-color: rgba(137, 180, 250, 0.5);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border-color: rgba(var(--blue-rgb), 0.5);
   }
 
   .action-btn code {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 10px;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .dismiss-btn {
@@ -381,7 +381,7 @@
     border-radius: 6px;
     border: none;
     background: transparent;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 14px;
     cursor: pointer;
     display: flex;
@@ -397,8 +397,8 @@
   }
 
   .dismiss-btn:hover {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   /* Scrollbar */
@@ -411,7 +411,7 @@
   }
 
   .notifications-list::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 3px;
   }
 </style>

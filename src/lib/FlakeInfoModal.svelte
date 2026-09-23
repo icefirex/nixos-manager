@@ -186,7 +186,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(var(--black-rgb), 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -195,15 +195,15 @@
   }
 
   .modal-content {
-    background: #1e1e2e;
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    background: var(--base);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-radius: 20px;
     padding: 0;
     width: 90%;
     max-width: 700px;
     max-height: 85vh;
     overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 64px rgba(var(--black-rgb), 0.5);
   }
 
   .modal-header {
@@ -211,14 +211,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
-    background: rgba(24, 24, 37, 0.9);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
+    background: rgba(var(--mantle-rgb), 0.9);
   }
 
   .modal-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
@@ -227,8 +227,8 @@
     height: 32px;
     border-radius: 8px;
     border: none;
-    background: rgba(49, 50, 68, 0.8);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--subtext0);
     font-size: 18px;
     cursor: pointer;
     display: flex;
@@ -238,8 +238,8 @@
   }
 
   .close-btn:hover {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   .loading {
@@ -248,35 +248,35 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    color: #a6adc8;
+    color: var(--subtext0);
     text-align: center;
   }
 
   .no-flake {
     font-size: 15px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .hint {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     line-height: 1.8;
   }
 
   .hint code {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 11px;
-    background: rgba(49, 50, 68, 0.6);
+    background: rgba(var(--surface0-rgb), 0.6);
     padding: 1px 5px;
     border-radius: 4px;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 3px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -290,12 +290,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     padding: 1px;
   }
 
   .info-section {
-    background: #1e1e2e;
+    background: var(--base);
     padding: 20px;
   }
 
@@ -303,7 +303,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin-bottom: 16px;
     font-weight: 600;
   }
@@ -314,7 +314,7 @@
     align-items: baseline;
     gap: 12px;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(49, 50, 68, 0.3);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.3);
   }
 
   .info-row:last-child {
@@ -323,13 +323,13 @@
 
   .label {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     flex-shrink: 0;
   }
 
   .value {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
     font-weight: 500;
     text-align: right;
     max-width: 65%;
@@ -355,28 +355,28 @@
   }
 
   .value.highlight {
-    color: #89b4fa;
+    color: var(--blue);
     font-weight: 700;
   }
 
   .value.dim {
-    color: #6c7086;
+    color: var(--overlay0);
     font-weight: 400;
   }
 
   .value.status-clean {
-    color: #a6e3a1;
+    color: var(--green);
     font-weight: 600;
   }
 
   .value.status-dirty {
-    color: #f9e2af;
+    color: var(--yellow);
     font-weight: 500;
   }
 
   .sub {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-weight: 400;
     margin-left: 4px;
   }
