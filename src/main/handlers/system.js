@@ -6,175 +6,243 @@ const { runCmd } = require('../utils');
 const { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } = require('../constants');
 
 /**
+ * Parse VERSION_ID and PRETTY_NAME from os-release content.
+ * Pure.
+ */
+function parseOsRelease(content) {
+  const versionMatch = (content || '').match(/VERSION_ID="?([^"\n]+)"?/);
+  const nameMatch = (content || '').match(/PRETTY_NAME="?([^"\n]+)"?/);
+  return {
+    version: versionMatch ? versionMatch[1] : null,
+    name: nameMatch ? nameMatch[1].replace(/"/g, '') : null
+  };
+}
+
+/**
+ * Format an uptime in seconds as 'Xd Xh Xm' or 'Xh Xm'.
+ * Pure.
+ */
+function formatUptime(uptimeSeconds) {
+  const days = Math.floor(uptimeSeconds / 86400);
+  const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  return days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
+}
+
+/**
+ * Build memory info from total/free bytes.
+ * Pure.
+ */
+function buildMemoryInfo(totalMem, freeMem) {
+  const usedMem = totalMem - freeMem;
+  return {
+    total: (totalMem / 1073741824).toFixed(1) + ' GB',
+    used: (usedMem / 1073741824).toFixed(1) + ' GB',
+    free: (freeMem / 1073741824).toFixed(1) + ' GB',
+    percentage: Math.round((usedMem / totalMem) * 100)
+  };
+}
+
+/**
+ * Format the time since the last system switch.
+ * Pure.
+ */
+function formatLastBuildTime(mtimeMs, nowMs) {
+  const hours = Math.floor((nowMs - mtimeMs) / 3600000);
+  if (hours < 1) return 'just now';
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Resolve the active specialization name.
+ * Pure (realpath is injected). Returns 'base', the entry name, or 'unknown'.
+ */
+function resolveSpecialization(currentPath, basePath, specEntries, realpath) {
+  if (currentPath === basePath) return 'base';
+  for (const entry of specEntries) {
+    try {
+      if (currentPath === realpath(entry)) return entry;
+    } catch (e) {}
+  }
+  return 'unknown';
+}
+
+/**
+ * Create system info handlers with dependency injection support.
+ */
+function createSystemHandlers(deps = {}) {
+  const depsOs = deps.os || os;
+  const depsFs = deps.fs || fs;
+  const depsRunCmd = deps.runCmd || runCmd;
+  const profilePath = deps.profilePath || NIX_SYSTEM_PROFILE;
+  const currentSystem = deps.currentSystem || NIX_CURRENT_SYSTEM;
+
+  return {
+    // Basic system info for header
+    getSystemInfo: async () => {
+      const hostname = depsOs.hostname();
+      const username = depsOs.userInfo().username;
+
+      // Get NixOS version
+      let nixosVersion = 'unknown';
+      try {
+        const osRelease = depsFs.readFileSync('/etc/os-release', 'utf8');
+        const { version } = parseOsRelease(osRelease);
+        if (version) nixosVersion = version;
+      } catch (e) {}
+
+      // Get kernel version
+      let kernelVersion = depsOs.release().split('-')[0];
+
+      // Get generation
+      let generation = 1;
+      try {
+        const link = depsFs.readlinkSync(profilePath);
+        const match = link.match(/system-(\d+)-link/);
+        if (match) generation = parseInt(match[1]);
+      } catch (e) {}
+
+      // Get last build time
+      let lastBuild = 'unknown';
+      try {
+        const stats = depsFs.lstatSync(profilePath);
+        lastBuild = formatLastBuildTime(stats.mtimeMs, Date.now());
+      } catch (e) {}
+
+      return {
+        profile: username,
+        hostname,
+        nixosVersion,
+        kernelVersion,
+        generation,
+        lastBuild,
+        healthy: depsFs.existsSync(currentSystem)
+      };
+    },
+
+    // Detailed system info for modal
+    getDetailedSystemInfo: async () => {
+      const info = {};
+
+      // Basic info
+      info.hostname = depsOs.hostname();
+      info.username = depsOs.userInfo().username;
+      info.platform = depsOs.platform();
+      info.arch = depsOs.arch();
+
+      // OS info
+      try {
+        const osRelease = depsFs.readFileSync('/etc/os-release', 'utf8');
+        const { version, name } = parseOsRelease(osRelease);
+        info.nixosVersion = version || 'unknown';
+        info.osName = name || 'NixOS';
+      } catch (e) {
+        info.nixosVersion = 'unknown';
+        info.osName = 'NixOS';
+      }
+
+      // Kernel
+      info.kernel = depsOs.release();
+
+      // Uptime
+      info.uptime = formatUptime(depsOs.uptime());
+
+      // Memory
+      info.memory = buildMemoryInfo(depsOs.totalmem(), depsOs.freemem());
+
+      // CPU
+      const cpus = depsOs.cpus();
+      info.cpu = {
+        model: cpus[0]?.model || 'Unknown',
+        cores: cpus.length,
+        speed: cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'Unknown'
+      };
+
+      // Generation info
+      try {
+        const link = depsFs.readlinkSync(profilePath);
+        const match = link.match(/system-(\d+)-link/);
+        info.generation = match ? parseInt(match[1]) : 1;
+      } catch (e) {
+        info.generation = 1;
+      }
+
+      // System switch time
+      try {
+        const stats = depsFs.lstatSync(profilePath);
+        info.buildTime = stats.mtime.toLocaleString();
+      } catch (e) {
+        info.buildTime = 'unknown';
+      }
+
+      // Run disk, store, and package queries in parallel (async)
+      const [dfOutput, storeCount, packageCount] = await Promise.all([
+        depsRunCmd('df -h / | tail -1'),
+        depsRunCmd('ls /nix/store 2>/dev/null | wc -l'),
+        depsRunCmd(`ls ${currentSystem}/sw/bin 2>/dev/null | wc -l`)
+      ]);
+
+      // Disk usage
+      if (dfOutput) {
+        const parts = dfOutput.split(/\s+/);
+        info.disk = {
+          total: parts[1] || 'unknown',
+          used: parts[2] || 'unknown',
+          available: parts[3] || 'unknown',
+          percentage: parseInt(parts[4]) || 0
+        };
+      } else {
+        info.disk = { total: 'unknown', used: 'unknown', available: 'unknown', percentage: 0 };
+      }
+
+      // Nix store paths count
+      info.nixStorePaths = storeCount || 'unknown';
+
+      // Package count
+      info.packageCount = packageCount || 'unknown';
+
+      // Current specialization
+      try {
+        const currentReal = depsFs.realpathSync(currentSystem);
+        const baseReal = depsFs.realpathSync(profilePath);
+        let specEntries = [];
+        const specDir = `${profilePath}/specialisation`;
+        if (depsFs.existsSync(specDir)) {
+          specEntries = depsFs.readdirSync(specDir);
+        }
+        info.specialization = resolveSpecialization(currentReal, baseReal, specEntries, (p) => depsFs.realpathSync(path.join(specDir, p)));
+      } catch (e) {
+        info.specialization = 'unknown';
+      }
+
+      return info;
+    }
+  };
+}
+
+/**
  * Register system info IPC handlers
  */
-function register() {
-  // Basic system info for header
-  ipcMain.handle('get-system-info', async () => {
-    const hostname = os.hostname();
-    const username = os.userInfo().username;
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createSystemHandlers(deps);
 
-    // Get NixOS version
-    let nixosVersion = 'unknown';
-    try {
-      const osRelease = fs.readFileSync('/etc/os-release', 'utf8');
-      const match = osRelease.match(/VERSION_ID="?([^"\n]+)"?/);
-      if (match) nixosVersion = match[1];
-    } catch (e) {}
-
-    // Get kernel version
-    let kernelVersion = os.release().split('-')[0];
-
-    // Get generation
-    let generation = 1;
-    try {
-      const link = fs.readlinkSync(NIX_SYSTEM_PROFILE);
-      const match = link.match(/system-(\d+)-link/);
-      if (match) generation = parseInt(match[1]);
-    } catch (e) {}
-
-    // Get last build time
-    let lastBuild = 'unknown';
-    try {
-      const stats = fs.lstatSync(NIX_SYSTEM_PROFILE);
-      const hours = Math.floor((Date.now() - stats.mtimeMs) / 3600000);
-      if (hours < 1) lastBuild = 'just now';
-      else if (hours < 24) lastBuild = `${hours}h ago`;
-      else lastBuild = `${Math.floor(hours / 24)}d ago`;
-    } catch (e) {}
-
-    return {
-      profile: username,
-      hostname,
-      nixosVersion,
-      kernelVersion,
-      generation,
-      lastBuild,
-      healthy: fs.existsSync(NIX_CURRENT_SYSTEM)
-    };
+  depsIpcMain.handle('get-system-info', async () => {
+    return handlers.getSystemInfo();
   });
 
-  // Detailed system info for modal
-  ipcMain.handle('get-detailed-system-info', async () => {
-    const info = {};
-
-    // Basic info
-    info.hostname = os.hostname();
-    info.username = os.userInfo().username;
-    info.platform = os.platform();
-    info.arch = os.arch();
-
-    // OS info
-    try {
-      const osRelease = fs.readFileSync('/etc/os-release', 'utf8');
-      const versionMatch = osRelease.match(/VERSION_ID="?([^"\n]+)"?/);
-      const nameMatch = osRelease.match(/PRETTY_NAME="?([^"\n]+)"?/);
-      info.nixosVersion = versionMatch ? versionMatch[1] : 'unknown';
-      info.osName = nameMatch ? nameMatch[1].replace(/"/g, '') : 'NixOS';
-    } catch (e) {
-      info.nixosVersion = 'unknown';
-      info.osName = 'NixOS';
-    }
-
-    // Kernel
-    info.kernel = os.release();
-
-    // Uptime
-    const uptimeSeconds = os.uptime();
-    const days = Math.floor(uptimeSeconds / 86400);
-    const hours = Math.floor((uptimeSeconds % 86400) / 3600);
-    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-    info.uptime = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
-
-    // Memory
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
-    info.memory = {
-      total: (totalMem / 1073741824).toFixed(1) + ' GB',
-      used: (usedMem / 1073741824).toFixed(1) + ' GB',
-      free: (freeMem / 1073741824).toFixed(1) + ' GB',
-      percentage: Math.round((usedMem / totalMem) * 100)
-    };
-
-    // CPU
-    const cpus = os.cpus();
-    info.cpu = {
-      model: cpus[0]?.model || 'Unknown',
-      cores: cpus.length,
-      speed: cpus[0]?.speed ? `${cpus[0].speed} MHz` : 'Unknown'
-    };
-
-    // Generation info
-    try {
-      const link = fs.readlinkSync(NIX_SYSTEM_PROFILE);
-      const match = link.match(/system-(\d+)-link/);
-      info.generation = match ? parseInt(match[1]) : 1;
-    } catch (e) {
-      info.generation = 1;
-    }
-
-    // System switch time
-    try {
-      const stats = fs.lstatSync(NIX_SYSTEM_PROFILE);
-      info.buildTime = stats.mtime.toLocaleString();
-    } catch (e) {
-      info.buildTime = 'unknown';
-    }
-
-    // Run disk, store, and package queries in parallel (async)
-    const [dfOutput, storeCount, packageCount] = await Promise.all([
-      runCmd('df -h / | tail -1'),
-      runCmd('ls /nix/store 2>/dev/null | wc -l'),
-      runCmd(`ls ${NIX_CURRENT_SYSTEM}/sw/bin 2>/dev/null | wc -l`)
-    ]);
-
-    // Disk usage
-    if (dfOutput) {
-      const parts = dfOutput.split(/\s+/);
-      info.disk = {
-        total: parts[1] || 'unknown',
-        used: parts[2] || 'unknown',
-        available: parts[3] || 'unknown',
-        percentage: parseInt(parts[4]) || 0
-      };
-    } else {
-      info.disk = { total: 'unknown', used: 'unknown', available: 'unknown', percentage: 0 };
-    }
-
-    // Nix store paths count
-    info.nixStorePaths = storeCount || 'unknown';
-
-    // Package count
-    info.packageCount = packageCount || 'unknown';
-
-    // Current specialization
-    try {
-      const currentPath = fs.realpathSync(NIX_CURRENT_SYSTEM);
-      const basePath = fs.realpathSync(NIX_SYSTEM_PROFILE);
-      if (currentPath === basePath) {
-        info.specialization = 'base';
-      } else {
-        const specDir = `${NIX_SYSTEM_PROFILE}/specialisation`;
-        if (fs.existsSync(specDir)) {
-          const entries = fs.readdirSync(specDir);
-          for (const entry of entries) {
-            const specPath = path.join(specDir, entry);
-            const resolvedSpecPath = fs.realpathSync(specPath);
-            if (currentPath === resolvedSpecPath) {
-              info.specialization = entry;
-              break;
-            }
-          }
-        }
-        if (!info.specialization) info.specialization = 'unknown';
-      }
-    } catch (e) {
-      info.specialization = 'unknown';
-    }
-
-    return info;
+  depsIpcMain.handle('get-detailed-system-info', async () => {
+    return handlers.getDetailedSystemInfo();
   });
 }
 
-module.exports = { register };
+module.exports = {
+  register,
+  createSystemHandlers,
+  parseOsRelease,
+  formatUptime,
+  buildMemoryInfo,
+  formatLastBuildTime,
+  resolveSpecialization,
+};
