@@ -1,3 +1,4 @@
+// @ts-check
 const { app, BrowserWindow } = require('electron');
 
 app.setName('nixos-manager');
@@ -41,8 +42,8 @@ app.whenReady().then(() => {
 
   // If launched with --show-updates, tell renderer to open git modal
   if (process.argv.includes('--show-updates')) {
-    win.webContents.on('did-finish-load', () => {
-      win.webContents.send('show-updates');
+    win?.webContents.on('did-finish-load', () => {
+      win?.webContents.send('show-updates');
     });
   }
 });

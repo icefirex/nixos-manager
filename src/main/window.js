@@ -1,8 +1,11 @@
+// @ts-check
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+/** @type {import('electron').BrowserWindow | null} */
 let mainWindow = null;
+/** @type {string | null} */
 let cachedVersion = null; // CQ-08: read once, not on every IPC call
 
 /**
@@ -48,7 +51,7 @@ function createWindow() {
   if (isDev()) {
     mainWindow.webContents.on('before-input-event', (event, input) => {
       if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-        mainWindow.webContents.toggleDevTools();
+        mainWindow?.webContents.toggleDevTools();
       }
     });
   }
@@ -58,6 +61,7 @@ function createWindow() {
 
 /**
  * Get the main window instance
+ * @returns {import('electron').BrowserWindow | null}
  */
 function getMainWindow() {
   return mainWindow;
