@@ -63,20 +63,17 @@ Pure-parser-only extraction (factory can be added later):
 - Use small fake process objects for spawn-based flows (`stdout`, `stderr`, `close`, `error`).
 - Keep one integration-style test through `register()` only when channel wiring itself is under test.
 
-## TypeScript Strategy
+## TypeScript
 
-The Electron main process is plain CommonJS loaded directly by Electron (`main.js`),
-with no bundler. Renaming `.js` sources to `.ts` would therefore break the runtime.
-The migration is two-track:
+The main process is **real TypeScript** (`.ts` sources, ESM imports/exports):
 
-1. **Test files** are real TypeScript (`.test.ts`), checked by `npm run typecheck`
-   (`tsc -p tsconfig.json --noEmit`, strict mode, `allowJs`).
-2. **Source files** stay `.js` and opt into checking with a `// @ts-check` pragma plus
-   JSDoc annotations (`@param`, `@returns`, `@typedef`).
-
-Every source module carries `// @ts-check`, including `main.js`, `preload.js`,
-`window.js`, and all handlers. Handler factories declare their DI contract via
-`@typedef {Object} XDeps` so injected dependencies are type-checked.
-
-To migrate a source file to real `.ts` later, a main-process build step
-(e.g. esbuild) must be introduced first.
+- `npm run typecheck` — strict `tsc` check of sources, types, and tests.
+- `npm run build:main` — compiles `main.ts` + `preload.ts` + `src/main/**` to
+  `dist-electron/` as CommonJS (`tsconfig.build.json`; relative `.ts` specifiers
+  are rewritten to `.js` via `rewriteRelativeImportExtensions`).
+- `package.json` `main` points at `dist-electron/main.js`; the Nix package
+  (`package.nix`) builds and wraps the same output.
+- Vitest runs the `.ts` sources natively through Node's type stripping
+  (Node >= 23.6 required — nix-shell provides Node 24).
+- Dev workflow: run `npm run build:main` (or `npm run dev:electron`) before
+  launching `electron .`, since Electron now loads the compiled output.
