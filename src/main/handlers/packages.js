@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +7,23 @@ const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 const { getAllPackages, findDuplicates } = require('../nix-packages');
 
+/**
+ * @typedef {Object} PackagesDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {() => string | null} [findFlakeDir]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {() => string} [flakeDirNotFoundMsg]
+ * @property {() => {system: string[], user: string[], homeManager: string[]}} [getAllPackages]
+ * @property {() => Array<import('./nix-packages').DuplicateResult>} [findDuplicates]
+ * @property {(pkg: string, flake?: string) => Array<import('./nix-packages').PackageFindResult>} [findPackage]
+ * @property {() => import('node:sqlite').DatabaseSync} [getDb]
+ * @property {typeof import('fs')} [fs]
+ * @property {typeof import('os')} [os]
+ */
+
+/**
+ * @param {PackagesDeps} [deps]
+ */
 function createPackagesHandlers(deps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsRunCmd = deps.runCmd || runCmd;
@@ -316,6 +334,7 @@ function createPackagesHandlers(deps = {}) {
 
 /**
  * Register package management IPC handlers
+ * @param {PackagesDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
@@ -492,6 +511,13 @@ function register(deps = {}) {
   });
 }
 
+/**
+ * Parse a git diff of nix config changes into added/removed/changed option deltas.
+ * @param {string} diffOut
+ * @param {string} flakeDir
+ * @param {(p: string) => string} [readFile]
+ * @returns {{added: Array<{optionPath: string, file: string | null, to: string}>, removed: Array<{optionPath: string, file: string | null, from: string}>, changed: Array<{optionPath: string, file: string | null, from: string, to: string}>}}
+ */
 function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFileSync(p, 'utf8')) {
   const lineMap = new Map();
   let currentFile = null;
