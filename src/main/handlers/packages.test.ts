@@ -37,7 +37,7 @@ describe('packages handler', () => {
   });
 
   it('register(deps) forwards injected deps so factory channels use them', async () => {
-    const {  ipcMain  } = require('../../../tests/mocks/electron.ts');
+    const { ipcMain } = require('../../../tests/mocks/electron.ts');
     ipcMain.__resetHandlers();
     const mod = require('./packages.ts');
 
@@ -46,6 +46,41 @@ describe('packages handler', () => {
     const handler = ipcMain.__getHandler('packages-get-duplicates');
     const result = await handler();
     expect(result).toEqual({ success: false, error: 'Flake directory not found' });
+  });
+
+  describe('createPackagesHandlers coverage', () => {
+    const { createPackagesHandlers } = require('./packages.ts');
+
+    it('getPackages returns all packages from the injected scanner', async () => {
+      const handlers = createPackagesHandlers({
+        findFlakeDir: () => '/tmp/flake',
+        getAllPackages: () => ({ system: ['git'], user: ['hello'], homeManager: ['vim'] }),
+      });
+      expect(await handlers.getPackages()).toEqual({
+        system: ['git'],
+        user: ['hello'],
+        homeManager: ['vim'],
+      });
+    });
+
+    it('getPackages throws the injected message when flake dir is missing', async () => {
+      const handlers = createPackagesHandlers({
+        findFlakeDir: () => null,
+        flakeDirNotFoundMsg: () => 'no flake',
+      });
+      await expect(handlers.getPackages()).rejects.toThrow('no flake');
+    });
+
+    it('getDuplicates returns duplicates from the injected finder', async () => {
+      const handlers = createPackagesHandlers({
+        findFlakeDir: () => '/tmp/flake',
+        findDuplicates: () => [{ pkgname: 'git', scope: 'system', files: [], crossUser: false }],
+      });
+      expect(await handlers.getDuplicates()).toEqual({
+        success: true,
+        duplicates: [{ pkgname: 'git', scope: 'system', files: [], crossUser: false }],
+      });
+    });
   });
 
   it('parses nested scoped option changes from git diff', () => {

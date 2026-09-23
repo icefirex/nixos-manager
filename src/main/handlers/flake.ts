@@ -32,6 +32,10 @@ function getInputUpdateStatus() {
   return inputUpdateStatus;
 }
 
+function resetInputUpdateStatus() {
+  inputUpdateStatus = {};
+}
+
 /**
  * Build the flake input list from a parsed flake.lock.
  * Pure: no fs/network access.
@@ -156,231 +160,243 @@ async function runUpdateChecks(flakeDir: any) {
   await Promise.all(checks);
 }
 
-/**
- * Register flake management IPC handlers
- */
-function register() {
-  // Update all flake inputs
-  ipcMain.handle('update-flake-inputs', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      throw new Error(flakeDirNotFoundMsg());
-    }
 
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('terminal-show', { title: 'Updating All Flake Inputs' });
 
+type FlakeDeps = {
+  ipcMain?: any;
+  findFlakeDir?: () => string | null;
+  flakeDirNotFoundMsg?: () => string;
+  getSpawnEnv?: () => NodeJS.ProcessEnv;
+  spawn?: any;
+  getMainWindow?: () => any;
+  fs?: typeof import('fs');
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  getInputUpdateStatus?: () => Record<string, boolean>;
+  resetInputUpdateStatus?: () => void;
+  runUpdateChecks?: (flakeDir: string) => Promise<void>;
+};
+
+/** Shared runner for `nix flake update [...]` spawn flows. */
+function runFlakeUpdate(
+  deps: FlakeDeps,
+  flakeDir: string,
+  args: string[],
+  title: string,
+  onZero: (lockBefore: string | null, lockAfter: string | null) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const mainWindow = deps.getMainWindow?.();
+    mainWindow?.webContents.send('terminal-show', { title });
+
+    const fsDep = deps.fs || fs;
     const lockPath = path.join(flakeDir, 'flake.lock');
-    const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
+    const lockBefore = fsDep.existsSync(lockPath) ? fsDep.readFileSync(lockPath, 'utf8') : null;
 
-    return new Promise<any>((resolve, reject) => {
-      const proc = spawn('nix', ['flake', 'update'], {
-        cwd: flakeDir,
-        env: getSpawnEnv()
-      });
-
-      let output = '';
-      proc.stdout.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-
-      proc.stderr.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          // Clear all cached update statuses — every input was just updated
-          inputUpdateStatus = {};
-          const lockAfter = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
-          const changed = lockBefore !== lockAfter;
-          const summary = changed
-            ? '\n✓ All flake inputs updated successfully.'
-            : '\n• All flake inputs are already up to date.';
-          mainWindow?.webContents.send('build-output', summary);
-        }
-        mainWindow?.webContents.send('build-complete', { success: code === 0 });
-        if (code === 0) {
-          resolve('Flake inputs updated');
-        } else {
-          reject(new Error(`Update failed with code ${code}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        mainWindow?.webContents.send('build-complete', { success: false });
-        reject(err);
-      });
+    const proc = (deps.spawn || spawn)('nix', args, {
+      cwd: flakeDir,
+      env: deps.getSpawnEnv ? deps.getSpawnEnv() : getSpawnEnv()
     });
-  });
 
-  // Update a single flake input
-  ipcMain.handle('update-flake-input', async (event: any, inputName: any) => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      throw new Error(flakeDirNotFoundMsg());
-    }
-
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('terminal-show', { title: `Updating ${inputName}` });
-
-    const lockPath = path.join(flakeDir, 'flake.lock');
-    const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
-
-    return new Promise<any>((resolve, reject) => {
-      const proc = spawn('nix', ['flake', 'update', inputName], {
-        cwd: flakeDir,
-        env: getSpawnEnv()
-      });
-
-      let output = '';
-      proc.stdout.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-
-      proc.stderr.on('data', (data) => {
-        output += data.toString();
-        mainWindow?.webContents.send('build-output', data.toString());
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          const lockAfter = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
-          const changed = lockBefore !== lockAfter;
-          const summary = changed
-            ? `\n✓ ${inputName} updated successfully.`
-            : `\n• ${inputName} is already up to date.`;
-          mainWindow?.webContents.send('build-output', summary);
-          // Clear cached update status for this input — badge disappears immediately
-          inputUpdateStatus[inputName] = false;
-        }
-        mainWindow?.webContents.send('build-complete', { success: code === 0 });
-        if (code === 0) {
-          resolve(`Flake input "${inputName}" updated`);
-        } else {
-          reject(new Error(`Update failed with code ${code}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        mainWindow?.webContents.send('build-complete', { success: false });
-        reject(err);
-      });
+    proc.stdout.on('data', (data: any) => {
+      mainWindow?.webContents.send('build-output', data.toString());
     });
-  });
 
-  // Get flake inputs from flake.lock
-  ipcMain.handle('get-flake-inputs', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return [];
-    }
+    proc.stderr.on('data', (data: any) => {
+      mainWindow?.webContents.send('build-output', data.toString());
+    });
 
-    const lockPath = path.join(flakeDir, 'flake.lock');
-    if (!fs.existsSync(lockPath)) {
-      return [];
-    }
-
-    try {
-      const lockContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-      return parseFlakeInputs(lockContent, inputUpdateStatus);
-    } catch (e: any) {
-      console.error('Failed to parse flake.lock:', e);
-      return [];
-    }
-  });
-  // Background check: detect available upstream updates for all GitHub-type inputs
-  ipcMain.handle('check-flake-input-updates', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) return {};
-
-    await runUpdateChecks(flakeDir);
-
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send('flake-update-check-complete', inputUpdateStatus);
-
-    return inputUpdateStatus;
-  });
-
-  // Flake info for the info modal
-  ipcMain.handle('get-flake-info', async () => {
-    const flakeDir = findFlakeDir();
-    const info: any = { flakeDir: flakeDir || null };
-    if (!flakeDir) return info;
-
-    // Description from flake.nix
-    try {
-      const flakeNix = fs.readFileSync(path.join(flakeDir, 'flake.nix'), 'utf8');
-      const m = flakeNix.match(/description\s*=\s*"([^"]+)"/);
-      info.description = m ? m[1] : null;
-    } catch { info.description = null; }
-
-    // flake.lock — input list + nixpkgs pin info
-    const lockPath = path.join(flakeDir, 'flake.lock');
-    if (fs.existsSync(lockPath)) {
-      try {
-        const stats = fs.lstatSync(lockPath);
-        info.lockUpdated = stats.mtime.toLocaleString();
-        info.lockUpdatedRelative = relativeTime(stats.mtimeMs);
-      } catch {}
-
-      try {
-        const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-        Object.assign(info, parseFlakeLockInfo(lock));
-      } catch {}
-    }
-
-    // Git info (local only — no network call)
-    try {
-      const [branch, shortRev, lastLog, statusOut] = await Promise.all([
-        runCmd(`git -C "${flakeDir}" branch --show-current 2>/dev/null`,    CMD_TIMEOUT_FAST),
-        runCmd(`git -C "${flakeDir}" rev-parse --short HEAD 2>/dev/null`,   CMD_TIMEOUT_FAST),
-        runCmd(`git -C "${flakeDir}" log -1 --format="%s|%cr" 2>/dev/null`, CMD_TIMEOUT_FAST),
-        runCmd(`git -C "${flakeDir}" status --porcelain 2>/dev/null`,        CMD_TIMEOUT_FAST),
-      ]);
-      info.gitBranch = branch?.trim()    || null;
-      info.gitRev    = shortRev?.trim()  || null;
-      if (lastLog) {
-        const [msg, when] = lastLog.trim().split('|');
-        info.gitLastMsg  = msg?.trim()  || null;
-        info.gitLastWhen = when?.trim() || null;
+    proc.on('close', (code: number | null) => {
+      if (code === 0) {
+        const lockAfter = fsDep.existsSync(lockPath) ? fsDep.readFileSync(lockPath, 'utf8') : null;
+        onZero(lockBefore, lockAfter);
       }
-      info.gitDirty = statusOut
-        ? statusOut.trim().split('\n').filter(Boolean).length
-        : 0;
-    } catch {}
+      mainWindow?.webContents.send('build-complete', { success: code === 0 });
+      if (code === 0) {
+        resolve(args.length > 2 ? `Flake input "${args[2]}" updated` : `Flake inputs updated`);
+      } else {
+        reject(new Error(`Update failed with code ${code}`));
+      }
+    });
 
-    // Current system profile (generation + last switch time)
-    try {
-      const link  = fs.readlinkSync(NIX_SYSTEM_PROFILE);
-      const m     = link.match(/system-(\d+)-link/);
-      info.generation        = m ? parseInt(m[1]) : null;
-      const stats            = fs.lstatSync(NIX_SYSTEM_PROFILE);
-      info.lastSwitch        = stats.mtime.toLocaleString();
-      info.lastSwitchRelative = relativeTime(stats.mtimeMs);
-    } catch {}
-
-    // NixOS version
-    try {
-      const osRelease = fs.readFileSync('/etc/os-release', 'utf8');
-      const m = osRelease.match(/VERSION_ID="?([^"\n]+)"?/);
-      info.nixosVersion = m ? m[1] : null;
-    } catch {}
-
-    // Nix version (strip to just the semver number)
-    try {
-      const raw = await runCmd('nix --version 2>/dev/null', CMD_TIMEOUT_FAST);
-      const m = raw?.match(/\(Nix\)\s*([\d.]+)/);
-      info.nixVersion = m ? m[1] : (raw?.trim() || null);
-    } catch {}
-
-    return info;
+    proc.on('error', (err: Error) => {
+      mainWindow?.webContents.send('build-complete', { success: false });
+      reject(err);
+    });
   });
 }
 
-export { register, getInputUpdateStatus, relativeTime, runUpdateChecks, parseFlakeInputs, parseFlakeLockInfo };
+/** Create flake handlers with dependency injection support. */
+function createFlakeHandlers(deps: FlakeDeps = {}) {
+  const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
+  const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
+  const depsGetInputStatus = deps.getInputUpdateStatus || getInputUpdateStatus;
+  const depsResetStatus = deps.resetInputUpdateStatus || resetInputUpdateStatus;
+  const depsRunUpdateChecks = deps.runUpdateChecks || runUpdateChecks;
+  const depsGetMainWindow = deps.getMainWindow || getMainWindow;
+  const depsFs = deps.fs || fs;
+  const depsRunCmd = deps.runCmd || runCmd;
+
+  return {
+    updateFlakeInputs: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        throw new Error(depsFlakeDirNotFoundMsg());
+      }
+
+      return runFlakeUpdate(deps, flakeDir, ['flake', 'update'], 'Updating All Flake Inputs', (before, after) => {
+        depsResetStatus();
+        const changed = before !== after;
+        const summary = changed
+          ? '\n✓ All flake inputs updated successfully.'
+          : '\n• All flake inputs are already up to date.';
+        depsGetMainWindow()?.webContents.send('build-output', summary);
+      });
+    },
+
+    updateFlakeInput: async (inputName: string) => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        throw new Error(depsFlakeDirNotFoundMsg());
+      }
+
+      return runFlakeUpdate(deps, flakeDir, ['flake', 'update', inputName], `Updating ${inputName}`, (before, after) => {
+        const changed = before !== after;
+        const summary = changed
+          ? `\n✓ ${inputName} updated successfully.`
+          : `\n• ${inputName} is already up to date.`;
+        depsGetMainWindow()?.webContents.send('build-output', summary);
+        depsGetInputStatus()[inputName] = false;
+      });
+    },
+
+    getFlakeInputs: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return [];
+      }
+
+      const lockPath = path.join(flakeDir, 'flake.lock');
+      if (!depsFs.existsSync(lockPath)) {
+        return [];
+      }
+
+      try {
+        const lockContent = JSON.parse(depsFs.readFileSync(lockPath, 'utf8'));
+        return parseFlakeInputs(lockContent, depsGetInputStatus());
+      } catch (e: any) {
+        console.error('Failed to parse flake.lock:', e);
+        return [];
+      }
+    },
+
+    checkFlakeInputUpdates: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) return {};
+
+      await depsRunUpdateChecks(flakeDir);
+
+      const status = depsGetInputStatus();
+      depsGetMainWindow()?.webContents.send('flake-update-check-complete', status);
+      return status;
+    },
+
+    getFlakeInfo: async () => {
+      const flakeDir = depsFindFlakeDir();
+      const info: any = { flakeDir: flakeDir || null };
+      if (!flakeDir) return info;
+
+      try {
+        const flakeNix = depsFs.readFileSync(path.join(flakeDir, 'flake.nix'), 'utf8');
+        const m = flakeNix.match(/description\s*=\s*"([^"]+)"/);
+        info.description = m ? m[1] : null;
+      } catch { info.description = null; }
+
+      const lockPath = path.join(flakeDir, 'flake.lock');
+      if (depsFs.existsSync(lockPath)) {
+        try {
+          const stats = depsFs.lstatSync(lockPath);
+          info.lockUpdated = stats.mtime.toLocaleString();
+          info.lockUpdatedRelative = relativeTime(stats.mtimeMs);
+        } catch {}
+
+        try {
+          const lock = JSON.parse(depsFs.readFileSync(lockPath, 'utf8'));
+          Object.assign(info, parseFlakeLockInfo(lock));
+        } catch {}
+      }
+
+      try {
+        const [branch, shortRev, lastLog, statusOut] = await Promise.all([
+          depsRunCmd(`git -C "${flakeDir}" branch --show-current 2>/dev/null`,    CMD_TIMEOUT_FAST),
+          depsRunCmd(`git -C "${flakeDir}" rev-parse --short HEAD 2>/dev/null`,   CMD_TIMEOUT_FAST),
+          depsRunCmd(`git -C "${flakeDir}" log -1 --format="%s|%cr" 2>/dev/null`, CMD_TIMEOUT_FAST),
+          depsRunCmd(`git -C "${flakeDir}" status --porcelain 2>/dev/null`,        CMD_TIMEOUT_FAST),
+        ]);
+        info.gitBranch = branch?.trim()    || null;
+        info.gitRev    = shortRev?.trim()  || null;
+        if (lastLog) {
+          const [msg, when] = lastLog.trim().split('|');
+          info.gitLastMsg  = msg?.trim()  || null;
+          info.gitLastWhen = when?.trim() || null;
+        }
+        info.gitDirty = statusOut
+          ? statusOut.trim().split('\n').filter(Boolean).length
+          : 0;
+      } catch {}
+
+      try {
+        const link  = depsFs.readlinkSync(NIX_SYSTEM_PROFILE);
+        const m     = link.match(/system-(\d+)-link/);
+        info.generation        = m ? parseInt(m[1]) : null;
+        const stats            = depsFs.lstatSync(NIX_SYSTEM_PROFILE);
+        info.lastSwitch        = stats.mtime.toLocaleString();
+        info.lastSwitchRelative = relativeTime(stats.mtimeMs);
+      } catch {}
+
+      try {
+        const osRelease = depsFs.readFileSync('/etc/os-release', 'utf8');
+        const m = osRelease.match(/VERSION_ID="?([^"\n]+)"?/);
+        info.nixosVersion = m ? m[1] : null;
+      } catch {}
+
+      try {
+        const raw = await depsRunCmd('nix --version 2>/dev/null', CMD_TIMEOUT_FAST);
+        const m = raw?.match(/\(Nix\)\s*([\d.]+)/);
+        info.nixVersion = m ? m[1] : (raw?.trim() || null);
+      } catch {}
+
+      return info;
+    }
+  };
+}
+
+/** Register flake management IPC handlers */
+function register(deps: FlakeDeps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const handlers = createFlakeHandlers(deps);
+
+  depsIpcMain.handle('update-flake-inputs', async () => {
+    return handlers.updateFlakeInputs();
+  });
+
+  depsIpcMain.handle('update-flake-input', async (_event: unknown, inputName: string) => {
+    return handlers.updateFlakeInput(inputName);
+  });
+
+  depsIpcMain.handle('get-flake-inputs', async () => {
+    return handlers.getFlakeInputs();
+  });
+
+  depsIpcMain.handle('check-flake-input-updates', async () => {
+    return handlers.checkFlakeInputUpdates();
+  });
+
+  depsIpcMain.handle('get-flake-info', async () => {
+    return handlers.getFlakeInfo();
+  });
+}
+
+
+export { register, createFlakeHandlers, getInputUpdateStatus, resetInputUpdateStatus, relativeTime, runUpdateChecks, parseFlakeInputs, parseFlakeLockInfo };
 
 export {};

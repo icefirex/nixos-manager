@@ -394,6 +394,47 @@ describe('discover handler', () => {
       const trying = await ipcMain.__getHandler('discover-is-trying')();
       expect(trying).toEqual({ running: false, package: null });
     });
+    it('searchNixpkgs parses spawn output via injected spawn', async () => {
+      const { EventEmitter } = require('events');
+      const mod2 = require("./discover.ts");
+      const handlers = mod2.createDiscoverHandlers({
+        spawn: vi.fn(() => {
+          const proc: any = new EventEmitter();
+          proc.stdout = new EventEmitter();
+          proc.stderr = new EventEmitter();
+          setTimeout(() => {
+            proc.stdout.emit('data', JSON.stringify({
+              'legacyPackages.x86_64-linux.zsh': { pname: 'zsh', version: '5.9', description: 'Z shell' }
+            }));
+            proc.emit('close', 0);
+          }, 0);
+          return proc;
+        }),
+        getSpawnEnv: () => ({}),
+      });
+
+      const results = await handlers.searchNixpkgs('zsh');
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({ pkgname: 'zsh', name: 'zsh', version: '5.9', isNixpkgsResult: true });
+    });
+
+    it('searchNixpkgs returns [] for empty queries and spawn errors', async () => {
+      const { EventEmitter } = require('events');
+      const mod3 = require("./discover.ts");
+      const handlers = mod3.createDiscoverHandlers({
+        spawn: vi.fn(() => {
+          const proc: any = new EventEmitter();
+          proc.stdout = new EventEmitter();
+          proc.stderr = new EventEmitter();
+          setTimeout(() => proc.emit('error', new Error('boom')), 0);
+          return proc;
+        }),
+        getSpawnEnv: () => ({}),
+      });
+
+      expect(await handlers.searchNixpkgs('')).toEqual([]);
+      expect(await handlers.searchNixpkgs('anything')).toEqual([]);
+    });
   });
 
 });

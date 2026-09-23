@@ -213,6 +213,116 @@ describe('options handler', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  describe('createOptionsHandlers coverage', () => {
+    const { createOptionsHandlers } = require('./options.ts');
+
+    function makeTempFlake(files: Record<string, string>) {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-factory-'));
+      for (const [rel, content] of Object.entries(files)) {
+        fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+        fs.writeFileSync(path.join(dir, rel), content);
+      }
+      return dir;
+    }
+
+    it('getOptions parses and categorizes options from the flake', async () => {
+      const dir = makeTempFlake({
+        'configuration.nix': `
+{ config, pkgs, ... }:
+{
+  services.openssh.enable = true;
+  programs.zsh.enable = true;
+  networking.hostName = "box";
+}
+`
+      });
+
+      const handlers = createOptionsHandlers({ findFlakeDir: () => dir });
+      const options = await handlers.getOptions();
+
+      expect(options.services).toContainEqual(expect.objectContaining({ path: 'services.openssh.enable' }));
+      expect(options.programs).toContainEqual(expect.objectContaining({ path: 'programs.zsh.enable' }));
+      expect(options.networking).toContainEqual(expect.objectContaining({ path: 'networking.hostName' }));
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('optionsListFiles lists nix files with relative paths', async () => {
+      const dir = makeTempFlake({
+        'configuration.nix': '{ }\n',
+        'modules/home.nix': '{ }\n',
+        'README.md': 'not nix',
+      });
+
+      const handlers = createOptionsHandlers({ findFlakeDir: () => dir });
+      const result = await handlers.optionsListFiles();
+      expect(result.success).toBe(true);
+      expect(result.files.map((f: any) => f.relativePath).sort()).toEqual(['configuration.nix', path.join('modules', 'home.nix')]);
+
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('optionsListFiles reports failure without a flake dir', async () => {
+      const handlers = createOptionsHandlers({ findFlakeDir: () => null, flakeDirNotFoundMsg: () => 'no flake' });
+      expect(await handlers.optionsListFiles()).toEqual({ success: false, error: 'no flake' });
+    });
+
+    it('getLiveOptions collects services, programs, networking, and boot info', async () => {
+      const runCmd = vi.fn(async (cmd: string) => {
+        if (cmd.includes('systemctl list-unit-files')) return 'sshd.service enabled enabled\nsystemd-journald.service enabled enabled';
+        if (cmd.startsWith('which git')) return '/run/current-system/sw/bin/git';
+        if (cmd.startsWith('which vim')) return '';
+        if (cmd === 'hostname 2>/dev/null') return 'nixbox';
+        if (cmd.includes('firewall')) return 'active';
+        if (cmd.startsWith('uname -r')) return '6.6.1';
+        return '';
+      });
+
+      const handlers = createOptionsHandlers({ runCmd });
+      const live = await handlers.getLiveOptions();
+
+      expect(live.services).toContainEqual({ path: 'services.sshd', value: 'enabled', source: 'systemd' });
+      expect(live.programs).toContainEqual({ path: 'programs.git', value: '/run/current-system/sw/bin/git', source: 'which' });
+      expect(live.networking.map((o: any) => o.path)).toContain('networking.hostName');
+      expect(live.networking.map((o: any) => o.path)).toContain('networking.firewall');
+      expect(live.boot).toContainEqual({ path: 'boot.kernelPackages', value: '6.6.1', source: 'uname' });
+    });
+
+    it('getOptionInfo merges nixos-option output with config locations', async () => {
+      const runCmd = vi.fn(async (cmd: string) => {
+        if (cmd.startsWith('nixos-option')) return '{}';
+        if (cmd.startsWith('grep')) return '/flake/config.nix:5:services.x.enable = true;\n/flake/config.nix:9:services.x.enable = false;';
+        return '';
+      });
+
+      const handlers = createOptionsHandlers({
+        findFlakeDir: () => '/flake',
+        runCmd,
+      });
+
+      const info = await handlers.getOptionInfo('services.x.enable');
+      expect(info.path).toBe('services.x.enable');
+      expect(info.configLocations).toEqual(['config.nix:5', 'config.nix:9']);
+    });
+
+    it('searchOptionsCatalog passes through to the injected catalog search', async () => {
+      const searchOptionCatalog = vi.fn(async () => [{ path: 'services.x.enable', description: null }]);
+      const handlers = createOptionsHandlers({ searchOptionCatalog });
+
+      const result = await handlers.searchOptionsCatalog('services.x');
+      expect(result.success).toBe(true);
+      expect(result.results).toHaveLength(1);
+      expect(searchOptionCatalog).toHaveBeenCalledWith('services.x', 'unstable', 20);
+    });
+
+    it('searchOptionsCatalog reports errors from the catalog', async () => {
+      const handlers = createOptionsHandlers({
+        searchOptionCatalog: vi.fn(async () => { throw new Error('network down'); }),
+      });
+      const result = await handlers.searchOptionsCatalog('x');
+      expect(result).toEqual({ success: false, error: 'network down' });
+    });
+  });
+
 });
 
 export {};
