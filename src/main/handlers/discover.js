@@ -444,239 +444,630 @@ async function loadComponents() {
 }
 
 /**
- * Register IPC handlers for discover functionality
+ * Reset in-memory component caches.
  */
-function register() {
-  // Initialize AppStream data
-  ipcMain.handle('discover-init', async () => {
+function resetComponentsCache() {
+  componentsCache = null;
+  componentsByPkgname = null;
+  categories = null;
+  lastCacheTime = 0;
+}
+
+/**
+ * Build a pkgname -> component lookup index. Pure.
+ */
+function buildPkgnameIndex(components) {
+  const index = new Map();
+  for (const comp of components) {
+    index.set(comp.pkgname, comp);
+  }
+  return index;
+}
+
+/**
+ * Build the sorted category list from components. Pure.
+ */
+function buildCategoriesList(components) {
+  const catSet = new Set();
+  for (const comp of components) {
+    for (const cat of comp.categories) {
+      catSet.add(cat);
+    }
+  }
+  return Array.from(catSet).sort();
+}
+
+/**
+ * Filter, sort, and slice components for a search query. Pure.
+ */
+function searchComponents(components, query, options = {}) {
+  const { category, limit = 50 } = options;
+  const q = (query || '').toLowerCase();
+
+  const results = components.filter(comp => {
+    // Category filter
+    if (category && !comp.categories.includes(category)) {
+      return false;
+    }
+
+    // Search in name, summary, pkgname
+    if (q) {
+      const searchable = `${comp.name} ${comp.summary} ${comp.pkgname}`.toLowerCase();
+      return searchable.includes(q);
+    }
+
+    return true;
+  });
+
+  // Sort by relevance (exact name match first, then alphabetical)
+  results.sort((a, b) => {
+    if (q) {
+      const aExact = a.name.toLowerCase() === q || a.pkgname === q;
+      const bExact = b.name.toLowerCase() === q || b.pkgname === q;
+      if (aExact && !bExact) return -1;
+      if (bExact && !aExact) return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return results.slice(0, limit);
+}
+
+/**
+ * Parse `nix search --json` stdout into result entries. Pure.
+ */
+function parseNixpkgsSearchResults(stdout) {
+  if (!stdout || stdout.trim() === '{}' || stdout.trim() === '') return [];
+  try {
+    const packages = JSON.parse(stdout);
+    const results = [];
+    for (const [attrPath, pkg] of Object.entries(packages)) {
+      const parts = attrPath.split('.');
+      const pkgname = parts.slice(2).join('.');
+      results.push({
+        id: attrPath,
+        pkgname,
+        name: pkg.pname || pkgname.split('.').pop(),
+        summary: pkg.description || '',
+        version: pkg.version || null,
+        categories: [],
+        icon: null,
+        isNixpkgsResult: true
+      });
+    }
+    results.sort((a, b) => a.name.localeCompare(b.name));
+    return results.slice(0, 100);
+  } catch (e) {
+    console.error('Failed to parse nixpkgs search result:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Resolve the config section for a package type. Pure.
+ */
+function resolvePackageSection(packageType, userName) {
+  switch (packageType) {
+    case 'system':
+      return { ok: true, sectionPrefix: 'environment.systemPackages' };
+    case 'homeManager':
+      return { ok: true, sectionPrefix: 'home.packages' };
+    case 'user': {
+      if (!userName) {
+        return { ok: false, error: 'User name is required for user packages' };
+      }
+      return { ok: true, sectionPrefix: `users.users.${userName}.packages` };
+    }
+    default:
+      return { ok: false, error: `Unknown package type: ${packageType}` };
+  }
+}
+
+/**
+ * Remove a package reference from nix config file content. Pure.
+ */
+function removePackageFromContent(content, pkgname) {
+  const pkgRef = `pkgs.${pkgname}`;
+  const escapedRef = pkgRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedName = pkgname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lineRegex = new RegExp(`(\\n\\s*)${escapedRef}(\\s*#[^\\n]*)?\\s*\\n`, 'g');
+
+  let newContent;
+  if (lineRegex.test(content)) {
+    newContent = content.replace(lineRegex, '\n');
+  } else {
+    const bareRegex = new RegExp(`(\\n\\s*)${escapedName}(\\s*#[^\\n]*)?\\s*\\n`, 'g');
+    if (!bareRegex.test(content)) {
+      return { ok: false, error: `Package '${pkgname}' not found in file` };
+    }
+    newContent = content.replace(bareRegex, '\n');
+  }
+
+  newContent = newContent.replace(/\n{3,}/g, '\n\n');
+  return { ok: true, content: newContent };
+}
+
+/**
+ * Add a package reference to nix config file content under a section. Pure.
+ */
+function addPackageToContent(content, pkgname, sectionPrefix) {
+  const pkgRef = `pkgs.${pkgname}`;
+
+  // Find the opening bracket of the section and insert before the closing ]
+  const escapedPrefix = sectionPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const headerRegex = new RegExp(`${escapedPrefix}\\s*=\\s*(?:with\\s+pkgs;\\s*)?\\[`);
+  const headerMatch = content.match(headerRegex);
+  if (headerMatch) {
+    const listStart = headerMatch.index + headerMatch[0].length;
+    const afterOpen = content.slice(listStart);
+
+    // Find the first ] after the opening bracket
+    const closeIdx = afterOpen.indexOf(']');
+    if (closeIdx === -1) {
+      return { ok: false, error: 'Could not find closing bracket for the section' };
+    }
+
+    const innerContent = afterOpen.slice(0, closeIdx);
+
+    if (innerContent.includes(pkgRef) || innerContent.includes(`\n${pkgname}\n`)) {
+      return { ok: false, error: `Package '${pkgname}' is already in ${sectionPrefix}` };
+    }
+
+    // Detect indentation from existing list items
+    const indentMatch = innerContent.match(/\n(\s+)\S/);
+    const itemIndent = indentMatch ? indentMatch[1] : '  ';
+
+    // Trim trailing whitespace before ], then insert the new line there.
+    // This avoids disrupting the ] line's indentation or position.
+    const trimmedEnd = innerContent.replace(/\s+$/, '');
+    const insertPoint = listStart + trimmedEnd.length;
+    const newContent = content.slice(0, insertPoint) + `\n${itemIndent}${pkgRef}` + content.slice(insertPoint);
+    return { ok: true, content: newContent };
+  }
+
+  // Section doesn't exist — detect file indentation and add at end
+  const fileIndent = content.match(/^(\s+)/m);
+  const baseIndent = fileIndent ? fileIndent[1] : '';
+  const newSection = `\n${baseIndent}${sectionPrefix} = with pkgs; [\n${baseIndent}  ${pkgRef}\n${baseIndent}];\n`;
+  const trimmed = content.trimEnd();
+  let newContent;
+  if (trimmed.endsWith('}')) {
+    newContent = trimmed.replace(/\}(\s*)$/, `${newSection}}$1`);
+  } else {
+    newContent = content + newSection;
+  }
+  return { ok: true, content: newContent };
+}
+
+/**
+ * Scan a flake directory for .nix config files and their package sections.
+ */
+function scanNixConfigFiles(flakeDir, depsFs = fs) {
+  const nixFiles = [];
+  function scanDir(dir) {
+    let entries;
     try {
-      await loadComponents();
+      entries = depsFs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        scanDir(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.nix')) {
+        let content;
+        try {
+          content = depsFs.readFileSync(fullPath, 'utf8');
+        } catch {
+          continue;
+        }
+        const sections = [];
+        const users = [];
+        if (/environment\.systemPackages/.test(content)) sections.push('system');
+        if (/home\.packages/.test(content)) sections.push('homeManager');
+        const userMatches = content.matchAll(/users\.users\.([^.]+)\.packages/g);
+        for (const m of userMatches) {
+          const name = m[1];
+          if (!users.includes(name)) users.push(name);
+          if (!sections.includes('user')) sections.push('user');
+        }
+        nixFiles.push({
+          path: fullPath,
+          relativePath: path.relative(flakeDir, fullPath),
+          sections,
+          users
+        });
+      }
+    }
+  }
+  scanDir(flakeDir);
+  return nixFiles;
+}
+
+/**
+ * Create discover handlers with dependency injection support.
+ * Note: the try-package/is-trying/kill-try trio stays in register() because it
+ * shares module-level process state with launchInTerminal() and cleanup().
+ */
+function createDiscoverHandlers(deps = {}) {
+  const depsFs = deps.fs || fs;
+  const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
+  const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
+  const depsRunCmd = deps.runCmd || runCmd;
+  const depsNixEvalRaw = deps.nixEvalRaw || nixEvalRaw;
+  const depsNixEvalJson = deps.nixEvalJson || nixEvalJson;
+  const depsLoadComponents = deps.loadComponents || loadComponents;
+  const depsGetComponentsCache = deps.getComponentsCache || (() => componentsCache);
+  const depsGetComponentsByPkgname = deps.getComponentsByPkgname || (() => componentsByPkgname);
+  const depsGetCategories = deps.getCategories || (() => categories);
+  const depsResetCache = deps.resetCache || resetComponentsCache;
+  const depsGetAllPackages = deps.getAllPackages || (() => require('../nix-packages').getAllPackages());
+  const depsFindPackage = deps.findPackage || ((pkgname) => require('../nix-packages').findPackage(pkgname));
+  const depsCacheDir = deps.cacheDir || CACHE_DIR;
+  const depsSpawn = deps.spawn || spawn;
+  const depsGetSpawnEnv = deps.getSpawnEnv || getSpawnEnv;
+
+  return {
+    init: async () => {
+      try {
+        await depsLoadComponents();
+        const cache = depsGetComponentsCache() || [];
+        const cats = depsGetCategories() || [];
+        return {
+          success: true,
+          stats: {
+            totalApps: cache.length,
+            categories: cats.length
+          }
+        };
+      } catch (e) {
+        return { success: false, error: e.message };
+      }
+    },
+
+    getCategories: async () => {
+      await depsLoadComponents();
+      return depsGetCategories() || [];
+    },
+
+    search: async (query, options = {}) => {
+      await depsLoadComponents();
+      return searchComponents(depsGetComponentsCache() || [], query, options);
+    },
+
+    byCategory: async (category, limit = 50) => {
+      await depsLoadComponents();
+      return (depsGetComponentsCache() || [])
+        .filter(comp => comp.categories.includes(category))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, limit);
+    },
+
+    featured: async (limit = 12) => {
+      await depsLoadComponents();
+
+      // Return a curated selection of well-known apps
+      const featured = [
+        'firefox', 'chromium', 'vlc', 'gimp', 'inkscape', 'blender',
+        'libreoffice', 'thunderbird', 'kdenlive', 'obs-studio', 'audacity',
+        'krita', 'darktable', 'handbrake', 'mpv', 'transmission-gtk'
+      ];
+
+      const byPkgname = depsGetComponentsByPkgname();
+      const results = [];
+      for (const pkgname of featured) {
+        const comp = byPkgname?.get(pkgname);
+        if (comp) results.push(comp);
+        if (results.length >= limit) break;
+      }
+
+      // Fill with random if not enough
+      if (results.length < limit) {
+        const shuffled = [...(depsGetComponentsCache() || [])]
+          .filter(c => !results.includes(c))
+          .sort(() => Math.random() - 0.5);
+
+        for (const comp of shuffled) {
+          if (!results.includes(comp)) {
+            results.push(comp);
+            if (results.length >= limit) break;
+          }
+        }
+      }
+
+      return results;
+    },
+
+    getIcon: async (iconName) => {
+      const iconsDir = path.join(depsCacheDir, 'icons');
+      const iconPath = path.join(iconsDir, iconName);
+
+      // Guard against path traversal (e.g. iconName = '../../etc/passwd')
+      if (!path.resolve(iconPath).startsWith(path.resolve(iconsDir) + path.sep)) {
+        return null;
+      }
+
+      if (depsFs.existsSync(iconPath)) {
+        const iconData = depsFs.readFileSync(iconPath);
+        const ext = path.extname(iconName).slice(1) || 'png';
+        const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
+        return `data:${mimeType};base64,${iconData.toString('base64')}`;
+      }
+
+      return null;
+    },
+
+    getDetails: async (pkgname) => {
+      await depsLoadComponents();
+
+      const component = depsGetComponentsByPkgname()?.get(pkgname);
+
+      // Get additional info from nix — using spawn-based helpers (no shell injection)
+      let nixMeta = {};
+      try {
+        nixMeta = (await depsNixEvalJson(`${pkgname}.meta`)) || {};
+      } catch (e) {
+        // Ignore errors
+      }
+
+      let version = null;
+      try {
+        version = (await depsNixEvalRaw(`${pkgname}.version`)) || null;
+      } catch (e) {}
+
       return {
-        success: true,
-        stats: {
-          totalApps: componentsCache.length,
-          categories: categories.length
+        appstream: component || null,
+        nix: {
+          version,
+          license: nixMeta.license?.spdxId || nixMeta.license?.shortName || null,
+          homepage: nixMeta.homepage || null,
+          description: nixMeta.description || null,
+          platforms: nixMeta.platforms?.slice(0, 5) || [],
+          maintainers: nixMeta.maintainers?.map(m => m.name || m).slice(0, 3) || []
         }
       };
-    } catch (e) {
-      return { success: false, error: e.message };
+    },
+
+    searchNixpkgs: async (query) => {
+      if (!query || typeof query !== 'string' || !query.trim()) return [];
+
+      return new Promise((resolve) => {
+        let stdout = '';
+        console.log(`Searching nixpkgs for: "${query}"`);
+
+        // Use spawn with arg array — no shell, no injection possible
+        const proc = depsSpawn('nix', ['search', NIX_FLAKE_REGISTRY, query, '--json'], {
+          env: depsGetSpawnEnv(),
+          timeout: 60000
+        });
+
+        proc.stdout.on('data', (d) => { stdout += d.toString(); });
+        proc.stderr.on('data', () => {}); // suppress stderr noise
+
+        proc.on('close', () => {
+          console.log(`Nixpkgs search result length: ${stdout?.length || 0}`);
+          resolve(parseNixpkgsSearchResults(stdout));
+        });
+
+        proc.on('error', (err) => {
+          console.error('Failed to search nixpkgs:', err.message);
+          resolve([]);
+        });
+      });
+    },
+
+    refresh: async () => {
+      depsResetCache();
+
+      // Remove cached files
+      const xmlPath = path.join(depsCacheDir, 'Components-x86_64-linux.xml');
+      if (depsFs.existsSync(xmlPath)) {
+        depsFs.unlinkSync(xmlPath);
+      }
+
+      return ensureAppStreamData();
+    },
+
+    getConfigFiles: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
+
+      return { success: true, files: scanNixConfigFiles(flakeDir, depsFs) };
+    },
+
+    checkNixpkgsPackage: async (pkgname) => {
+      try {
+        const result = await depsNixEvalRaw(`${pkgname}.meta.description`);
+        return { exists: !!result };
+      } catch {
+        return { exists: false };
+      }
+    },
+
+    findPackageHandler: async (pkgname) => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
+
+      const results = depsFindPackage(pkgname).map(f => ({
+        path: f.file,
+        relativePath: f.relativePath,
+        sections: f.sections
+      }));
+      return { success: true, files: results };
+    },
+
+    getConfigured: async () => {
+      const flakeDir = depsFindFlakeDir();
+      if (!flakeDir) {
+        return { success: false, error: depsFlakeDirNotFoundMsg() };
+      }
+
+      const scoped = depsGetAllPackages();
+      const allPackages = [...new Set([
+        ...(scoped.system || []),
+        ...(scoped.user || []),
+        ...(scoped.homeManager || [])
+      ])].sort((a, b) => a.localeCompare(b));
+
+      return { success: true, packages: allPackages };
+    },
+
+    removePackage: async (options) => {
+      const { pkgname, filePath } = options;
+
+      if (!filePath || !depsFs.existsSync(filePath)) {
+        return { success: false, error: 'Target file does not exist' };
+      }
+
+      let content;
+      try {
+        content = depsFs.readFileSync(filePath, 'utf8');
+      } catch (e) {
+        return { success: false, error: `Failed to read file: ${e.message}` };
+      }
+
+      const result = removePackageFromContent(content, pkgname);
+      if (!result.ok) {
+        return { success: false, error: result.error };
+      }
+
+      try {
+        depsFs.writeFileSync(filePath, result.content, 'utf8');
+      } catch (e) {
+        return { success: false, error: `Failed to write file: ${e.message}` };
+      }
+
+      let diff = '';
+      const flakeDir = depsFindFlakeDir();
+      if (flakeDir) {
+        try {
+          const relPath = path.relative(flakeDir, filePath);
+          diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
+        } catch (e) {}
+      }
+
+      return {
+        success: true,
+        message: `Removed ${pkgname} from configuration`,
+        diff: diff || null
+      };
+    },
+
+    addPackage: async (options) => {
+      const { pkgname, filePath, packageType, userName } = options;
+
+      if (!filePath || !depsFs.existsSync(filePath)) {
+        return { success: false, error: 'Target file does not exist' };
+      }
+
+      let content;
+      try {
+        content = depsFs.readFileSync(filePath, 'utf8');
+      } catch (e) {
+        return { success: false, error: `Failed to read file: ${e.message}` };
+      }
+
+      const section = resolvePackageSection(packageType, userName);
+      if (!section.ok) {
+        return { success: false, error: section.error };
+      }
+      const sectionPrefix = section.sectionPrefix;
+
+      const result = addPackageToContent(content, pkgname, sectionPrefix);
+      if (!result.ok) {
+        return { success: false, error: result.error };
+      }
+
+      try {
+        depsFs.writeFileSync(filePath, result.content, 'utf8');
+      } catch (e) {
+        return { success: false, error: `Failed to write file: ${e.message}` };
+      }
+
+      // Get git diff of the change
+      let diff = '';
+      const flakeDir = depsFindFlakeDir();
+      if (flakeDir) {
+        try {
+          const relPath = path.relative(flakeDir, filePath);
+          diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
+        } catch (e) {
+          // diff not available
+        }
+      }
+
+      return {
+        success: true,
+        message: `Added ${pkgname} to ${sectionPrefix} in ${path.basename(filePath)}`,
+        diff: diff || null
+      };
     }
+  };
+}
+
+/**
+ * Register IPC handlers for discover functionality
+ */
+function register(deps = {}) {
+  const depsIpcMain = deps.ipcMain || ipcMain;
+  const depsGetMainWindow = deps.getMainWindow || getMainWindow;
+  const depsSpawn = deps.spawn || spawn;
+  const depsGetSpawnEnv = deps.getSpawnEnv || getSpawnEnv;
+  const depsNixEvalRaw = deps.nixEvalRaw || nixEvalRaw;
+  const handlers = createDiscoverHandlers(deps);
+
+  // Initialize AppStream data
+  depsIpcMain.handle('discover-init', async () => {
+    return handlers.init();
   });
 
   // Get all categories
-  ipcMain.handle('discover-get-categories', async () => {
-    await loadComponents();
-    return categories || [];
+  depsIpcMain.handle('discover-get-categories', async () => {
+    return handlers.getCategories();
   });
 
   // Search packages
-  ipcMain.handle('discover-search', async (event, query, options = {}) => {
-    await loadComponents();
-
-    const { category, limit = 50 } = options;
-    const q = query.toLowerCase();
-
-    let results = componentsCache.filter(comp => {
-      // Category filter
-      if (category && !comp.categories.includes(category)) {
-        return false;
-      }
-
-      // Search in name, summary, pkgname
-      if (q) {
-        const searchable = `${comp.name} ${comp.summary} ${comp.pkgname}`.toLowerCase();
-        return searchable.includes(q);
-      }
-
-      return true;
-    });
-
-    // Sort by relevance (exact name match first, then alphabetical)
-    results.sort((a, b) => {
-      if (q) {
-        const aExact = a.name.toLowerCase() === q || a.pkgname === q;
-        const bExact = b.name.toLowerCase() === q || b.pkgname === q;
-        if (aExact && !bExact) return -1;
-        if (bExact && !aExact) return 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    return results.slice(0, limit);
+  depsIpcMain.handle('discover-search', async (event, query, options = {}) => {
+    return handlers.search(query, options);
   });
 
   // Get packages by category
-  ipcMain.handle('discover-by-category', async (event, category, limit = 50) => {
-    await loadComponents();
-
-    const results = componentsCache
-      .filter(comp => comp.categories.includes(category))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, limit);
-
-    return results;
+  depsIpcMain.handle('discover-by-category', async (event, category, limit = 50) => {
+    return handlers.byCategory(category, limit);
   });
 
   // Get featured/random packages
-  ipcMain.handle('discover-featured', async (event, limit = 12) => {
-    await loadComponents();
-
-    // Return a curated selection of well-known apps
-    const featured = [
-      'firefox', 'chromium', 'vlc', 'gimp', 'inkscape', 'blender',
-      'libreoffice', 'thunderbird', 'kdenlive', 'obs-studio', 'audacity',
-      'krita', 'darktable', 'handbrake', 'mpv', 'transmission-gtk'
-    ];
-
-    const results = [];
-    for (const pkgname of featured) {
-      const comp = componentsByPkgname?.get(pkgname);
-      if (comp) results.push(comp);
-      if (results.length >= limit) break;
-    }
-
-    // Fill with random if not enough
-    if (results.length < limit) {
-      const shuffled = [...componentsCache]
-        .filter(c => !results.includes(c))
-        .sort(() => Math.random() - 0.5);
-
-      for (const comp of shuffled) {
-        if (!results.includes(comp)) {
-          results.push(comp);
-          if (results.length >= limit) break;
-        }
-      }
-    }
-
-    return results;
+  depsIpcMain.handle('discover-featured', async (event, limit = 12) => {
+    return handlers.featured(limit);
   });
 
   // Get icon path for a package
-  ipcMain.handle('discover-get-icon', async (event, iconName) => {
-    const iconsDir = path.join(CACHE_DIR, 'icons');
-    const iconPath = path.join(iconsDir, iconName);
-
-    // Guard against path traversal (e.g. iconName = '../../etc/passwd')
-    if (!path.resolve(iconPath).startsWith(path.resolve(iconsDir) + path.sep)) {
-      return null;
-    }
-
-    if (fs.existsSync(iconPath)) {
-      const iconData = fs.readFileSync(iconPath);
-      const ext = path.extname(iconName).slice(1) || 'png';
-      const mimeType = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
-      return `data:${mimeType};base64,${iconData.toString('base64')}`;
-    }
-
-    return null;
+  depsIpcMain.handle('discover-get-icon', async (event, iconName) => {
+    return handlers.getIcon(iconName);
   });
 
   // Get detailed info for a package (combines AppStream + nix eval)
-  ipcMain.handle('discover-get-details', async (event, pkgname) => {
-    await loadComponents();
-
-    const component = componentsByPkgname?.get(pkgname);
-
-    // Get additional info from nix — using spawn-based helpers (no shell injection)
-    let nixMeta = {};
-    try {
-      nixMeta = (await nixEvalJson(`${pkgname}.meta`)) || {};
-    } catch (e) {
-      // Ignore errors
-    }
-
-    let version = null;
-    try {
-      version = (await nixEvalRaw(`${pkgname}.version`)) || null;
-    } catch (e) {}
-
-    return {
-      appstream: component || null,
-      nix: {
-        version,
-        license: nixMeta.license?.spdxId || nixMeta.license?.shortName || null,
-        homepage: nixMeta.homepage || null,
-        description: nixMeta.description || null,
-        platforms: nixMeta.platforms?.slice(0, 5) || [],
-        maintainers: nixMeta.maintainers?.map(m => m.name || m).slice(0, 3) || []
-      }
-    };
+  depsIpcMain.handle('discover-get-details', async (event, pkgname) => {
+    return handlers.getDetails(pkgname);
   });
 
   // Search full nixpkgs (not just AppStream packages)
-  ipcMain.handle('discover-search-nixpkgs', async (event, query) => {
-    if (!query || typeof query !== 'string' || !query.trim()) return [];
-
-    return new Promise((resolve) => {
-      let stdout = '';
-      console.log(`Searching nixpkgs for: "${query}"`);
-
-      // Use spawn with arg array — no shell, no injection possible
-      const proc = spawn('nix', ['search', NIX_FLAKE_REGISTRY, query, '--json'], {
-        env: getSpawnEnv(),
-        timeout: 60000
-      });
-
-      proc.stdout.on('data', (d) => { stdout += d.toString(); });
-      proc.stderr.on('data', () => {}); // suppress stderr noise
-
-      proc.on('close', () => {
-        console.log(`Nixpkgs search result length: ${stdout?.length || 0}`);
-        if (!stdout || stdout.trim() === '{}' || stdout.trim() === '') {
-          resolve([]);
-          return;
-        }
-        try {
-          const packages = JSON.parse(stdout);
-          const results = [];
-          for (const [attrPath, pkg] of Object.entries(packages)) {
-            const parts = attrPath.split('.');
-            const pkgname = parts.slice(2).join('.');
-            results.push({
-              id: attrPath,
-              pkgname,
-              name: pkg.pname || pkgname.split('.').pop(),
-              summary: pkg.description || '',
-              version: pkg.version || null,
-              categories: [],
-              icon: null,
-              isNixpkgsResult: true
-            });
-          }
-          results.sort((a, b) => a.name.localeCompare(b.name));
-          resolve(results.slice(0, 100));
-        } catch (e) {
-          console.error('Failed to parse nixpkgs search result:', e.message);
-          resolve([]);
-        }
-      });
-
-      proc.on('error', (err) => {
-        console.error('Failed to search nixpkgs:', err.message);
-        resolve([]);
-      });
-    });
+  depsIpcMain.handle('discover-search-nixpkgs', async (event, query) => {
+    return handlers.searchNixpkgs(query);
   });
 
   // Force refresh cache
-  ipcMain.handle('discover-refresh', async () => {
-    componentsCache = null;
-    componentsByPkgname = null;
-    categories = null;
-    lastCacheTime = 0;
-
-    // Remove cached files
-    const xmlPath = path.join(CACHE_DIR, 'Components-x86_64-linux.xml');
-    if (fs.existsSync(xmlPath)) {
-      fs.unlinkSync(xmlPath);
-    }
-
-    return ensureAppStreamData();
+  depsIpcMain.handle('discover-refresh', async () => {
+    return handlers.refresh();
   });
 
   // Check if a try-package process is running
-  ipcMain.handle('discover-is-trying', async () => {
+  depsIpcMain.handle('discover-is-trying', async () => {
     return {
       running: runningTryProcess !== null,
       package: runningTryPackage
@@ -684,9 +1075,9 @@ function register() {
   });
 
   // Kill the running try-package process
-  ipcMain.handle('discover-kill-try', async () => {
+  depsIpcMain.handle('discover-kill-try', async () => {
     if (runningTryProcess) {
-      const mainWindow = getMainWindow();
+      const mainWindow = depsGetMainWindow();
       try {
         // Kill the process group (negative PID kills the group)
         process.kill(-runningTryProcess.pid, 'SIGTERM');
@@ -707,13 +1098,13 @@ function register() {
   });
 
   // Try/run a package in nix-shell
-  ipcMain.handle('discover-try-package', async (event, pkgname) => {
-    const mainWindow = getMainWindow();
+  depsIpcMain.handle('discover-try-package', async (event, pkgname) => {
+    const mainWindow = depsGetMainWindow();
 
     // Get the main program name (binary) — use spawn-based helper (no shell injection)
     let mainProgram = pkgname.split('.').pop(); // Default: last part of package name
     try {
-      const result = await nixEvalRaw(`${pkgname}.meta.mainProgram`);
+      const result = await depsNixEvalRaw(`${pkgname}.meta.mainProgram`);
       if (result && result.trim()) {
         mainProgram = result.trim();
       }
@@ -729,8 +1120,8 @@ function register() {
       mainWindow?.webContents.send('build-output', `\r\n\x1b[1;36m>>> Trying package: ${pkgname}\x1b[0m\r\n`);
       mainWindow?.webContents.send('build-output', `\x1b[90mRunning: NIXPKGS_ALLOW_UNFREE=1 nix-shell -p ${pkgname} --run ${mainProgram}\x1b[0m\r\n\r\n`);
 
-      const proc = spawn('nix-shell', ['-p', pkgname, '--run', mainProgram], {
-        env: { ...getSpawnEnv(), NIXPKGS_ALLOW_UNFREE: '1' },
+      const proc = depsSpawn('nix-shell', ['-p', pkgname, '--run', mainProgram], {
+        env: { ...depsGetSpawnEnv(), NIXPKGS_ALLOW_UNFREE: '1' },
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe']
       });
@@ -800,254 +1191,33 @@ function register() {
   });
 
   // Get config files from flake directory for "add to configuration"
-  ipcMain.handle('discover-get-config-files', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
-
-    const nixFiles = [];
-    function scanDir(dir) {
-      let entries;
-      try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          scanDir(fullPath);
-        } else if (entry.isFile() && entry.name.endsWith('.nix')) {
-          let content;
-          try {
-            content = fs.readFileSync(fullPath, 'utf8');
-          } catch {
-            continue;
-          }
-          const sections = [];
-          const users = [];
-          if (/environment\.systemPackages/.test(content)) sections.push('system');
-          if (/home\.packages/.test(content)) sections.push('homeManager');
-          const userMatches = content.matchAll(/users\.users\.([^.]+)\.packages/g);
-          for (const m of userMatches) {
-            const name = m[1];
-            if (!users.includes(name)) users.push(name);
-            if (!sections.includes('user')) sections.push('user');
-          }
-          nixFiles.push({
-            path: fullPath,
-            relativePath: path.relative(flakeDir, fullPath),
-            sections,
-            users
-          });
-        }
-      }
-    }
-    scanDir(flakeDir);
-
-    return { success: true, files: nixFiles };
+  depsIpcMain.handle('discover-get-config-files', async () => {
+    return handlers.getConfigFiles();
   });
 
   // Check if a package name exists in nixpkgs (home-manager validation)
-  ipcMain.handle('discover-check-nixpkgs-package', async (event, pkgname) => {
-    try {
-      const result = await nixEvalRaw(`${pkgname}.meta.description`);
-      return { exists: !!result };
-    } catch {
-      return { exists: false };
-    }
+  depsIpcMain.handle('discover-check-nixpkgs-package', async (event, pkgname) => {
+    return handlers.checkNixpkgsPackage(pkgname);
   });
 
   // Find which config files contain a specific package
-  ipcMain.handle('discover-find-package', async (event, pkgname) => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
-
-    const { findPackage } = require('../nix-packages');
-    const results = findPackage(pkgname).map(f => ({
-      path: f.file,
-      relativePath: f.relativePath,
-      sections: f.sections
-    }));
-    return { success: true, files: results };
+  depsIpcMain.handle('discover-find-package', async (event, pkgname) => {
+    return handlers.findPackageHandler(pkgname);
   });
 
   // Get a flat list of all configured packages across all nix files
-  ipcMain.handle('discover-get-configured', async () => {
-    const flakeDir = findFlakeDir();
-    if (!flakeDir) {
-      return { success: false, error: flakeDirNotFoundMsg() };
-    }
-
-    const { getAllPackages } = require('../nix-packages');
-    const scoped = getAllPackages();
-    const allPackages = [...new Set([
-      ...(scoped.system || []),
-      ...(scoped.user || []),
-      ...(scoped.homeManager || [])
-    ])].sort((a, b) => a.localeCompare(b));
-
-    return { success: true, packages: allPackages };
+  depsIpcMain.handle('discover-get-configured', async () => {
+    return handlers.getConfigured();
   });
 
   // Remove a package from a nix config file
-  ipcMain.handle('discover-remove-package', async (event, options) => {
-    const { pkgname, filePath } = options;
-    const pkgRef = `pkgs.${pkgname}`;
-
-    if (!filePath || !fs.existsSync(filePath)) {
-      return { success: false, error: 'Target file does not exist' };
-    }
-
-    let content;
-    try {
-      content = fs.readFileSync(filePath, 'utf8');
-    } catch (e) {
-      return { success: false, error: `Failed to read file: ${e.message}` };
-    }
-
-    const escapedRef = pkgRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escapedName = pkgname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const lineRegex = new RegExp(`(\\n\\s*)${escapedRef}(\\s*#[^\\n]*)?\\s*\\n`, 'g');
-
-    let newContent;
-    if (lineRegex.test(content)) {
-      newContent = content.replace(lineRegex, '\n');
-    } else {
-      const bareRegex = new RegExp(`(\\n\\s*)${escapedName}(\\s*#[^\\n]*)?\\s*\\n`, 'g');
-      if (!bareRegex.test(content)) {
-        return { success: false, error: `Package '${pkgname}' not found in file` };
-      }
-      newContent = content.replace(bareRegex, '\n');
-    }
-
-    newContent = newContent.replace(/\n{3,}/g, '\n\n');
-
-    try {
-      fs.writeFileSync(filePath, newContent, 'utf8');
-    } catch (e) {
-      return { success: false, error: `Failed to write file: ${e.message}` };
-    }
-
-    let diff = '';
-    const flakeDir = findFlakeDir();
-    if (flakeDir) {
-      try {
-        const relPath = path.relative(flakeDir, filePath);
-        diff = await runCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-      } catch (e) {}
-    }
-
-    return {
-      success: true,
-      message: `Removed ${pkgname} from configuration`,
-      diff: diff || null
-    };
+  depsIpcMain.handle('discover-remove-package', async (event, options) => {
+    return handlers.removePackage(options);
   });
 
   // Add a package to a nix config file
-  ipcMain.handle('discover-add-package', async (event, options) => {
-    const { pkgname, filePath, packageType, userName } = options;
-    const pkgRef = `pkgs.${pkgname}`;
-
-    if (!filePath || !fs.existsSync(filePath)) {
-      return { success: false, error: 'Target file does not exist' };
-    }
-
-    let content;
-    try {
-      content = fs.readFileSync(filePath, 'utf8');
-    } catch (e) {
-      return { success: false, error: `Failed to read file: ${e.message}` };
-    }
-
-    let sectionPrefix;
-    switch (packageType) {
-      case 'system':
-        sectionPrefix = 'environment.systemPackages';
-        break;
-      case 'homeManager':
-        sectionPrefix = 'home.packages';
-        break;
-      case 'user': {
-        if (!userName) {
-          return { success: false, error: 'User name is required for user packages' };
-        }
-        sectionPrefix = `users.users.${userName}.packages`;
-        break;
-      }
-      default:
-        return { success: false, error: `Unknown package type: ${packageType}` };
-    }
-
-    // Find the opening bracket of the section and insert before the closing ]
-    const escapedPrefix = sectionPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const headerRegex = new RegExp(`${escapedPrefix}\\s*=\\s*(?:with\\s+pkgs;\\s*)?\\[`);
-    const headerMatch = content.match(headerRegex);
-    if (headerMatch) {
-      const listStart = headerMatch.index + headerMatch[0].length;
-      const afterOpen = content.slice(listStart);
-
-      // Find the first ] after the opening bracket
-      const closeIdx = afterOpen.indexOf(']');
-      if (closeIdx === -1) {
-        return { success: false, error: 'Could not find closing bracket for the section' };
-      }
-
-      const innerContent = afterOpen.slice(0, closeIdx);
-
-      if (innerContent.includes(pkgRef) || innerContent.includes(`\n${pkgname}\n`)) {
-        return { success: false, error: `Package '${pkgname}' is already in ${sectionPrefix}` };
-      }
-
-      // Detect indentation from existing list items
-      const indentMatch = innerContent.match(/\n(\s+)\S/);
-      const itemIndent = indentMatch ? indentMatch[1] : '  ';
-
-      // Trim trailing whitespace before ], then insert the new line there.
-      // This avoids disrupting the ] line's indentation or position.
-      const trimmedEnd = innerContent.replace(/\s+$/, '');
-      const insertPoint = listStart + trimmedEnd.length;
-      content = content.slice(0, insertPoint) + `\n${itemIndent}${pkgRef}` + content.slice(insertPoint);
-    } else {
-      // Section doesn't exist — detect file indentation and add at end
-      const fileIndent = content.match(/^(\s+)/m);
-      const baseIndent = fileIndent ? fileIndent[1] : '';
-      const newSection = `\n${baseIndent}${sectionPrefix} = with pkgs; [\n${baseIndent}  ${pkgRef}\n${baseIndent}];\n`;
-      const trimmed = content.trimEnd();
-      if (trimmed.endsWith('}')) {
-        content = trimmed.replace(/\}(\s*)$/, `${newSection}}$1`);
-      } else {
-        content += newSection;
-      }
-    }
-
-    try {
-      fs.writeFileSync(filePath, content, 'utf8');
-    } catch (e) {
-      return { success: false, error: `Failed to write file: ${e.message}` };
-    }
-
-    // Get git diff of the change
-    let diff = '';
-    const flakeDir = findFlakeDir();
-    if (flakeDir) {
-      try {
-        const relPath = path.relative(flakeDir, filePath);
-        diff = await runCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-      } catch (e) {
-        // diff not available
-      }
-    }
-
-    return {
-      success: true,
-      message: `Added ${pkgname} to ${sectionPrefix} in ${path.basename(filePath)}`,
-      diff: diff || null
-    };
+  depsIpcMain.handle('discover-add-package', async (event, options) => {
+    return handlers.addPackage(options);
   });
 }
 
@@ -1071,6 +1241,7 @@ function cleanup() {
 module.exports = {
   register,
   cleanup,
+  createDiscoverHandlers,
   isTTYError,
   parseAppStreamXML,
   extractTag,
@@ -1080,4 +1251,13 @@ module.exports = {
   extractUrl,
   extractScreenshots,
   decodeXmlEntities,
+  resetComponentsCache,
+  buildPkgnameIndex,
+  buildCategoriesList,
+  searchComponents,
+  parseNixpkgsSearchResults,
+  resolvePackageSection,
+  removePackageFromContent,
+  addPackageToContent,
+  scanNixConfigFiles,
 };
