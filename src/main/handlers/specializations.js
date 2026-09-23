@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const { execFile } = require('child_process');
 const fs = require('fs');
@@ -48,7 +49,17 @@ function buildSpecializationList(activeSpec, specEntries, isDirectory) {
 }
 
 /**
+ * @typedef {Object} SpecializationsDeps
+ * @property {typeof import('fs')} [fs]
+ * @property {typeof import('child_process').execFile} [execFile]
+ * @property {string} [profilePath]
+ * @property {string} [currentSystem]
+ * @property {import('electron').IpcMain} [ipcMain]
+ */
+
+/**
  * Create specialization handlers with dependency injection support.
+ * @param {SpecializationsDeps} [deps]
  */
 function createSpecializationsHandlers(deps = {}) {
   const depsFs = deps.fs || fs;
@@ -121,6 +132,7 @@ function createSpecializationsHandlers(deps = {}) {
 
 /**
  * Register specialization IPC handlers
+ * @param {SpecializationsDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
