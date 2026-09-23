@@ -1,3 +1,4 @@
+// @ts-check
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -7,11 +8,19 @@ const { CMD_TIMEOUT_DEFAULT, NIX_CURRENT_SYSTEM } = require('./constants');
 
 const execAsync = util.promisify(exec);
 
-// Track last build status in memory
+/**
+ * @typedef {Object} BuildStatus
+ * @property {boolean} success
+ * @property {string} message
+ * @property {string} time
+ */
+
+/** @type {BuildStatus | null} */
 let lastBuildStatus = null;
 
 /**
  * Find the flake directory by checking common locations
+ * @returns {string | null}
  */
 function findFlakeDir() {
   const candidates = [
@@ -31,6 +40,9 @@ function findFlakeDir() {
 
 /**
  * Run a shell command asynchronously with timeout
+ * @param {string} cmd
+ * @param {number} [timeout]
+ * @returns {Promise<string>}
  */
 async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
   try {
@@ -42,7 +54,8 @@ async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
     return stdout.trimEnd();
   } catch (e) {
     // Log failures so they're visible in dev tools / stderr; return '' to preserve caller compatibility
-    const reason = e.code === 'ETIMEDOUT' ? 'timeout' : (e.code || e.message || 'error');
+    const err = /** @type {any} */ (e);
+    const reason = err.code === 'ETIMEDOUT' ? 'timeout' : (err.code || err.message || 'error');
     console.error(`[runCmd] failed (${reason}):`, cmd.slice(0, 120));
     return '';
   }
@@ -50,6 +63,9 @@ async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
 
 /**
  * Update build status (called after rebuilds)
+ * @param {boolean} success
+ * @param {string} message
+ * @returns {void}
  */
 function updateBuildStatus(success, message) {
   lastBuildStatus = {
@@ -61,6 +77,7 @@ function updateBuildStatus(success, message) {
 
 /**
  * Get last build status
+ * @returns {BuildStatus | null}
  */
 function getLastBuildStatus() {
   return lastBuildStatus;
@@ -68,6 +85,7 @@ function getLastBuildStatus() {
 
 /**
  * Get spawn environment with color support
+ * @returns {NodeJS.ProcessEnv}
  */
 function getSpawnEnv() {
   return {
@@ -82,6 +100,7 @@ function getSpawnEnv() {
 
 /**
  * Get a user-friendly error message when no flake directory is found
+ * @returns {string}
  */
 function flakeDirNotFoundMsg() {
   const candidates = [

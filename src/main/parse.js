@@ -1,5 +1,18 @@
+// @ts-check
+
+/**
+ * @typedef {Object} NixOption
+ * @property {string} category
+ * @property {string} path
+ * @property {string} value
+ * @property {string|null} file
+ * @property {number} line
+ */
+
 /**
  * Extract package names from nix expression content, matching pkgs.xxx patterns
+ * @param {string} content
+ * @returns {string[]}
  */
 function extractPackages(content) {
   const pkgs = [];
@@ -15,6 +28,8 @@ function extractPackages(content) {
 /**
  * Extract bare package names from a block (used with `with pkgs;` patterns).
  * Matches standalone names on their own line.
+ * @param {string} block
+ * @returns {string[]}
  */
 function extractBareNames(block) {
   const names = [];
@@ -32,6 +47,8 @@ function extractBareNames(block) {
 
 /**
  * Parse a block of nix code for environment.systemPackages
+ * @param {string} content
+ * @returns {string[]}
  */
 function parseSystemPackages(content) {
   const packages = [];
@@ -52,6 +69,8 @@ function parseSystemPackages(content) {
 
 /**
  * Parse a block of nix code for home.packages
+ * @param {string} content
+ * @returns {string[]}
  */
 function parseHomePackages(content) {
   const packages = [];
@@ -72,6 +91,8 @@ function parseHomePackages(content) {
 
 /**
  * Parse a block of nix code for users.users.<name>.packages
+ * @param {string} content
+ * @returns {string[]}
  */
 function parseUserPackages(content) {
   const packages = [];
@@ -93,6 +114,9 @@ function parseUserPackages(content) {
 /**
  * Parse NixOS option assignments from content.
  * Returns array of { category, path, value, line } objects.
+ * @param {string} content
+ * @param {string|null} relativePath
+ * @returns {NixOption[]}
  */
 function parseOptions(content, relativePath) {
   const options = [];

@@ -1,3 +1,4 @@
+// @ts-check
 // CQ-09: Centralised constants — avoids scattered magic strings/numbers
 
 // ----- Nix system paths -----
