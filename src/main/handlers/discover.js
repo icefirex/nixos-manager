@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -686,9 +687,32 @@ function scanNixConfigFiles(flakeDir, depsFs = fs) {
 }
 
 /**
+ * @typedef {Object} DiscoverDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {typeof import('fs')} [fs]
+ * @property {() => string | null} [findFlakeDir]
+ * @property {() => string} [flakeDirNotFoundMsg]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {(attrPath: string) => Promise<string>} [nixEvalRaw]
+ * @property {(attrPath: string) => Promise<any>} [nixEvalJson]
+ * @property {() => Promise<any[]>} [loadComponents]
+ * @property {() => any[] | null} [getComponentsCache]
+ * @property {() => Map<string, any> | null} [getComponentsByPkgname]
+ * @property {() => string[] | null} [getCategories]
+ * @property {() => void} [resetCache]
+ * @property {() => {system: string[], user: string[], homeManager: string[]}} [getAllPackages]
+ * @property {(pkg: string, flake?: string) => Array<import('./nix-packages').PackageFindResult>} [findPackage]
+ * @property {string} [cacheDir]
+ * @property {typeof import('child_process').spawn} [spawn]
+ * @property {() => NodeJS.ProcessEnv} [getSpawnEnv]
+ * @property {() => import('electron').BrowserWindow | null} [getMainWindow]
+ */
+
+/**
  * Create discover handlers with dependency injection support.
  * Note: the try-package/is-trying/kill-try trio stays in register() because it
  * shares module-level process state with launchInTerminal() and cleanup().
+ * @param {DiscoverDeps} [deps]
  */
 function createDiscoverHandlers(deps = {}) {
   const depsFs = deps.fs || fs;
@@ -1012,6 +1036,7 @@ function createDiscoverHandlers(deps = {}) {
 
 /**
  * Register IPC handlers for discover functionality
+ * @param {DiscoverDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
