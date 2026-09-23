@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const { exec } = require('child_process');
 const fs = require('fs');
@@ -79,7 +80,25 @@ function parseClosureDiff(stdout) {
 }
 
 /**
+ * @typedef {Object} GenerationsDeps
+ * @property {typeof import('fs')} [fs]
+ * @property {typeof import('child_process').exec} [exec]
+ * @property {string} [profileDir]
+ * @property {string} [profilePath]
+ * @property {import('electron').IpcMain} [ipcMain]
+ */
+
+/**
+ * @typedef {Object} GenerationRecord
+ * @property {number} number
+ * @property {string} date
+ * @property {boolean} current
+ * @property {string} path
+ */
+
+/**
  * Create generation handlers with dependency injection support.
+ * @param {GenerationsDeps} [deps]
  */
 function createGenerationsHandlers(deps = {}) {
   const depsFs = deps.fs || fs;
@@ -261,6 +280,7 @@ function createGenerationsHandlers(deps = {}) {
 
 /**
  * Register generation IPC handlers
+ * @param {GenerationsDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;

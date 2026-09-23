@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const os = require('os');
@@ -69,7 +70,18 @@ function resolveSpecialization(currentPath, basePath, specEntries, realpath) {
 }
 
 /**
+ * @typedef {Object} SystemDeps
+ * @property {typeof import('os')} [os]
+ * @property {typeof import('fs')} [fs]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {string} [profilePath]
+ * @property {string} [currentSystem]
+ * @property {import('electron').IpcMain} [ipcMain]
+ */
+
+/**
  * Create system info handlers with dependency injection support.
+ * @param {SystemDeps} [deps]
  */
 function createSystemHandlers(deps = {}) {
   const depsOs = deps.os || os;
@@ -223,6 +235,7 @@ function createSystemHandlers(deps = {}) {
 
 /**
  * Register system info IPC handlers
+ * @param {SystemDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;

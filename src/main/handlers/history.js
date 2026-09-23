@@ -1,3 +1,4 @@
+// @ts-check
 const { app, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -5,6 +6,9 @@ const { DatabaseSync } = require('node:sqlite');
 
 let _db = null;
 
+/**
+ * @param {import('node:sqlite').DatabaseSync} db
+ */
 function ensureOptionHistorySchema(db) {
   const table = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='option_history'").get();
   if (!table || !table.sql) return;
@@ -73,12 +77,35 @@ function getDb() {
   return _db;
 }
 
+/**
+ * @param {OptionHistoryEntry} entry
+ */
 function addOptionHistoryEntry(entry) {
   const db = getDb();
   const stmt = db.prepare('INSERT INTO option_history (timestamp, option_path, action, old_value, new_value, file) VALUES (?, ?, ?, ?, ?, ?)');
   stmt.run(Date.now(), entry.optionPath, entry.action, entry.oldValue || null, entry.newValue || null, entry.file);
 }
 
+/**
+ * @typedef {Object} HistoryDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {() => import('node:sqlite').DatabaseSync} [getDb]
+ * @property {(entry: OptionHistoryEntry) => void} [addOptionHistoryEntry]
+ * @property {() => number} [now]
+ */
+
+/**
+ * @typedef {Object} OptionHistoryEntry
+ * @property {string} optionPath
+ * @property {'set'|'added'|'removed'|'reverted'} action
+ * @property {string} [oldValue]
+ * @property {string} [newValue]
+ * @property {string} file
+ */
+
+/**
+ * @param {HistoryDeps} [deps]
+ */
 function createHistoryHandlers(deps = {}) {
   const depsGetDb = deps.getDb || getDb;
   const depsAddOptionHistoryEntry = deps.addOptionHistoryEntry || addOptionHistoryEntry;
@@ -128,6 +155,9 @@ function createHistoryHandlers(deps = {}) {
   };
 }
 
+/**
+ * @param {HistoryDeps} [deps]
+ */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createHistoryHandlers(deps);
