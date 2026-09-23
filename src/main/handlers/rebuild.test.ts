@@ -6,14 +6,14 @@ describe('rebuild handler', () => {
   });
 
   it('exports register function', () => {
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
     expect(mod.register).toBeInstanceOf(Function);
   });
 
   it('registers all expected IPC channels via register(deps)', () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
 
     mod.register({ ipcMain });
 
@@ -23,9 +23,9 @@ describe('rebuild handler', () => {
   });
 
   it('register(deps) forwards injected deps so channels use the factory', async () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
 
     mod.register({
       ipcMain,
@@ -42,12 +42,12 @@ describe('rebuild handler', () => {
 
   it('prefers custom rebuild command when env var is set', () => {
     process.env.NIXOS_REBUILD_COMMAND = 'my-rebuild --fast';
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
     expect(mod.resolveRebuildCommand({})).toEqual(['my-rebuild', '--fast']);
   });
 
   it('falls back to nixos-manager-rebuild when wrapper is unavailable', () => {
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
     const execSync = require('child_process').execSync;
     const spy = vi.spyOn(require('child_process'), 'execSync').mockImplementation(() => {
       throw new Error('missing');
@@ -62,13 +62,13 @@ describe('rebuild handler', () => {
 
   it('prefers custom eval command when env var is set', () => {
     process.env.NIXOS_EVAL_COMMAND = 'my-eval --json';
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
     expect(mod.resolveEvalCommand({})).toEqual(['my-eval', '--json']);
   });
 
   it('supports DI-lite createRebuildHandlers for dry-build success path', async () => {
     const { EventEmitter } = require('events');
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
 
     const sendSpy = vi.fn();
     const updateBuildStatusSpy = vi.fn();
@@ -111,7 +111,7 @@ describe('rebuild handler', () => {
 
   it('supports DI-lite cancelRebuild by killing running process', async () => {
     const { EventEmitter } = require('events');
-    const mod = require('./rebuild');
+    const mod = require('./rebuild.ts');
 
     const proc = new EventEmitter();
     proc.stdout = new EventEmitter();

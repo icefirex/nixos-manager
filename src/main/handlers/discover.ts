@@ -1,15 +1,17 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const zlib = require('zlib');
-const https = require('https');
-const { promisify } = require('util');
-const { execFileSync, spawn } = require('child_process');
-const { getMainWindow } = require('../window');
-const { findFlakeDir, getSpawnEnv, flakeDirNotFoundMsg, runCmd } = require('../utils');
-const { NIX_FLAKE_REGISTRY } = require('../constants');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import zlib from 'zlib';
+import https from 'https';
+import { promisify } from 'util';
+import { execFileSync, spawn } from 'child_process';
+import { getMainWindow } from '../window.ts';
+import { findFlakeDir, getSpawnEnv, flakeDirNotFoundMsg, runCmd } from '../utils.ts';
+import { NIX_FLAKE_REGISTRY } from '../constants.ts';
+import { getAllPackages, findPackage } from '../nix-packages.ts';
 
 const gunzip = promisify(zlib.gunzip);
 
@@ -18,15 +20,15 @@ const CACHE_DIR = path.join(os.homedir(), '.cache', 'nixos-manager', 'appstream'
 const APPSTREAM_BASE_URL = 'https://raw.githubusercontent.com/snowfallorg/nixos-appstream-data/main/appstream/nixos-unstable';
 
 // In-memory cache
-let componentsCache = null;
-let componentsByPkgname = null;
-let categories = null;
+let componentsCache: any = null;
+let componentsByPkgname: any = null;
+let categories: any = null;
 let lastCacheTime = 0;
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Track running try-package process
-let runningTryProcess = null;
-let runningTryPackage = null;
+let runningTryProcess: any = null;
+let runningTryPackage: any = null;
 
 // TTY error patterns that indicate a TUI app failed without a terminal
 const TTY_ERROR_PATTERNS = [
@@ -48,7 +50,7 @@ function isCommandAvailable(cmd) {
   try {
     execFileSync('which', [cmd], { stdio: 'ignore', env: getSpawnEnv() });
     return true;
-  } catch (e) {
+  } catch (e: any) {
     return false;
   }
 }
@@ -58,7 +60,7 @@ function isCommandAvailable(cmd) {
  * Returns the stdout trimmed, or '' on any error.
  */
 function nixEvalRaw(attrPath) {
-  return new Promise((resolve) => {
+  return new Promise<any>((resolve) => {
     let stdout = '';
     const proc = spawn('nix', ['eval', '--raw', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
       env: getSpawnEnv(),
@@ -74,7 +76,7 @@ function nixEvalRaw(attrPath) {
  * Returns parsed JSON or null on any error.
  */
 function nixEvalJson(attrPath) {
-  return new Promise((resolve) => {
+  return new Promise<any>((resolve) => {
     let stdout = '';
     const proc = spawn('nix', ['eval', '--json', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
       env: getSpawnEnv(),
@@ -172,12 +174,12 @@ function launchInTerminal(terminal, pkgname, mainProgram, mainWindow) {
  * Download a file from URL to local path
  */
 function downloadFile(url, destPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise<any>((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
     https.get(url, (response) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
         // Follow redirect — check final status before piping
-        https.get(response.headers.location, (res) => {
+        https.get(response.headers.location as string, (res) => {
           if (res.statusCode !== 200) {
             file.close();
             fs.unlink(destPath, () => {});
@@ -187,14 +189,14 @@ function downloadFile(url, destPath) {
           res.pipe(file);
           file.on('finish', () => {
             file.close();
-            resolve();
+            resolve(undefined);
           });
         }).on('error', reject);
       } else if (response.statusCode === 200) {
         response.pipe(file);
         file.on('finish', () => {
           file.close();
-          resolve();
+          resolve(undefined);
         });
       } else {
         reject(new Error(`HTTP ${response.statusCode}`));
@@ -253,7 +255,7 @@ async function ensureAppStreamData() {
       fs.writeFileSync(xmlPath, decompressed);
 
       console.log('AppStream XML downloaded and extracted');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to download AppStream XML:', e.message);
       throw e;
     }
@@ -272,7 +274,7 @@ async function ensureAppStreamData() {
         });
 
         console.log(`Icons extracted: ${fs.readdirSync(iconsDir).length} files`);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to download icons:', e.message);
         // Non-fatal, continue without icons
       }
@@ -286,7 +288,7 @@ async function ensureAppStreamData() {
  * Parse AppStream XML into components
  */
 function parseAppStreamXML(xmlContent) {
-  const components = [];
+  const components: any[] = [];
 
   // Simple regex-based XML parsing (good enough for this structure)
   const componentRegex = /<component[^>]*>([\s\S]*?)<\/component>/g;
@@ -348,7 +350,7 @@ function extractDescription(xml) {
 }
 
 function extractCategories(xml) {
-  const categories = [];
+  const categories: any[] = [];
   const catRegex = /<category>([^<]*)<\/category>/g;
   let match;
   while ((match = catRegex.exec(xml)) !== null) {
@@ -380,7 +382,7 @@ function extractUrl(xml, type) {
 }
 
 function extractScreenshots(xml) {
-  const screenshots = [];
+  const screenshots: any[] = [];
   const imgRegex = /<image[^>]*>([^<]*)<\/image>/g;
   let match;
   while ((match = imgRegex.exec(xml)) !== null) {
@@ -481,7 +483,7 @@ function buildCategoriesList(components) {
 /**
  * Filter, sort, and slice components for a search query. Pure.
  */
-function searchComponents(components, query, options = {}) {
+function searchComponents(components, query, options: any = {}) {
   const { category, limit = 50 } = options;
   const q = (query || '').toLowerCase();
 
@@ -520,9 +522,9 @@ function searchComponents(components, query, options = {}) {
 function parseNixpkgsSearchResults(stdout) {
   if (!stdout || stdout.trim() === '{}' || stdout.trim() === '') return [];
   try {
-    const packages = JSON.parse(stdout);
-    const results = [];
-    for (const [attrPath, pkg] of Object.entries(packages)) {
+    const packages: any = JSON.parse(stdout);
+    const results: any[] = [];
+    for (const [attrPath, pkg] of Object.entries(packages) as [string, any][]) {
       const parts = attrPath.split('.');
       const pkgname = parts.slice(2).join('.');
       results.push({
@@ -538,7 +540,7 @@ function parseNixpkgsSearchResults(stdout) {
     }
     results.sort((a, b) => a.name.localeCompare(b.name));
     return results.slice(0, 100);
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to parse nixpkgs search result:', e.message);
     return [];
   }
@@ -644,7 +646,7 @@ function addPackageToContent(content, pkgname, sectionPrefix) {
  * Scan a flake directory for .nix config files and their package sections.
  */
 function scanNixConfigFiles(flakeDir, depsFs = fs) {
-  const nixFiles = [];
+  const nixFiles: any[] = [];
   function scanDir(dir) {
     let entries;
     try {
@@ -663,8 +665,8 @@ function scanNixConfigFiles(flakeDir, depsFs = fs) {
         } catch {
           continue;
         }
-        const sections = [];
-        const users = [];
+        const sections: any[] = [];
+        const users: any[] = [];
         if (/environment\.systemPackages/.test(content)) sections.push('system');
         if (/home\.packages/.test(content)) sections.push('homeManager');
         const userMatches = content.matchAll(/users\.users\.([^.]+)\.packages/g);
@@ -686,27 +688,26 @@ function scanNixConfigFiles(flakeDir, depsFs = fs) {
   return nixFiles;
 }
 
-/**
- * @typedef {Object} DiscoverDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {typeof import('fs')} [fs]
- * @property {() => string | null} [findFlakeDir]
- * @property {() => string} [flakeDirNotFoundMsg]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {(attrPath: string) => Promise<string>} [nixEvalRaw]
- * @property {(attrPath: string) => Promise<any>} [nixEvalJson]
- * @property {() => Promise<any[]>} [loadComponents]
- * @property {() => any[] | null} [getComponentsCache]
- * @property {() => Map<string, any> | null} [getComponentsByPkgname]
- * @property {() => string[] | null} [getCategories]
- * @property {() => void} [resetCache]
- * @property {() => {system: string[], user: string[], homeManager: string[]}} [getAllPackages]
- * @property {(pkg: string, flake?: string) => Array<import('./nix-packages').PackageFindResult>} [findPackage]
- * @property {string} [cacheDir]
- * @property {typeof import('child_process').spawn} [spawn]
- * @property {() => NodeJS.ProcessEnv} [getSpawnEnv]
- * @property {() => import('electron').BrowserWindow | null} [getMainWindow]
- */
+type DiscoverDeps = {
+  ipcMain?: import('electron').IpcMain;
+  fs?: typeof import('fs');
+  findFlakeDir?: () => string | null;
+  flakeDirNotFoundMsg?: () => string;
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  nixEvalRaw?: (attrPath: string) => Promise<string>;
+  nixEvalJson?: (attrPath: string) => Promise<any>;
+  loadComponents?: () => Promise<any[]>;
+  getComponentsCache?: () => any[] | null;
+  getComponentsByPkgname?: () => Map<string, any> | null;
+  getCategories?: () => string[] | null;
+  resetCache?: () => void;
+  getAllPackages?: () => { system: string[]; user: string[]; homeManager: string[] };
+  findPackage?: (pkg: string, flake?: string) => Array<any>;
+  cacheDir?: string;
+  spawn?: typeof import('child_process').spawn;
+  getSpawnEnv?: () => NodeJS.ProcessEnv;
+  getMainWindow?: () => import('electron').BrowserWindow | null;
+};
 
 /**
  * Create discover handlers with dependency injection support.
@@ -714,7 +715,7 @@ function scanNixConfigFiles(flakeDir, depsFs = fs) {
  * shares module-level process state with launchInTerminal() and cleanup().
  * @param {DiscoverDeps} [deps]
  */
-function createDiscoverHandlers(deps = {}) {
+function createDiscoverHandlers(deps: DiscoverDeps = {}) {
   const depsFs = deps.fs || fs;
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
@@ -726,8 +727,8 @@ function createDiscoverHandlers(deps = {}) {
   const depsGetComponentsByPkgname = deps.getComponentsByPkgname || (() => componentsByPkgname);
   const depsGetCategories = deps.getCategories || (() => categories);
   const depsResetCache = deps.resetCache || resetComponentsCache;
-  const depsGetAllPackages = deps.getAllPackages || (() => require('../nix-packages').getAllPackages());
-  const depsFindPackage = deps.findPackage || ((pkgname) => require('../nix-packages').findPackage(pkgname));
+  const depsGetAllPackages = deps.getAllPackages || getAllPackages;
+  const depsFindPackage = deps.findPackage || ((pkgname) => findPackage(pkgname));
   const depsCacheDir = deps.cacheDir || CACHE_DIR;
   const depsSpawn = deps.spawn || spawn;
   const depsGetSpawnEnv = deps.getSpawnEnv || getSpawnEnv;
@@ -745,7 +746,7 @@ function createDiscoverHandlers(deps = {}) {
             categories: cats.length
           }
         };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: e.message };
       }
     },
@@ -755,7 +756,7 @@ function createDiscoverHandlers(deps = {}) {
       return depsGetCategories() || [];
     },
 
-    search: async (query, options = {}) => {
+    search: async (query, options: any = {}) => {
       await depsLoadComponents();
       return searchComponents(depsGetComponentsCache() || [], query, options);
     },
@@ -779,7 +780,7 @@ function createDiscoverHandlers(deps = {}) {
       ];
 
       const byPkgname = depsGetComponentsByPkgname();
-      const results = [];
+      const results: any[] = [];
       for (const pkgname of featured) {
         const comp = byPkgname?.get(pkgname);
         if (comp) results.push(comp);
@@ -828,17 +829,17 @@ function createDiscoverHandlers(deps = {}) {
       const component = depsGetComponentsByPkgname()?.get(pkgname);
 
       // Get additional info from nix — using spawn-based helpers (no shell injection)
-      let nixMeta = {};
+      let nixMeta: any = {};
       try {
         nixMeta = (await depsNixEvalJson(`${pkgname}.meta`)) || {};
-      } catch (e) {
+      } catch (e: any) {
         // Ignore errors
       }
 
-      let version = null;
+      let version: any = null;
       try {
         version = (await depsNixEvalRaw(`${pkgname}.version`)) || null;
-      } catch (e) {}
+      } catch (e: any) {}
 
       return {
         appstream: component || null,
@@ -856,7 +857,7 @@ function createDiscoverHandlers(deps = {}) {
     searchNixpkgs: async (query) => {
       if (!query || typeof query !== 'string' || !query.trim()) return [];
 
-      return new Promise((resolve) => {
+      return new Promise<any>((resolve) => {
         let stdout = '';
         console.log(`Searching nixpkgs for: "${query}"`);
 
@@ -951,7 +952,7 @@ function createDiscoverHandlers(deps = {}) {
       let content;
       try {
         content = depsFs.readFileSync(filePath, 'utf8');
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: `Failed to read file: ${e.message}` };
       }
 
@@ -962,7 +963,7 @@ function createDiscoverHandlers(deps = {}) {
 
       try {
         depsFs.writeFileSync(filePath, result.content, 'utf8');
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: `Failed to write file: ${e.message}` };
       }
 
@@ -972,7 +973,7 @@ function createDiscoverHandlers(deps = {}) {
         try {
           const relPath = path.relative(flakeDir, filePath);
           diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-        } catch (e) {}
+        } catch (e: any) {}
       }
 
       return {
@@ -992,7 +993,7 @@ function createDiscoverHandlers(deps = {}) {
       let content;
       try {
         content = depsFs.readFileSync(filePath, 'utf8');
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: `Failed to read file: ${e.message}` };
       }
 
@@ -1009,7 +1010,7 @@ function createDiscoverHandlers(deps = {}) {
 
       try {
         depsFs.writeFileSync(filePath, result.content, 'utf8');
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: `Failed to write file: ${e.message}` };
       }
 
@@ -1020,7 +1021,7 @@ function createDiscoverHandlers(deps = {}) {
         try {
           const relPath = path.relative(flakeDir, filePath);
           diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-        } catch (e) {
+        } catch (e: any) {
           // diff not available
         }
       }
@@ -1038,7 +1039,7 @@ function createDiscoverHandlers(deps = {}) {
  * Register IPC handlers for discover functionality
  * @param {DiscoverDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: DiscoverDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const depsGetMainWindow = deps.getMainWindow || getMainWindow;
   const depsSpawn = deps.spawn || spawn;
@@ -1106,7 +1107,7 @@ function register(deps = {}) {
       try {
         // Kill the process group (negative PID kills the group)
         process.kill(-runningTryProcess.pid, 'SIGTERM');
-      } catch (e) {
+      } catch (e: any) {
         // Process may already be dead
         try {
           runningTryProcess.kill('SIGTERM');
@@ -1133,11 +1134,11 @@ function register(deps = {}) {
       if (result && result.trim()) {
         mainProgram = result.trim();
       }
-    } catch (e) {
+    } catch (e: any) {
       // Fall back to package name's last segment
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       // Signal to show terminal (mark as try process)
       mainWindow?.webContents.send('terminal-show', { title: `Trying ${mainProgram}`, isTry: true });
 
@@ -1251,7 +1252,7 @@ function cleanup() {
   if (runningTryProcess) {
     try {
       process.kill(-runningTryProcess.pid, 'SIGTERM');
-    } catch (e) {
+    } catch (e: any) {
       try {
         runningTryProcess.kill('SIGTERM');
       } catch (e2) {
@@ -1263,26 +1264,6 @@ function cleanup() {
   }
 }
 
-module.exports = {
-  register,
-  cleanup,
-  createDiscoverHandlers,
-  isTTYError,
-  parseAppStreamXML,
-  extractTag,
-  extractDescription,
-  extractCategories,
-  extractIcon,
-  extractUrl,
-  extractScreenshots,
-  decodeXmlEntities,
-  resetComponentsCache,
-  buildPkgnameIndex,
-  buildCategoriesList,
-  searchComponents,
-  parseNixpkgsSearchResults,
-  resolvePackageSection,
-  removePackageFromContent,
-  addPackageToContent,
-  scanNixConfigFiles,
-};
+export { register, cleanup, createDiscoverHandlers, isTTYError, parseAppStreamXML, extractTag, extractDescription, extractCategories, extractIcon, extractUrl, extractScreenshots, decodeXmlEntities, resetComponentsCache, buildPkgnameIndex, buildCategoriesList, searchComponents, parseNixpkgsSearchResults, resolvePackageSection, removePackageFromContent, addPackageToContent, scanNixConfigFiles };
+
+export {};

@@ -1,14 +1,12 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const {
-  flakeDirNotFoundMsg,
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { flakeDirNotFoundMsg,
   updateBuildStatus,
   getLastBuildStatus,
   getSpawnEnv,
   findFlakeDir,
-  runCmd,
-} = require('./utils');
+  runCmd, } from './utils.ts';
 
 describe('flakeDirNotFoundMsg', () => {
   it('returns a user-facing message mentioning common locations', () => {
@@ -28,7 +26,7 @@ describe('build status', () => {
 
   it('stores and returns build status', () => {
     updateBuildStatus(true, 'Build succeeded');
-    const status = getLastBuildStatus();
+    const status: any = getLastBuildStatus();
     expect(status.success).toBe(true);
     expect(status.message).toBe('Build succeeded');
     expect(status.time).toBeDefined();
@@ -37,7 +35,7 @@ describe('build status', () => {
   it('overwrites previous status', () => {
     updateBuildStatus(true, 'First build');
     updateBuildStatus(false, 'Second build failed');
-    const status = getLastBuildStatus();
+    const status: any = getLastBuildStatus();
     expect(status.success).toBe(false);
     expect(status.message).toBe('Second build failed');
   });
@@ -45,7 +43,7 @@ describe('build status', () => {
 
 describe('getSpawnEnv', () => {
   it('includes color-related env vars', () => {
-    const env = getSpawnEnv();
+    const env: any = getSpawnEnv();
     expect(env.TERM).toBe('xterm-256color');
     expect(env.FORCE_COLOR).toBe('3');
     expect(env.CLICOLOR_FORCE).toBe('1');
@@ -53,12 +51,12 @@ describe('getSpawnEnv', () => {
   });
 
   it('prepends Nix system path to PATH', () => {
-    const env = getSpawnEnv();
+    const env: any = getSpawnEnv();
     expect(env.PATH).toContain('/run/current-system/sw/bin');
   });
 
   it('spreads process.env', () => {
-    const env = getSpawnEnv();
+    const env: any = getSpawnEnv();
     if (process.env.HOME) expect(env.HOME).toBe(process.env.HOME);
   });
 });

@@ -1,26 +1,24 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const { findFlakeDir, getLastBuildStatus, runCmd } = require('../utils');
-const { getInputUpdateStatus } = require('./flake');
-const {
-  NIX_PROFILES_DIR,
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import fs from 'fs';
+import path from 'path';
+import { findFlakeDir, getLastBuildStatus, runCmd } from '../utils.ts';
+import { getInputUpdateStatus } from './flake.ts';
+import { NIX_PROFILES_DIR,
   FLAKE_STALE_DAYS,
   DISK_CRITICAL_PCT,
   DISK_WARN_PCT,
-  MAX_GENERATIONS_WARN,
-} = require('../constants');
+  MAX_GENERATIONS_WARN, } from '../constants.ts';
 
-/**
- * @typedef {Object} NotificationsDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {() => string | null} [findFlakeDir]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {typeof import('fs')} [fs]
- * @property {() => Record<string, boolean>} [getInputUpdateStatus]
- * @property {() => import('../utils').BuildStatus | null} [getLastBuildStatus]
- */
+type NotificationsDeps = {
+  ipcMain?: import('electron').IpcMain;
+  findFlakeDir?: () => string | null;
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  fs?: typeof import('fs');
+  getInputUpdateStatus?: () => Record<string, boolean>;
+  getLastBuildStatus?: () => import('../utils').BuildStatus | null;
+};
 
 /**
  * Build git sync notifications from ahead/behind counts and porcelain status.
@@ -31,7 +29,7 @@ const {
  * @returns {Array<{id: string, type: string, title: string, message: string, action: string | null}>}
  */
 function buildGitSyncNotifications(behindCount, aheadCount, status) {
-  const notifications = [];
+  const notifications: any[] = [];
 
   if (parseInt(behindCount) > 0) {
     notifications.push({
@@ -74,10 +72,10 @@ function buildGitSyncNotifications(behindCount, aheadCount, status) {
  */
 function collectStaleInputs(lockContent) {
   const nodes = lockContent?.nodes || {};
-  const rootInputs = nodes.root?.inputs || {};
+  const rootInputs: any = nodes.root?.inputs || {};
 
-  const staleInputs = [];
-  for (const [name, nodeRef] of Object.entries(rootInputs)) {
+  const staleInputs: any[] = [];
+  for (const [name, nodeRef] of Object.entries(rootInputs) as [string, any][]) {
     const node = nodes[nodeRef];
     if (node && node.locked && node.locked.lastModified) {
       const ageMs = Date.now() - (node.locked.lastModified * 1000);
@@ -182,7 +180,7 @@ function buildFlakeUpdatesNotification(updateStatus) {
  * Create notifications handlers with dependency injection support.
  * @param {NotificationsDeps} [deps]
  */
-function createNotificationsHandlers(deps = {}) {
+function createNotificationsHandlers(deps: NotificationsDeps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsRunCmd = deps.runCmd || runCmd;
   const depsFs = deps.fs || fs;
@@ -191,7 +189,7 @@ function createNotificationsHandlers(deps = {}) {
 
   return {
     getNotifications: async () => {
-      const notifications = [];
+      const notifications: any[] = [];
       const flakeDir = depsFindFlakeDir();
 
       // 1. Check git sync status (async)
@@ -206,7 +204,7 @@ function createNotificationsHandlers(deps = {}) {
           ]);
 
           notifications.push(...buildGitSyncNotifications(behindCount, aheadCount, status));
-        } catch (e) {}
+        } catch (e: any) {}
       }
 
       // 2. Check flake inputs age
@@ -220,7 +218,7 @@ function createNotificationsHandlers(deps = {}) {
               notifications.push(staleNotification);
             }
           }
-        } catch (e) {}
+        } catch (e: any) {}
       }
 
       // 3. Check disk space (async)
@@ -232,7 +230,7 @@ function createNotificationsHandlers(deps = {}) {
         if (diskNotification) {
           notifications.push(diskNotification);
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // 4. Check generation count
       try {
@@ -249,7 +247,7 @@ function createNotificationsHandlers(deps = {}) {
             action: 'nix-collect-garbage --delete-older-than 14d'
           });
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // 5. Flake input updates available (from background check cache)
       try {
@@ -257,7 +255,7 @@ function createNotificationsHandlers(deps = {}) {
         if (updatesNotification) {
           notifications.push(updatesNotification);
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // 6. Last build status
       const lastBuildStatus = depsGetLastBuildStatus();
@@ -281,7 +279,7 @@ function createNotificationsHandlers(deps = {}) {
  * Register notifications IPC handlers
  * @param {NotificationsDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: NotificationsDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createNotificationsHandlers(deps);
 
@@ -290,12 +288,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  createNotificationsHandlers,
-  buildGitSyncNotifications,
-  collectStaleInputs,
-  buildStaleInputsNotification,
-  buildDiskNotification,
-  buildFlakeUpdatesNotification,
-};
+export { register, createNotificationsHandlers, buildGitSyncNotifications, collectStaleInputs, buildStaleInputsNotification, buildDiskNotification, buildFlakeUpdatesNotification };
+
+export {};

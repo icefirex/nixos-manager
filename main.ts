@@ -1,23 +1,24 @@
 // @ts-check
-const { app, BrowserWindow } = require('electron');
+import electron from 'electron';
+const { app, BrowserWindow } = electron as any;
 
 app.setName('nixos-manager');
 
 // Import window management
-const { createWindow, registerWindowHandlers } = require('./src/main/window');
+import { createWindow, registerWindowHandlers } from './src/main/window.ts';
 
 // Import IPC handlers
-const systemHandlers = require('./src/main/handlers/system');
-const notificationsHandlers = require('./src/main/handlers/notifications');
-const rebuildHandlers = require('./src/main/handlers/rebuild');
-const specializationsHandlers = require('./src/main/handlers/specializations');
-const flakeHandlers = require('./src/main/handlers/flake');
-const packagesHandlers = require('./src/main/handlers/packages');
-const optionsHandlers = require('./src/main/handlers/options');
-const generationsHandlers = require('./src/main/handlers/generations');
-const gitHandlers = require('./src/main/handlers/git');
-const discoverHandlers = require('./src/main/handlers/discover');
-const historyHandlers = require('./src/main/handlers/history');
+import * as systemHandlers from './src/main/handlers/system.ts';
+import * as notificationsHandlers from './src/main/handlers/notifications.ts';
+import * as rebuildHandlers from './src/main/handlers/rebuild.ts';
+import * as specializationsHandlers from './src/main/handlers/specializations.ts';
+import * as flakeHandlers from './src/main/handlers/flake.ts';
+import * as packagesHandlers from './src/main/handlers/packages.ts';
+import * as optionsHandlers from './src/main/handlers/options.ts';
+import * as generationsHandlers from './src/main/handlers/generations.ts';
+import * as gitHandlers from './src/main/handlers/git.ts';
+import * as discoverHandlers from './src/main/handlers/discover.ts';
+import * as historyHandlers from './src/main/handlers/history.ts';
 
 // Register all IPC handlers
 function registerAllHandlers() {
@@ -62,3 +63,5 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+export {};

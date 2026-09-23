@@ -1,8 +1,7 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const {
-  stripStrings,
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { stripStrings,
   extractFromList,
   extractListBlock,
   extractListBlockAt,
@@ -10,15 +9,14 @@ const {
   findPackageLines,
   findPackage,
   findDuplicates,
-  getAllPackages,
-} = require('./nix-packages');
+  getAllPackages, } from './nix-packages.ts';
 
 function makeTempDir(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nix-test-'));
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = path.join(dir, relPath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content);
+    fs.writeFileSync(fullPath, content as any);
   }
   return dir;
 }

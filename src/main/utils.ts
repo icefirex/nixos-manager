@@ -1,22 +1,21 @@
 // @ts-check
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { exec } = require('child_process');
-const util = require('util');
-const { CMD_TIMEOUT_DEFAULT, NIX_CURRENT_SYSTEM } = require('./constants');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { exec } from 'child_process';
+import util from 'util';
+import { CMD_TIMEOUT_DEFAULT, NIX_CURRENT_SYSTEM } from './constants.ts';
 
 const execAsync = util.promisify(exec);
 
-/**
- * @typedef {Object} BuildStatus
- * @property {boolean} success
- * @property {string} message
- * @property {string} time
- */
+export type BuildStatus = {
+  success: boolean;
+  message: string;
+  time: string;
+};
 
 /** @type {BuildStatus | null} */
-let lastBuildStatus = null;
+let lastBuildStatus: BuildStatus | null = null;
 
 /**
  * Find the flake directory by checking common locations
@@ -28,7 +27,7 @@ function findFlakeDir() {
     path.join(os.homedir(), 'nixos-config'),
     path.join(os.homedir(), '.config/nixos'),
     '/etc/nixos'
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   for (const dir of candidates) {
     if (fs.existsSync(path.join(dir, 'flake.nix'))) {
@@ -52,9 +51,9 @@ async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
       maxBuffer: 1024 * 1024
     });
     return stdout.trimEnd();
-  } catch (e) {
+  } catch (e: any) {
     // Log failures so they're visible in dev tools / stderr; return '' to preserve caller compatibility
-    const err = /** @type {any} */ (e);
+    const err = e as any;
     const reason = err.code === 'ETIMEDOUT' ? 'timeout' : (err.code || err.message || 'error');
     console.error(`[runCmd] failed (${reason}):`, cmd.slice(0, 120));
     return '';
@@ -123,12 +122,6 @@ function flakeDirNotFoundMsg() {
   ].join('\n');
 }
 
-module.exports = {
-  findFlakeDir,
-  runCmd,
-  execAsync,
-  updateBuildStatus,
-  getLastBuildStatus,
-  getSpawnEnv,
-  flakeDirNotFoundMsg
-};
+export { findFlakeDir, runCmd, execAsync, updateBuildStatus, getLastBuildStatus, getSpawnEnv, flakeDirNotFoundMsg };
+
+export {};

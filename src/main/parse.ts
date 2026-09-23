@@ -1,13 +1,12 @@
 // @ts-check
 
-/**
- * @typedef {Object} NixOption
- * @property {string} category
- * @property {string} path
- * @property {string} value
- * @property {string|null} file
- * @property {number} line
- */
+type NixOption = {
+  category: string;
+  path: string;
+  value: string;
+  file: string|null;
+  line: number;
+};
 
 /**
  * Extract package names from nix expression content, matching pkgs.xxx patterns
@@ -15,7 +14,7 @@
  * @returns {string[]}
  */
 function extractPackages(content) {
-  const pkgs = [];
+  const pkgs: string[] = [];
   const pkgMatches = content.matchAll(/(?:pkgs|pkgs-stable|pkgs-[a-z]+)\.([a-zA-Z0-9_-]+)/g);
   for (const match of pkgMatches) {
     if (!pkgs.includes(match[1])) {
@@ -32,7 +31,7 @@ function extractPackages(content) {
  * @returns {string[]}
  */
 function extractBareNames(block) {
-  const names = [];
+  const names: string[] = [];
   const bareMatches = block.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
   if (bareMatches) {
     for (const name of bareMatches) {
@@ -51,7 +50,7 @@ function extractBareNames(block) {
  * @returns {string[]}
  */
 function parseSystemPackages(content) {
-  const packages = [];
+  const packages: string[] = [];
   const match = content.match(/environment\.systemPackages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
   if (match) {
     const block = match[1];
@@ -73,7 +72,7 @@ function parseSystemPackages(content) {
  * @returns {string[]}
  */
 function parseHomePackages(content) {
-  const packages = [];
+  const packages: string[] = [];
   const match = content.match(/home\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
   if (match) {
     const block = match[1];
@@ -95,7 +94,7 @@ function parseHomePackages(content) {
  * @returns {string[]}
  */
 function parseUserPackages(content) {
-  const packages = [];
+  const packages: string[] = [];
   const matches = content.matchAll(/users\.users\.[^.]+\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/gs);
   for (const match of matches) {
     const block = match[1];
@@ -119,7 +118,7 @@ function parseUserPackages(content) {
  * @returns {NixOption[]}
  */
 function parseOptions(content, relativePath) {
-  const options = [];
+  const options: any[] = [];
   const lines = content.split('\n');
   const optionRegex = /^\s*(services|programs|hardware|networking|boot|system|virtualisation|security|users|fonts|environment|nixpkgs|nix|home)\.([a-zA-Z0-9._-]+)\s*=\s*(.+?);?\s*$/;
 
@@ -142,11 +141,6 @@ function parseOptions(content, relativePath) {
   return options;
 }
 
-module.exports = {
-  extractPackages,
-  extractBareNames,
-  parseSystemPackages,
-  parseHomePackages,
-  parseUserPackages,
-  parseOptions,
-};
+export { extractPackages, extractBareNames, parseSystemPackages, parseHomePackages, parseUserPackages, parseOptions };
+
+export {};

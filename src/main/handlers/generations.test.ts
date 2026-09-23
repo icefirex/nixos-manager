@@ -1,6 +1,6 @@
 describe('generations handler', () => {
   it('exports register, factory, and pure helpers', () => {
-    const mod = require('./generations');
+    const mod = require('./generations.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.createGenerationsHandlers).toBeInstanceOf(Function);
     expect(mod.parseCurrentGenerationLink).toBeInstanceOf(Function);
@@ -9,7 +9,7 @@ describe('generations handler', () => {
   });
 
   describe('parseCurrentGenerationLink', () => {
-    const { parseCurrentGenerationLink } = require('./generations');
+    const {  parseCurrentGenerationLink  } = require('./generations.ts');
 
     it('extracts generation number from a profile link target', () => {
       expect(parseCurrentGenerationLink('/nix/store/abc-system-42-link')).toBe(42);
@@ -23,7 +23,7 @@ describe('generations handler', () => {
   });
 
   describe('parseGenerationEntries', () => {
-    const { parseGenerationEntries } = require('./generations');
+    const {  parseGenerationEntries  } = require('./generations.ts');
 
     it('maps matching entries with dates and current flag', () => {
       const entries = ['system-3-link', 'system-10-link', 'other-file'];
@@ -48,7 +48,7 @@ describe('generations handler', () => {
   });
 
   describe('parseClosureDiff', () => {
-    const { parseClosureDiff } = require('./generations');
+    const {  parseClosureDiff  } = require('./generations.ts');
 
     it('categorizes added, removed, and changed packages and strips ANSI', () => {
       const output = '\x1b[32mhello:\x1b[0m ∅ → 2.1.2, +1.2 MiB\nfirefox: 120.0 → 121.0, +5.0 MiB\ngimp: 2.10 → ∅\nrandom note line';
@@ -69,7 +69,7 @@ describe('generations handler', () => {
   });
 
   describe('createGenerationsHandlers', () => {
-    const { createGenerationsHandlers } = require('./generations');
+    const {  createGenerationsHandlers  } = require('./generations.ts');
 
     function makeFs(overrides = {}) {
       return {
@@ -167,9 +167,9 @@ describe('generations handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers all expected IPC channels and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./generations');
+      const mod = require('./generations.ts');
 
       mod.register({
         ipcMain,

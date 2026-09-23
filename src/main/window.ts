@@ -1,18 +1,16 @@
 // @ts-check
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const fs = require('fs');
+import electron from 'electron';
+const { app, BrowserWindow, ipcMain } = electron as any;
+import path from 'path';
+import fs from 'fs';
 
-/** @type {import('electron').BrowserWindow | null} */
-let mainWindow = null;
-/** @type {string | null} */
-let cachedVersion = null; // CQ-08: read once, not on every IPC call
+let mainWindow: import('electron').BrowserWindow | null = null;
+let cachedVersion: string | null = null; // CQ-08: read once, not on every IPC call
 
 /**
  * Check if we're in development mode
  */
 function isDev() {
-  const { app } = require('electron');
   return process.env.ELECTRON_IS_DEV === '1' ||
     (process.env.ELECTRON_IS_DEV !== '0' && !app.isPackaged);
 }
@@ -35,28 +33,29 @@ function createWindow() {
       preload: path.join(__dirname, '..', '..', 'preload.js')
     }
   });
+  const win = mainWindow as import('electron').BrowserWindow;
 
   // Remove menu bar entirely
-  mainWindow.setMenuBarVisibility(false);
-  mainWindow.setMenu(null);
+  win.setMenuBarVisibility(false);
+  win.setMenu(null);
 
   if (isDev()) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    win.loadURL('http://localhost:5173');
+    win.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
+    win.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
   }
 
   // DevTools keyboard shortcut — dev builds only (BUG-03)
   if (isDev()) {
-    mainWindow.webContents.on('before-input-event', (event, input) => {
+    win.webContents.on('before-input-event', (event, input) => {
       if (input.control && input.shift && input.key.toLowerCase() === 'i') {
         mainWindow?.webContents.toggleDevTools();
       }
     });
   }
 
-  return mainWindow;
+  return win;
 }
 
 /**
@@ -101,16 +100,13 @@ function registerWindowHandlers() {
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       cachedVersion = packageJson.version;
       return cachedVersion;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to read package.json version:', e);
       return app.getVersion() || '?';
     }
   });
 }
 
-module.exports = {
-  createWindow,
-  getMainWindow,
-  registerWindowHandlers,
-  isDev
-};
+export { createWindow, getMainWindow, registerWindowHandlers, isDev };
+
+export {};

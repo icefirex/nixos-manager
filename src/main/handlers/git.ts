@@ -1,16 +1,16 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
-const path = require('path');
-const { CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import { findFlakeDir, runCmd, flakeDirNotFoundMsg } from '../utils.ts';
+import path from 'path';
+import { CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } from '../constants.ts';
 
-/**
- * @typedef {Object} GitDeps
- * @property {() => string | null} [findFlakeDir]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {() => string} [flakeDirNotFoundMsg]
- * @property {import('electron').IpcMain} [ipcMain]
- */
+type GitDeps = {
+  findFlakeDir?: () => string | null;
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  flakeDirNotFoundMsg?: () => string;
+  ipcMain?: import('electron').IpcMain;
+};
 
 /**
  * Extract "owner/repo" from a git remote URL (HTTPS or SSH).
@@ -32,7 +32,7 @@ function extractRepoName(remoteUrl) {
  */
 function parseBranchList(output, currentBranch) {
   if (!output) return [];
-  const branches = [];
+  const branches: any[] = [];
   const lines = output.split('\n').filter(Boolean);
   for (const line of lines) {
     const [name, upstream, track] = line.split('|');
@@ -67,7 +67,7 @@ function parseBranchList(output, currentBranch) {
  * @returns {{staged: Array<{file: string, status: string}>, modified: Array<{file: string, status: string}>, untracked: string[]}}
  */
 function parsePorcelainStatus(output) {
-  const status = { staged: [], modified: [], untracked: [] };
+  const status: any = { staged: [], modified: [], untracked: [] };
   if (!output) return status;
   for (const line of output.split('\n').filter(Boolean)) {
     // Parse porcelain format: "XY filename"
@@ -94,7 +94,7 @@ function parsePorcelainStatus(output) {
  */
 function parseRecentCommits(logOutput) {
   if (!logOutput) return [];
-  const commits = [];
+  const commits: any[] = [];
   for (const line of logOutput.split('\n').filter(Boolean)) {
     const [hash, shortHash, subject, author, timeAgo] = line.split('|');
     commits.push({ hash, shortHash, subject, author, timeAgo });
@@ -109,7 +109,7 @@ function parseRecentCommits(logOutput) {
  * @returns {{fullMessage: string | null, author: string | null, authorEmail: string | null, date: string | null, files: Array<{status: string, file: string}>}}
  */
 function parseCommitInfo(commitInfo) {
-  const details = { fullMessage: null, author: null, authorEmail: null, date: null, files: [] };
+  const details: any = { fullMessage: null, author: null, authorEmail: null, date: null, files: [] };
   if (!commitInfo) return details;
 
   const parts = commitInfo.split('---AUTHOR---');
@@ -141,7 +141,7 @@ function parseCommitInfo(commitInfo) {
  * Create git handlers with dependency injection support.
  * @param {GitDeps} [deps]
  */
-function createGitHandlers(deps = {}) {
+function createGitHandlers(deps: GitDeps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsRunCmd = deps.runCmd || runCmd;
   const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
@@ -157,7 +157,7 @@ function createGitHandlers(deps = {}) {
   return {
     getGitInfo: async () => {
       const flakeDir = requireFlakeDir();
-      const info = {
+      const info: any = {
         user: null,
         email: null,
         repo: null,
@@ -214,7 +214,7 @@ function createGitHandlers(deps = {}) {
           `git -C "${flakeDir}" log --oneline --format='%H|%h|%s|%an|%ar' -20 2>/dev/null`
         );
         info.recentCommits = parseRecentCommits(logOutput);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to get git info:', e.message);
       }
 
@@ -242,7 +242,7 @@ function createGitHandlers(deps = {}) {
           `git -C "${flakeDir}" show --format='' --stat ${hash} 2>/dev/null | head -50`
         );
         details.diff = diff?.trim() || null;
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to get commit details:', e.message);
       }
 
@@ -255,7 +255,7 @@ function createGitHandlers(deps = {}) {
       try {
         const result = await depsRunCmd(`git -C "${flakeDir}" checkout "${branchName}" 2>&1`, CMD_TIMEOUT_FAST);
         return { success: true, message: result?.trim() || 'Switched branch' };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, message: e.message };
       }
     },
@@ -266,7 +266,7 @@ function createGitHandlers(deps = {}) {
       try {
         const result = await depsRunCmd(`git -C "${flakeDir}" pull 2>&1`, CMD_TIMEOUT_NETWORK);
         return { success: true, message: result?.trim() || 'Pulled successfully' };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, message: e.message };
       }
     },
@@ -277,7 +277,7 @@ function createGitHandlers(deps = {}) {
       try {
         const result = await depsRunCmd(`git -C "${flakeDir}" fetch --all 2>&1`, CMD_TIMEOUT_NETWORK);
         return { success: true, message: result?.trim() || 'Fetched successfully' };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, message: e.message };
       }
     }
@@ -288,7 +288,7 @@ function createGitHandlers(deps = {}) {
  * Register git IPC handlers
  * @param {GitDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: GitDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createGitHandlers(deps);
 
@@ -313,12 +313,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  createGitHandlers,
-  extractRepoName,
-  parseBranchList,
-  parsePorcelainStatus,
-  parseRecentCommits,
-  parseCommitInfo,
-};
+export { register, createGitHandlers, extractRepoName, parseBranchList, parsePorcelainStatus, parseRecentCommits, parseCommitInfo };
+
+export {};

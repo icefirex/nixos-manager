@@ -1,14 +1,15 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const { findFlakeDir, getSpawnEnv, execAsync, runCmd, flakeDirNotFoundMsg } = require('../utils');
-const { getMainWindow } = require('../window');
-const { FLAKE_WARN_DAYS, CMD_TIMEOUT_FAST, NIX_SYSTEM_PROFILE } = require('../constants');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { findFlakeDir, getSpawnEnv, execAsync, runCmd, flakeDirNotFoundMsg } from '../utils.ts';
+import { getMainWindow } from '../window.ts';
+import { FLAKE_WARN_DAYS, CMD_TIMEOUT_FAST, NIX_SYSTEM_PROFILE } from '../constants.ts';
 
 /** @type {Record<string, boolean>} */
-let inputUpdateStatus = {};
+let inputUpdateStatus: Record<string, boolean> = {};
 
 /**
  * Human-readable relative time from epoch ms
@@ -39,11 +40,11 @@ function getInputUpdateStatus() {
  * @returns {Array<{name: string, status: string, age: string, hasUpdate: boolean}>}
  */
 function parseFlakeInputs(lockContent, updateStatus = {}) {
-  const inputs = [];
+  const inputs: any[] = [];
   const nodes = lockContent?.nodes || {};
-  const rootInputs = nodes.root?.inputs || {};
+  const rootInputs: any = nodes.root?.inputs || {};
 
-  for (const [name, nodeRef] of Object.entries(rootInputs)) {
+  for (const [name, nodeRef] of Object.entries(rootInputs) as [string, any][]) {
     const node = nodes[nodeRef];
     if (node && node.locked) {
       const lastModified = node.locked.lastModified;
@@ -81,9 +82,9 @@ function parseFlakeInputs(lockContent, updateStatus = {}) {
  * @returns {Record<string, any>}
  */
 function parseFlakeLockInfo(lock) {
-  const info = {};
+  const info: any = {};
   const nodes = lock?.nodes || {};
-  const rootInputs = nodes.root?.inputs || {};
+  const rootInputs: any = nodes.root?.inputs || {};
   const inputNames = Object.keys(rootInputs);
   info.inputCount = inputNames.length;
   info.inputNames = inputNames;
@@ -124,10 +125,10 @@ async function runUpdateChecks(flakeDir) {
   }
 
   const nodes = lockContent.nodes || {};
-  const rootInputs = nodes.root?.inputs || {};
+  const rootInputs: any = nodes.root?.inputs || {};
   const env = getSpawnEnv();
 
-  const checks = Object.entries(rootInputs).map(async ([name, nodeRef]) => {
+  const checks = (Object.entries(rootInputs) as [string, any][]).map(async ([name, nodeRef]) => {
     const node = nodes[nodeRef];
     if (!node?.locked) return;
 
@@ -172,7 +173,7 @@ function register() {
     const lockPath = path.join(flakeDir, 'flake.lock');
     const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
 
-    return new Promise((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       const proc = spawn('nix', ['flake', 'update'], {
         cwd: flakeDir,
         env: getSpawnEnv()
@@ -228,7 +229,7 @@ function register() {
     const lockPath = path.join(flakeDir, 'flake.lock');
     const lockBefore = fs.existsSync(lockPath) ? fs.readFileSync(lockPath, 'utf8') : null;
 
-    return new Promise((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       const proc = spawn('nix', ['flake', 'update', inputName], {
         cwd: flakeDir,
         env: getSpawnEnv()
@@ -286,7 +287,7 @@ function register() {
     try {
       const lockContent = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
       return parseFlakeInputs(lockContent, inputUpdateStatus);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to parse flake.lock:', e);
       return [];
     }
@@ -307,7 +308,7 @@ function register() {
   // Flake info for the info modal
   ipcMain.handle('get-flake-info', async () => {
     const flakeDir = findFlakeDir();
-    const info = { flakeDir: flakeDir || null };
+    const info: any = { flakeDir: flakeDir || null };
     if (!flakeDir) return info;
 
     // Description from flake.nix
@@ -380,4 +381,6 @@ function register() {
   });
 }
 
-module.exports = { register, getInputUpdateStatus, relativeTime, runUpdateChecks, parseFlakeInputs, parseFlakeLockInfo };
+export { register, getInputUpdateStatus, relativeTime, runUpdateChecks, parseFlakeInputs, parseFlakeLockInfo };
+
+export {};

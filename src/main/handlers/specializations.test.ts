@@ -1,6 +1,6 @@
 describe('specializations handler', () => {
   it('exports register, factory, and pure helpers', () => {
-    const mod = require('./specializations');
+    const mod = require('./specializations.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.createSpecializationsHandlers).toBeInstanceOf(Function);
     expect(mod.buildSpecSwitchPath).toBeInstanceOf(Function);
@@ -9,7 +9,7 @@ describe('specializations handler', () => {
   });
 
   describe('VALID_SPEC_NAME', () => {
-    const { VALID_SPEC_NAME } = require('./specializations');
+    const {  VALID_SPEC_NAME  } = require('./specializations.ts');
 
     it('accepts safe names and rejects traversal/odd characters', () => {
       expect(VALID_SPEC_NAME.test('gaming')).toBe(true);
@@ -21,7 +21,7 @@ describe('specializations handler', () => {
   });
 
   describe('buildSpecSwitchPath', () => {
-    const { buildSpecSwitchPath } = require('./specializations');
+    const {  buildSpecSwitchPath  } = require('./specializations.ts');
 
     it('builds base and specialization switch paths', () => {
       expect(buildSpecSwitchPath('base', '/nix/var/nix/profiles/system'))
@@ -32,7 +32,7 @@ describe('specializations handler', () => {
   });
 
   describe('determineActiveSpec', () => {
-    const { determineActiveSpec } = require('./specializations');
+    const {  determineActiveSpec  } = require('./specializations.ts');
 
     it('returns base when current matches base path', () => {
       expect(determineActiveSpec('/same', '/same', [], () => '/x')).toBe('base');
@@ -56,7 +56,7 @@ describe('specializations handler', () => {
   });
 
   describe('buildSpecializationList', () => {
-    const { buildSpecializationList } = require('./specializations');
+    const {  buildSpecializationList  } = require('./specializations.ts');
 
     it('lists base first plus directory entries with active flags', () => {
       const list = buildSpecializationList('gaming', ['gaming', 'notes.txt'], (e) => e !== 'notes.txt');
@@ -74,7 +74,7 @@ describe('specializations handler', () => {
   });
 
   describe('createSpecializationsHandlers', () => {
-    const { createSpecializationsHandlers } = require('./specializations');
+    const {  createSpecializationsHandlers  } = require('./specializations.ts');
 
     function makeFs(overrides = {}) {
       return {
@@ -184,9 +184,9 @@ describe('specializations handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers both IPC channels and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./specializations');
+      const mod = require('./specializations.ts');
 
       mod.register({
         ipcMain,

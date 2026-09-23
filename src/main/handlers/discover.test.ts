@@ -1,6 +1,6 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 describe('discover handler', () => {
   afterEach(() => {
@@ -9,24 +9,24 @@ describe('discover handler', () => {
   });
 
   it('exports register and cleanup functions', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.cleanup).toBeInstanceOf(Function);
   });
 
   it('detects tty-related errors', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
     expect(mod.isTTYError('error opening terminal')).toBe(true);
     expect(mod.isTTYError('all good')).toBe(false);
   });
 
   it('decodes xml entities in catalog values', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
     expect(mod.decodeXmlEntities('Fish &amp; Chips &lt;3')).toBe('Fish & Chips <3');
   });
 
   it('extracts icon and categories from appstream xml snippet', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
     const xml = `
 <component type="desktop-application">
   <id>org.demo.App</id>
@@ -45,7 +45,7 @@ describe('discover handler', () => {
   });
 
   it('parses appstream xml component fields', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
     const parsed = mod.parseAppStreamXML(`
 <components version="0.16">
   <component type="desktop-application">
@@ -68,7 +68,7 @@ describe('discover handler', () => {
   });
 
   describe('searchComponents', () => {
-    const { searchComponents } = require('./discover');
+    const {  searchComponents  } = require('./discover.ts');
 
     const components = [
       { name: 'GIMP', summary: 'Image editor', pkgname: 'gimp', categories: ['Graphics'] },
@@ -102,7 +102,7 @@ describe('discover handler', () => {
   });
 
   describe('parseNixpkgsSearchResults', () => {
-    const { parseNixpkgsSearchResults } = require('./discover');
+    const {  parseNixpkgsSearchResults  } = require('./discover.ts');
 
     it('maps nix search json output to result entries', () => {
       const stdout = JSON.stringify({
@@ -134,7 +134,7 @@ describe('discover handler', () => {
   });
 
   describe('resolvePackageSection', () => {
-    const { resolvePackageSection } = require('./discover');
+    const {  resolvePackageSection  } = require('./discover.ts');
 
     it('resolves all package types', () => {
       expect(resolvePackageSection('system')).toEqual({ ok: true, sectionPrefix: 'environment.systemPackages' });
@@ -149,7 +149,7 @@ describe('discover handler', () => {
   });
 
   describe('removePackageFromContent', () => {
-    const { removePackageFromContent } = require('./discover');
+    const {  removePackageFromContent  } = require('./discover.ts');
 
     it('removes a pkgs reference line and collapses blank lines', () => {
       const content = 'environment.systemPackages = with pkgs; [\n  pkgs.hello\n\n  pkgs.git\n];\n';
@@ -181,7 +181,7 @@ describe('discover handler', () => {
   });
 
   describe('addPackageToContent', () => {
-    const { addPackageToContent } = require('./discover');
+    const {  addPackageToContent  } = require('./discover.ts');
 
     it('inserts into an existing list matching its indentation', () => {
       const content = 'environment.systemPackages = with pkgs; [\n  pkgs.git\n];\n';
@@ -214,7 +214,7 @@ describe('discover handler', () => {
   });
 
   describe('scanNixConfigFiles', () => {
-    const { scanNixConfigFiles } = require('./discover');
+    const {  scanNixConfigFiles  } = require('./discover.ts');
 
     it('scans .nix files and reports sections and users', () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'discover-scan-'));
@@ -239,7 +239,7 @@ describe('discover handler', () => {
   });
 
   describe('createDiscoverHandlers', () => {
-    const mod = require('./discover');
+    const mod = require('./discover.ts');
 
     it('init reports stats on success and errors on failure', async () => {
       const okHandlers = mod.createDiscoverHandlers({
@@ -355,9 +355,9 @@ describe('discover handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers all expected IPC channels and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./discover');
+      const mod = require('./discover.ts');
 
       mod.register({
         ipcMain,

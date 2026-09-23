@@ -1,21 +1,21 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const { spawn, execSync } = require('child_process');
-const { findFlakeDir, updateBuildStatus, getSpawnEnv, flakeDirNotFoundMsg } = require('../utils');
-const { getMainWindow } = require('../window');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import { spawn, execSync } from 'child_process';
+import { findFlakeDir, updateBuildStatus, getSpawnEnv, flakeDirNotFoundMsg } from '../utils.ts';
+import { getMainWindow } from '../window.ts';
 
-/**
- * @typedef {Object} RebuildDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {() => string | null} [findFlakeDir]
- * @property {(success: boolean, message: string) => void} [updateBuildStatus]
- * @property {() => NodeJS.ProcessEnv} [getSpawnEnv]
- * @property {() => import('electron').BrowserWindow | null} [getMainWindow]
- * @property {() => string} [flakeDirNotFoundMsg]
- * @property {typeof import('child_process').spawn} [spawn]
- * @property {(spawnEnv: NodeJS.ProcessEnv) => string[]} [resolveRebuildCommand]
- * @property {(spawnEnv: NodeJS.ProcessEnv) => string[]} [resolveEvalCommand]
- */
+type RebuildDeps = {
+  ipcMain?: import('electron').IpcMain;
+  findFlakeDir?: () => string | null;
+  updateBuildStatus?: (success: boolean, message: string) => void;
+  getSpawnEnv?: () => NodeJS.ProcessEnv;
+  getMainWindow?: () => import('electron').BrowserWindow | null;
+  flakeDirNotFoundMsg?: () => string;
+  spawn?: typeof import('child_process').spawn;
+  resolveRebuildCommand?: (spawnEnv: NodeJS.ProcessEnv) => string[];
+  resolveEvalCommand?: (spawnEnv: NodeJS.ProcessEnv) => string[];
+};
 
 /**
  * Check if a command exists on PATH within the given environment.
@@ -78,7 +78,7 @@ function resolveEvalCommand(spawnEnv) {
  * Create rebuild handlers with dependency injection support.
  * @param {RebuildDeps} [deps]
  */
-function createRebuildHandlers(deps = {}) {
+function createRebuildHandlers(deps: RebuildDeps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsUpdateBuildStatus = deps.updateBuildStatus || updateBuildStatus;
   const depsGetSpawnEnv = deps.getSpawnEnv || getSpawnEnv;
@@ -89,7 +89,7 @@ function createRebuildHandlers(deps = {}) {
   const depsResolveEvalCommand = deps.resolveEvalCommand || resolveEvalCommand;
 
   /** @type {import('child_process').ChildProcess | null} */
-  let runningRebuildProcess = null;
+  let runningRebuildProcess: any = null;
 
   return {
     nixosRebuild: async ({ action, updateInputs }) => {
@@ -105,7 +105,7 @@ function createRebuildHandlers(deps = {}) {
       if (action === 'dry-build') {
         const [evalCmd, ...evalArgs] = depsResolveEvalCommand(spawnEnv);
         mainWindow?.webContents.send('terminal-show', { title: 'Evaluating Configuration' });
-        return new Promise((resolve, reject) => {
+        return new Promise<any>((resolve, reject) => {
           const proc = depsSpawn(evalCmd, evalArgs, {
             env: spawnEnv,
             cwd: flakeDir
@@ -160,7 +160,7 @@ function createRebuildHandlers(deps = {}) {
       };
       mainWindow?.webContents.send('terminal-show', { title: actionTitles[action] || 'Building' });
 
-      return new Promise((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const proc = depsSpawn(rebuildCmd, args, {
           env: spawnEnv,
           cwd: flakeDir
@@ -214,7 +214,7 @@ function createRebuildHandlers(deps = {}) {
  * Register NixOS rebuild IPC handlers
  * @param {RebuildDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: RebuildDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createRebuildHandlers(deps);
 
@@ -227,10 +227,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  commandExists,
-  resolveRebuildCommand,
-  resolveEvalCommand,
-  createRebuildHandlers,
-};
+export { register, commandExists, resolveRebuildCommand, resolveEvalCommand, createRebuildHandlers };
+
+export {};

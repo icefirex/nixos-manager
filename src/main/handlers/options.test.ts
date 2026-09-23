@@ -1,6 +1,6 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 function makeTempFile(content) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-unit-'));
@@ -11,14 +11,14 @@ function makeTempFile(content) {
 
 describe('options handler', () => {
   it('exports register function', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     expect(mod.register).toBeInstanceOf(Function);
   });
 
   it('registers all expected IPC channels via register(deps)', () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./options');
+    const mod = require('./options.ts');
 
     mod.register({ ipcMain });
 
@@ -36,9 +36,9 @@ describe('options handler', () => {
   });
 
   it('register(deps) forwards injected deps so channels use the factory', async () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./options');
+    const mod = require('./options.ts');
 
     mod.register({
       ipcMain,
@@ -52,7 +52,7 @@ describe('options handler', () => {
   });
 
   it('updates nested attrset assignments via updateOptionInFile', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const { dir, filePath } = makeTempFile(`
 { ... }:
 {
@@ -73,7 +73,7 @@ describe('options handler', () => {
   });
 
   it('throws when allowCreate is false and option does not exist', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const { dir, filePath } = makeTempFile(`
 { ... }:
 {
@@ -89,7 +89,7 @@ describe('options handler', () => {
   });
 
   it('extracts scoped values from committed content when nested keys are used', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const value = mod.extractOptionValueFromContent(`
 { ... }:
 {
@@ -105,7 +105,7 @@ describe('options handler', () => {
   });
 
   it('builds scoped assignments for relative keys inside nested blocks', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const entries = mod.buildScopedAssignments(`
 { ... }:
 {
@@ -124,20 +124,20 @@ describe('options handler', () => {
   });
 
   it('normalizes option values by trimming and removing trailing semicolon', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     expect(mod.normalizeOptionValue('  true;  ')).toBe('true');
     expect(mod.normalizeOptionValue('"abc" ;')).toBe('"abc"');
     expect(mod.normalizeOptionValue(null)).toBe('');
   });
 
   it('resolves absolute-root scope precedence in resolveScopePath', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const resolved = mod.resolveScopePath(['foo', 'services.cockpit', 'settings.WebService']);
     expect(resolved).toBe('services.cockpit.settings.WebService');
   });
 
   it('resolves target file paths with flake-dir-prefixed relative paths', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-path-'));
     const flakeDir = path.join(dir, 'myflake');
     fs.mkdirSync(path.join(flakeDir, 'modules'), { recursive: true });
@@ -151,7 +151,7 @@ describe('options handler', () => {
   });
 
   it('updates multiline assignment while preserving trailing comment', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const { dir, filePath } = makeTempFile(`
 { ... }:
 {
@@ -172,13 +172,13 @@ describe('options handler', () => {
   });
 
   it('returns null when option is not present in content', () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const value = mod.extractOptionValueFromContent('{ services.openssh.enable = true; }\n', 'programs.zsh.enable');
     expect(value).toBeNull();
   });
 
   it('supports DI-lite via createOptionsHandlers for setOptionValue flow', async () => {
-    const mod = require('./options');
+    const mod = require('./options.ts');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-di-lite-'));
     fs.writeFileSync(path.join(dir, 'flake.nix'), '{ }\n');
     const filePath = path.join(dir, 'configuration.nix');

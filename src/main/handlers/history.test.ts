@@ -1,13 +1,13 @@
 describe('history handler', () => {
   it('exports register function', () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     expect(mod.register).toBeInstanceOf(Function);
   });
 
   it('registers all expected IPC channels via register(deps)', () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./history');
+    const mod = require('./history.ts');
 
     mod.register({ ipcMain });
 
@@ -17,9 +17,9 @@ describe('history handler', () => {
   });
 
   it('register(deps) forwards injected deps so channels use the factory', async () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./history');
+    const mod = require('./history.ts');
 
     const rows = [{ timestamp: 1, subject: 'git', action: 'added' }];
     const fakeDb = { prepare: () => ({ all: () => rows }) };
@@ -31,7 +31,7 @@ describe('history handler', () => {
   });
 
   it('migrates option_history schema to include reverted action', () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     const execSpy = vi.fn();
     const db = {
       prepare: vi.fn(() => ({
@@ -49,7 +49,7 @@ describe('history handler', () => {
   });
 
   it('does not migrate when reverted is already present', () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     const execSpy = vi.fn();
     const db = {
       prepare: vi.fn(() => ({
@@ -66,7 +66,7 @@ describe('history handler', () => {
   });
 
   it('supports DI-lite createHistoryHandlers for history-add', async () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     const runSpy = vi.fn();
     const fakeDb = {
       prepare: vi.fn(() => ({ run: runSpy }))
@@ -92,7 +92,7 @@ describe('history handler', () => {
   });
 
   it('supports DI-lite createHistoryHandlers for history-add-option', async () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     const addOptionSpy = vi.fn();
     const handlers = mod.createHistoryHandlers({ addOptionHistoryEntry: addOptionSpy });
 
@@ -110,7 +110,7 @@ describe('history handler', () => {
   });
 
   it('supports DI-lite createHistoryHandlers for history-get', async () => {
-    const mod = require('./history');
+    const mod = require('./history.ts');
     const rows = [{ timestamp: 1, entry_type: 'package', subject: 'git', action: 'added' }];
     const fakeDb = {
       prepare: vi.fn(() => ({ all: () => rows }))

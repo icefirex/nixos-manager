@@ -1,37 +1,38 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
-const { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
-const { getAllPackages, findDuplicates } = require('../nix-packages');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { findFlakeDir, runCmd, flakeDirNotFoundMsg } from '../utils.ts';
+import { NIX_CURRENT_SYSTEM, NIX_FLAKE_REGISTRY, CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } from '../constants.ts';
+import { getDb } from './history.ts';
+import { getAllPackages, findDuplicates, findPackage } from '../nix-packages.ts';
 
-/**
- * @typedef {Object} PackagesDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {() => string | null} [findFlakeDir]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {() => string} [flakeDirNotFoundMsg]
- * @property {() => {system: string[], user: string[], homeManager: string[]}} [getAllPackages]
- * @property {() => Array<import('./nix-packages').DuplicateResult>} [findDuplicates]
- * @property {(pkg: string, flake?: string) => Array<import('./nix-packages').PackageFindResult>} [findPackage]
- * @property {() => import('node:sqlite').DatabaseSync} [getDb]
- * @property {typeof import('fs')} [fs]
- * @property {typeof import('os')} [os]
- */
+type PackagesDeps = {
+  ipcMain?: import('electron').IpcMain;
+  findFlakeDir?: () => string | null;
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  flakeDirNotFoundMsg?: () => string;
+  getAllPackages?: () => {system: string[], user: string[], homeManager: string[]};
+  findDuplicates?: () => Array<import('../nix-packages').DuplicateResult>;
+  findPackage?: (pkg: string, flake?: string) => Array<import('../nix-packages').PackageFindResult>;
+  getDb?: () => import('node:sqlite').DatabaseSync;
+  fs?: typeof import('fs');
+  os?: typeof import('os');
+};
 
 /**
  * @param {PackagesDeps} [deps]
  */
-function createPackagesHandlers(deps = {}) {
+function createPackagesHandlers(deps: PackagesDeps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsRunCmd = deps.runCmd || runCmd;
   const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
   const depsGetAllPackages = deps.getAllPackages || getAllPackages;
   const depsFindDuplicates = deps.findDuplicates || findDuplicates;
-  const depsFindPackage = deps.findPackage || ((pkg, flake) => require('../nix-packages').findPackage(pkg, flake));
-  const depsGetDb = deps.getDb || (() => require('./history').getDb());
+  const depsFindPackage = deps.findPackage || ((pkg, flake) => findPackage(pkg));
+  const depsGetDb = deps.getDb || getDb;
   const depsFs = deps.fs || fs;
   const depsOs = deps.os || os;
 
@@ -68,20 +69,20 @@ function createPackagesHandlers(deps = {}) {
       }
 
       // Get last rebuild time (from system profile symlink modification time)
-      let lastRebuild = null;
+      let lastRebuild: any = null;
       try {
         const sysProfile = '/nix/var/nix/profiles/system';
         if (depsFs.existsSync(sysProfile)) {
           const lstat = depsFs.lstatSync(sysProfile);
           if (lstat) lastRebuild = lstat.mtime.toISOString();
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get last config file modification time
-      let lastConfigChange = null;
+      let lastConfigChange: any = null;
       try {
         function findNewestNix(dir) {
-          let newest = null;
+          let newest: any = null;
           let entries;
           try { entries = depsFs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
           for (const entry of entries) {
@@ -100,7 +101,7 @@ function createPackagesHandlers(deps = {}) {
         }
         const newestMs = findNewestNix(flakeDir);
         if (newestMs) lastConfigChange = new Date(newestMs).toISOString();
-      } catch (e) {}
+      } catch (e: any) {}
 
       const mtimeDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
 
@@ -110,14 +111,14 @@ function createPackagesHandlers(deps = {}) {
           try {
             const rel = path.relative(flakeDir, filePath);
             if (!rel.startsWith('..')) return rel;
-          } catch (e) {}
+          } catch (e: any) {}
         }
         return filePath;
       };
 
       // Collect generic git working-tree signals (includes external/manual edits)
-      let changedFiles = [];
-      let optionDiffSummary = { added: [], removed: [], changed: [] };
+      let changedFiles: any[] = [];
+      let optionDiffSummary: any = { added: [], removed: [], changed: [] };
       try {
         const fileOut = await depsRunCmd(`git -C "${flakeDir}" diff --name-only`);
         changedFiles = (fileOut || '')
@@ -125,19 +126,19 @@ function createPackagesHandlers(deps = {}) {
           .map(s => s.trim())
           .filter(Boolean)
           .filter(name => name.endsWith('.nix'));
-      } catch (e) {}
+      } catch (e: any) {}
 
       try {
         const diffOut = await depsRunCmd(`git -C "${flakeDir}" diff --unified=20 -- '*.nix'`);
         optionDiffSummary = parseOptionDiffSummary(diffOut, flakeDir);
-      } catch (e) {}
+      } catch (e: any) {}
 
       const hasDrift = mtimeDrift || changedFiles.length > 0;
 
       // If drift, check history for app-initiated changes since last rebuild
-      let pendingInstall = [];
-      let pendingRemove = [];
-      let optionChanges = [];
+      let pendingInstall: any[] = [];
+      let pendingRemove: any[] = [];
+      let optionChanges: any[] = [];
       const optionChangesByKey = new Map();
       if (hasDrift && lastRebuild) {
         try {
@@ -180,11 +181,11 @@ function createPackagesHandlers(deps = {}) {
 
           if (pendingRemove.length > 0) {
             const liveBins = new Set();
-            try { for (const n of depsFs.readdirSync('/nix/var/nix/profiles/system/sw/bin')) liveBins.add(n); } catch (e) {}
+            try { for (const n of depsFs.readdirSync('/nix/var/nix/profiles/system/sw/bin')) liveBins.add(n); } catch (e: any) {}
             const username = depsOs.userInfo().username;
             const hmDir = path.join('/etc/profiles/per-user', username, 'bin');
             if (depsFs.existsSync(hmDir)) {
-              try { for (const n of depsFs.readdirSync(hmDir)) liveBins.add(n); } catch (e) {}
+              try { for (const n of depsFs.readdirSync(hmDir)) liveBins.add(n); } catch (e: any) {}
             }
             pendingRemove = pendingRemove.filter(pkg => {
               if (liveBins.has(pkg)) return true;
@@ -230,7 +231,7 @@ function createPackagesHandlers(deps = {}) {
             });
           }
 
-        } catch (e) {}
+        } catch (e: any) {}
       }
 
       const gitPaths = new Set([
@@ -336,7 +337,7 @@ function createPackagesHandlers(deps = {}) {
  * Register package management IPC handlers
  * @param {PackagesDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: PackagesDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createPackagesHandlers(deps);
 
@@ -349,7 +350,7 @@ function register(deps = {}) {
   depsIpcMain.handle('get-package-info', async (event, packageName) => {
     const flakeDir = findFlakeDir();
 
-    const info = {
+    const info: any = {
       name: packageName,
       version: null,
       description: null,
@@ -389,7 +390,7 @@ function register(deps = {}) {
       if (meta.platforms && Array.isArray(meta.platforms)) {
         info.platforms = meta.platforms.slice(0, 10);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(`Failed to parse meta for ${packageName}:`, e.message);
     }
 
@@ -415,11 +416,10 @@ function register(deps = {}) {
         });
         info.programs = bins.slice(0, 20);
       }
-    } catch (e) {}
+    } catch (e: any) {}
 
     // Find where package is defined in config (actual package list declarations only)
     if (flakeDir) {
-      const { findPackage } = require('../nix-packages');
       const results = findPackage(packageName);
       for (const r of results) {
         for (const line of r.lines) {
@@ -438,7 +438,7 @@ function register(deps = {}) {
   depsIpcMain.handle('get-live-packages', async () => {
     const username = os.userInfo().username;
 
-    const packages = {
+    const packages: any = {
       system: [],
       user: [],
       homeManager: []
@@ -520,9 +520,9 @@ function register(deps = {}) {
  */
 function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFileSync(p, 'utf8')) {
   const lineMap = new Map();
-  let currentFile = null;
+  let currentFile: any = null;
   let braceDepth = 0;
-  const scopeStack = [];
+  const scopeStack: any[] = [];
   const assignment = /^([+-])\s*([a-zA-Z0-9._-]+)\s*=\s*(.*?);\s*(?:#.*)?$/;
   const absoluteRoots = new Set([
     'services', 'programs', 'hardware', 'networking', 'boot', 'system',
@@ -567,14 +567,14 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
     let content = '';
     try {
       content = readFile(absFile);
-    } catch (e) {
+    } catch (e: any) {
       fileScopedKeyCache.set(relFile, result);
       return result;
     }
 
     const lines = content.split('\n');
     let depth = 0;
-    const stack = [];
+    const stack: any[] = [];
 
     for (const line of lines) {
       const code = line.replace(/#.*$/, '');
@@ -663,7 +663,7 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
     }
   }
 
-  const optionDiffSummary = { added: [], removed: [], changed: [] };
+  const optionDiffSummary: any = { added: [], removed: [], changed: [] };
   for (const [, delta] of lineMap.entries()) {
     if (delta.added != null && delta.removed != null) {
       optionDiffSummary.changed.push({ optionPath: delta.optionPath, file: delta.file, from: delta.removed, to: delta.added });
@@ -679,8 +679,6 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
   return optionDiffSummary;
 }
 
-module.exports = {
-  register,
-  createPackagesHandlers,
-  parseOptionDiffSummary,
-};
+export { register, createPackagesHandlers, parseOptionDiffSummary };
+
+export {};

@@ -1,6 +1,7 @@
 // @ts-check
 
-const { contextBridge, ipcRenderer } = require('electron');
+import electron from 'electron';
+const { contextBridge, ipcRenderer } = electron as any;
 
 /** @type {import('./src/types/ipc').ElectronAPI} */
 const electronAPI = {
@@ -122,3 +123,5 @@ const electronAPI = {
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+
+export {};

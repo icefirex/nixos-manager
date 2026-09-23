@@ -1,46 +1,41 @@
 // @ts-check
-const fs = require('fs');
-const path = require('path');
-const { findFlakeDir } = require('./utils');
+import fs from 'fs';
+import path from 'path';
+import { findFlakeDir } from './utils.ts';
 
-/**
- * @typedef {Object} NixPackageFile
- * @property {string} file
- * @property {string} relativePath
- * @property {string[]} system
- * @property {string[]} homeManager
- * @property {Record<string, string[]>} users
- */
+type NixPackageFile = {
+  file: string;
+  relativePath: string;
+  system: string[];
+  homeManager: string[];
+  users: Record<string, string[]>;
+};
 
-/**
- * @typedef {Object} PackageLocation
- * @property {string} file
- * @property {string} relativePath
- */
+type PackageLocation = {
+  file: string;
+  relativePath: string;
+};
 
-/**
- * @typedef {Object} PackageFindResult
- * @property {string} file
- * @property {string} relativePath
- * @property {string[]} sections
- * @property {number[]} lines
- */
+export type PackageFindResult = {
+  file: string;
+  relativePath: string;
+  sections: string[];
+  lines: number[];
+};
 
-/**
- * @typedef {Object} DuplicateFileEntry
- * @property {string} file
- * @property {string} relativePath
- * @property {string} [user]
- */
+type DuplicateFileEntry = {
+  file: string;
+  relativePath: string;
+  user?: string;
+};
 
-/**
- * @typedef {Object} DuplicateResult
- * @property {string} pkgname
- * @property {string} scope
- * @property {DuplicateFileEntry[]} files
- * @property {string[]} [users]
- * @property {boolean} crossUser
- */
+export type DuplicateResult = {
+  pkgname: string;
+  scope: string;
+  files: DuplicateFileEntry[];
+  users?: string[];
+  crossUser: boolean;
+};
 
 /**
  * Extract package names from a packages list block.
@@ -171,13 +166,13 @@ function extractListBlockAt(content, startIndex) {
  * @returns {NixPackageFile[]}
  */
 function scanNixPackages(flakeDir) {
-  const results = [];
+  const results: any[] = [];
 
   function processFile(fullPath) {
       let content;
       try { content = fs.readFileSync(fullPath, 'utf8'); } catch { return; }
 
-      const entry = {
+      const entry: any = {
         file: fullPath,
         relativePath: path.relative(flakeDir, fullPath),
         system: [],
@@ -228,15 +223,15 @@ function getAllPackages() {
   const flakeDir = findFlakeDir();
   if (!flakeDir) return { system: [], user: [], homeManager: [] };
 
-  const files = scanNixPackages(flakeDir);
-  const sysSet = new Set();
-  const userSet = new Set();
-  const hmSet = new Set();
+  const files: any = scanNixPackages(flakeDir);
+  const sysSet = new Set<string>();
+  const userSet = new Set<string>();
+  const hmSet = new Set<string>();
 
   for (const f of files) {
     for (const p of f.system) sysSet.add(p);
     for (const p of f.homeManager) hmSet.add(p);
-    for (const pkgs of Object.values(f.users)) {
+    for (const pkgs of Object.values(f.users) as any[][]) {
       for (const p of pkgs) userSet.add(p);
     }
   }
@@ -257,14 +252,14 @@ function findPackage(pkgname) {
   const flakeDir = findFlakeDir();
   if (!flakeDir) return [];
 
-  const files = scanNixPackages(flakeDir);
-  const results = [];
+  const files: any = scanNixPackages(flakeDir);
+  const results: any[] = [];
 
   for (const f of files) {
-    const sections = [];
+    const sections: any[] = [];
     if (f.system.includes(pkgname)) sections.push('system');
     if (f.homeManager.includes(pkgname)) sections.push('homeManager');
-    for (const [username, pkgs] of Object.entries(f.users)) {
+    for (const [username, pkgs] of Object.entries(f.users) as [string, any][]) {
       if (pkgs.includes(pkgname)) sections.push(`user:${username}`);
     }
     if (sections.length > 0) {
@@ -283,7 +278,7 @@ function findPackage(pkgname) {
  * @returns {number[]}
  */
 function findPackageLines(filePath, pkgname) {
-  const lines = [];
+  const lines: any[] = [];
   const pkgRef = `pkgs.${pkgname}`;
   let content;
   try { content = fs.readFileSync(filePath, 'utf8'); } catch { return lines; }
@@ -386,10 +381,10 @@ function findDuplicates() {
   const flakeDir = findFlakeDir();
   if (!flakeDir) return [];
 
-  const files = scanNixPackages(flakeDir);
+  const files: any = scanNixPackages(flakeDir);
 
   // scope -> pkgname -> Set of files
-  const scopeMap = {};
+  const scopeMap: any = {};
   function add(scope, pkg, file, relPath) {
     if (!scopeMap[scope]) scopeMap[scope] = {};
     if (!scopeMap[scope][pkg]) scopeMap[scope][pkg] = [];
@@ -401,16 +396,16 @@ function findDuplicates() {
   for (const f of files) {
     for (const p of f.system) add('system', p, f.file, f.relativePath);
     for (const p of f.homeManager) add('homeManager', p, f.file, f.relativePath);
-    for (const [username, pkgs] of Object.entries(f.users)) {
+    for (const [username, pkgs] of Object.entries(f.users) as [string, any][]) {
       for (const p of pkgs) add(`user:${username}`, p, f.file, f.relativePath);
     }
   }
 
-  const duplicates = [];
+  const duplicates: any[] = [];
 
   // Case 1: same scope, multiple files
-  for (const [scope, pkgs] of Object.entries(scopeMap)) {
-    for (const [pkgname, fileEntries] of Object.entries(pkgs)) {
+  for (const [scope, pkgs] of Object.entries(scopeMap) as [string, any][]) {
+    for (const [pkgname, fileEntries] of Object.entries(pkgs) as [string, any][]) {
       if (fileEntries.length > 1) {
         duplicates.push({ pkgname, scope, files: fileEntries, crossUser: false });
       }
@@ -419,15 +414,15 @@ function findDuplicates() {
 
   // Case 2: same package in multiple different user scopes
   const userScopes = Object.keys(scopeMap).filter(s => s.startsWith('user:'));
-  const crossUserMap = {};
+  const crossUserMap: any = {};
   for (const us of userScopes) {
     const user = us.replace('user:', '');
-    for (const [pkg, fileEntries] of Object.entries(scopeMap[us] || {})) {
+    for (const [pkg, fileEntries] of Object.entries(scopeMap[us] || {}) as [string, any][]) {
       if (!crossUserMap[pkg]) crossUserMap[pkg] = [];
       crossUserMap[pkg].push({ user, files: fileEntries, scope: us });
     }
   }
-  for (const [pkgname, entries] of Object.entries(crossUserMap)) {
+  for (const [pkgname, entries] of Object.entries(crossUserMap) as [string, any][]) {
     if (entries.length > 1) {
       // Only flag if not already covered by case 1
       const alreadyFlagged = duplicates.some(d => d.pkgname === pkgname && d.crossUser);
@@ -447,4 +442,6 @@ function findDuplicates() {
   return duplicates;
 }
 
-module.exports = { scanNixPackages, getAllPackages, findPackage, findPackageLines, findDuplicates, stripStrings, extractFromList, extractListBlock, extractListBlockAt };
+export { scanNixPackages, getAllPackages, findPackage, findPackageLines, findDuplicates, stripStrings, extractFromList, extractListBlock, extractListBlockAt };
+
+export {};

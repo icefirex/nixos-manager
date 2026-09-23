@@ -1,11 +1,12 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
-const { addOptionHistoryEntry } = require('./history');
-const { stripStrings } = require('../nix-packages');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import { findFlakeDir, runCmd, flakeDirNotFoundMsg } from '../utils.ts';
+import { addOptionHistoryEntry } from './history.ts';
+import { stripStrings } from '../nix-packages.ts';
 
 const ELASTIC_USER = 'aWVSALXpZv';
 const ELASTIC_PASS = 'X8gPHnzL52wFEekuxsfQ9cSh';
@@ -16,21 +17,20 @@ const OPTION_ABSOLUTE_ROOTS = new Set([
   'virtualisation', 'security', 'users', 'fonts', 'environment', 'nixpkgs', 'nix', 'home', 'xdg'
 ]);
 
-/**
- * @typedef {Object} OptionsDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {() => string | null} [findFlakeDir]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {() => string} [flakeDirNotFoundMsg]
- * @property {(entry: import('./history').OptionHistoryEntry) => void} [addOptionHistoryEntry]
- * @property {(query: string, channel?: string, limit?: number) => Promise<Array<{path: string, description: string | null, type: string | null, default: string | null, example: string | null, declared: string | null}>>} [searchOptionCatalog]
- */
+type OptionsDeps = {
+  ipcMain?: import('electron').IpcMain;
+  findFlakeDir?: () => string | null;
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  flakeDirNotFoundMsg?: () => string;
+  addOptionHistoryEntry?: (entry: import('./history').OptionHistoryEntry) => void;
+  searchOptionCatalog?: (query: string, channel?: string, limit?: number) => Promise<Array<{path: string, description: string | null, type: string | null, default: string | null, example: string | null, declared: string | null}>>;
+};
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findNixFiles(dir, files = []) {
+function findNixFiles(dir, files: any[] = []) {
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -41,7 +41,7 @@ function findNixFiles(dir, files = []) {
         files.push(fullPath);
       }
     }
-  } catch (e) {}
+  } catch (e: any) {}
   return files;
 }
 
@@ -67,15 +67,14 @@ function resolveScopePath(paths) {
   return full;
 }
 
-/**
- * @typedef {Object} ScopedAssignment
- * @property {number} lineIndex
- * @property {string} lhs
- * @property {string} fullPath
- * @property {string} indent
- * @property {string} value
- * @property {string} comment
- */
+type ScopedAssignment = {
+  lineIndex: number;
+  lhs: string;
+  fullPath: string;
+  indent: string;
+  value: string;
+  comment: string;
+};
 
 /**
  * @param {string} content
@@ -83,9 +82,9 @@ function resolveScopePath(paths) {
  */
 function buildScopedAssignments(content) {
   const lines = content.split('\n');
-  const stack = [];
+  const stack: any[] = [];
   let depth = 0;
-  const entries = [];
+  const entries: any[] = [];
 
   function countChar(str, ch) {
     let count = 0;
@@ -151,7 +150,7 @@ function chooseOptionFile(flakeDir, preferredFile = null) {
  */
 function resolveTargetFilePath(flakeDir, filePath) {
   if (!filePath) return null;
-  const candidates = [];
+  const candidates: any[] = [];
 
   if (path.isAbsolute(filePath)) {
     candidates.push(filePath);
@@ -435,7 +434,7 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
     }
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise<any>((resolve, reject) => {
     const auth = Buffer.from(`${ELASTIC_USER}:${ELASTIC_PASS}`).toString('base64');
     const req = https.request({
       hostname: ELASTIC_HOST,
@@ -454,12 +453,12 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
       res.on('end', () => {
         try {
           const json = JSON.parse(body);
-          if (res.statusCode < 200 || res.statusCode >= 300) {
+          if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 300) {
             reject(new Error(json?.error?.reason || `Option search failed (${res.statusCode})`));
             return;
           }
           const hits = json?.hits?.hits || [];
-          const out = [];
+          const out: any[] = [];
           const seen = new Set();
           for (const hit of hits) {
             const src = hit?._source || {};
@@ -475,7 +474,7 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
             });
           }
           resolve(out);
-        } catch (e) {
+        } catch (e: any) {
           reject(new Error(`Failed to parse option search response: ${e.message}`));
         }
       });
@@ -490,7 +489,7 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
  * Create options management handlers with dependency injection support.
  * @param {OptionsDeps} [deps]
  */
-function createOptionsHandlers(deps = {}) {
+function createOptionsHandlers(deps: OptionsDeps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
   const depsRunCmd = deps.runCmd || runCmd;
   const depsFlakeDirNotFoundMsg = deps.flakeDirNotFoundMsg || flakeDirNotFoundMsg;
@@ -505,7 +504,7 @@ function createOptionsHandlers(deps = {}) {
         throw new Error(depsFlakeDirNotFoundMsg());
       }
 
-      const options = {
+      const options: any = {
         services: [],
         programs: [],
         hardware: [],
@@ -630,7 +629,7 @@ function createOptionsHandlers(deps = {}) {
               }
             }
           });
-        } catch (e) {
+        } catch (e: any) {
           console.error(`Failed to parse ${nixFile}:`, e.message);
         }
       }
@@ -647,7 +646,7 @@ function createOptionsHandlers(deps = {}) {
     getOptionInfo: async (optionPath) => {
       const flakeDir = depsFindFlakeDir();
 
-      const info = {
+      const info: any = {
         path: optionPath,
         description: null,
         type: null,
@@ -675,7 +674,7 @@ function createOptionsHandlers(deps = {}) {
             info.declared = parsed.declarations[0];
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error(`Failed to get nixos-option info for ${optionPath}:`, e.message);
       }
 
@@ -734,7 +733,7 @@ function createOptionsHandlers(deps = {}) {
         return { success: false, error: 'newValue is required' };
       }
 
-      let targetFile = null;
+      let targetFile: any = null;
       if (payload?.filePath) {
         targetFile = resolveTargetFilePath(flakeDir, payload.filePath);
         if (!targetFile) {
@@ -754,24 +753,24 @@ function createOptionsHandlers(deps = {}) {
         let diff = '';
         try {
           diff = await depsRunCmd(`git -C "${flakeDir}" diff "${relPath}"`);
-        } catch (e) {}
+        } catch (e: any) {}
         depsAddOptionHistoryEntry({
           optionPath,
-          action: result.action,
+          action: result.action as any,
           oldValue: result.oldValue,
           newValue: result.newValue,
           file: targetFile
         });
         return {
           success: true,
-          action: result.action,
+          action: result.action as any,
           file: targetFile,
           relativePath: relPath,
           oldValue: result.oldValue,
           newValue: result.newValue,
           diff: diff || null
         };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: e.message };
       }
     },
@@ -824,7 +823,7 @@ function createOptionsHandlers(deps = {}) {
         let diff = '';
         try {
           diff = await depsRunCmd(`git -C "${gitCtx.root}" diff "${relPath}"`);
-        } catch (e) {}
+        } catch (e: any) {}
 
         return {
           success: true,
@@ -835,26 +834,26 @@ function createOptionsHandlers(deps = {}) {
           newValue: committedValue,
           diff: diff || null
         };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: e.message };
       }
     },
 
-    searchOptionsCatalog: async (query, opts = {}) => {
+    searchOptionsCatalog: async (query, opts: any = {}) => {
       if (!query || typeof query !== 'string' || !query.trim()) {
         return { success: true, results: [] };
       }
       try {
         const results = await depsSearchOptionCatalog(query.trim(), opts.channel || 'unstable', opts.limit || 20);
         return { success: true, results };
-      } catch (e) {
+      } catch (e: any) {
         return { success: false, error: e.message };
       }
     },
 
     // Get live system options (enabled services, programs, etc.)
     getLiveOptions: async () => {
-      const options = {
+      const options: any = {
         services: [],
         programs: [],
         hardware: [],
@@ -891,7 +890,7 @@ function createOptionsHandlers(deps = {}) {
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to get enabled services:', e.message);
       }
 
@@ -909,7 +908,7 @@ function createOptionsHandlers(deps = {}) {
             });
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to check programs:', e.message);
       }
 
@@ -930,7 +929,7 @@ function createOptionsHandlers(deps = {}) {
           value: fwStatus.trim() === 'active' ? 'enabled' : 'disabled',
           source: 'systemd'
         });
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to get networking info:', e.message);
       }
 
@@ -944,7 +943,7 @@ function createOptionsHandlers(deps = {}) {
             source: 'uname'
           });
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to get boot info:', e.message);
       }
 
@@ -962,7 +961,7 @@ function createOptionsHandlers(deps = {}) {
  * Register options management IPC handlers
  * @param {OptionsDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: OptionsDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createOptionsHandlers(deps);
 
@@ -995,13 +994,4 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  normalizeOptionValue,
-  resolveScopePath,
-  buildScopedAssignments,
-  resolveTargetFilePath,
-  updateOptionInFile,
-  extractOptionValueFromContent,
-  createOptionsHandlers,
-};
+export { register, normalizeOptionValue, resolveScopePath, buildScopedAssignments, resolveTargetFilePath, updateOptionInFile, extractOptionValueFromContent, createOptionsHandlers };

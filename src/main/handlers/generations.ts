@@ -1,9 +1,10 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const { NIX_PROFILES_DIR, NIX_SYSTEM_PROFILE } = require('../constants');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { NIX_PROFILES_DIR, NIX_SYSTEM_PROFILE } from '../constants.ts';
 
 /**
  * Parse the current generation number from a profile symlink target.
@@ -18,8 +19,8 @@ function parseCurrentGenerationLink(link) {
  * Map profile directory entries into generation records.
  * Pure: date extraction is delegated to the injected getMtimeIso callback.
  */
-function parseGenerationEntries(entries, currentGeneration, profileDir, getMtimeIso = null) {
-  const generations = [];
+function parseGenerationEntries(entries, currentGeneration, profileDir, getMtimeIso: ((p: string) => string) | null = null) {
+  const generations: any[] = [];
   for (const entry of entries) {
     const match = entry.match(/^system-(\d+)-link$/);
     if (!match) continue;
@@ -30,7 +31,7 @@ function parseGenerationEntries(entries, currentGeneration, profileDir, getMtime
     if (getMtimeIso) {
       try {
         dateStr = getMtimeIso(genPath);
-      } catch (e) {}
+      } catch (e: any) {}
     }
 
     generations.push({
@@ -51,7 +52,7 @@ function parseClosureDiff(stdout) {
   const stripAnsi = (str) => str.replace(/\x1b\[[0-9;]*m/g, '');
   const cleanOutput = stripAnsi(stdout || '');
 
-  const diff = {
+  const diff: any = {
     added: [],
     removed: [],
     changed: [],
@@ -79,28 +80,26 @@ function parseClosureDiff(stdout) {
   return diff;
 }
 
-/**
- * @typedef {Object} GenerationsDeps
- * @property {typeof import('fs')} [fs]
- * @property {typeof import('child_process').exec} [exec]
- * @property {string} [profileDir]
- * @property {string} [profilePath]
- * @property {import('electron').IpcMain} [ipcMain]
- */
+type GenerationsDeps = {
+  fs?: typeof import('fs');
+  exec?: typeof import('child_process').exec;
+  profileDir?: string;
+  profilePath?: string;
+  ipcMain?: import('electron').IpcMain;
+};
 
-/**
- * @typedef {Object} GenerationRecord
- * @property {number} number
- * @property {string} date
- * @property {boolean} current
- * @property {string} path
- */
+type GenerationRecord = {
+  number: number;
+  date: string;
+  current: boolean;
+  path: string;
+};
 
 /**
  * Create generation handlers with dependency injection support.
  * @param {GenerationsDeps} [deps]
  */
-function createGenerationsHandlers(deps = {}) {
+function createGenerationsHandlers(deps: GenerationsDeps = {}) {
   const depsFs = deps.fs || fs;
   const depsExec = deps.exec || exec;
   const profileDir = deps.profileDir || NIX_PROFILES_DIR;
@@ -111,15 +110,15 @@ function createGenerationsHandlers(deps = {}) {
   return {
     getGenerations: async () => {
       // Determine current generation by following the symlink
-      let currentGeneration = null;
+      let currentGeneration: any = null;
       try {
         const profileLink = depsFs.readlinkSync(profilePath);
         currentGeneration = parseCurrentGenerationLink(profileLink);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to determine current generation:', e);
       }
 
-      let generations = [];
+      let generations: any[] = [];
       try {
         const entries = depsFs.readdirSync(profileDir);
         generations = parseGenerationEntries(
@@ -128,7 +127,7 @@ function createGenerationsHandlers(deps = {}) {
           profileDir,
           (p) => depsFs.lstatSync(p).mtime.toISOString()
         );
-      } catch (e) {
+      } catch (e: any) {
         throw new Error(`Failed to read generations: ${e.message}`);
       }
 
@@ -145,7 +144,7 @@ function createGenerationsHandlers(deps = {}) {
         throw new Error(`Generation ${genNumber} not found`);
       }
 
-      const info = {
+      const info: any = {
         number: genNumber,
         path: genPath,
         nixosVersion: null,
@@ -161,7 +160,7 @@ function createGenerationsHandlers(deps = {}) {
         if (depsFs.existsSync(versionPath)) {
           info.nixosVersion = depsFs.readFileSync(versionPath, 'utf8').trim();
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get kernel version
       try {
@@ -174,7 +173,7 @@ function createGenerationsHandlers(deps = {}) {
             info.kernelVersion = match[1];
           }
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get configuration revision (git commit)
       try {
@@ -182,10 +181,10 @@ function createGenerationsHandlers(deps = {}) {
         if (depsFs.existsSync(revPath)) {
           info.configurationRevision = depsFs.readFileSync(revPath, 'utf8').trim();
         }
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get closure size
-      await new Promise((resolve) => {
+      await new Promise<void>((resolve) => {
         depsExec(`nix path-info -Sh ${genPath} 2>/dev/null`, (error, stdout) => {
           if (!error && stdout) {
             const parts = stdout.trim().split(/\s+/);
@@ -193,7 +192,7 @@ function createGenerationsHandlers(deps = {}) {
               info.closureSize = parts[1];
             }
           }
-          resolve();
+          resolve(undefined);
         });
       });
 
@@ -208,7 +207,7 @@ function createGenerationsHandlers(deps = {}) {
         throw new Error('One or both generations not found');
       }
 
-      return new Promise((resolve) => {
+      return new Promise<any>((resolve) => {
         depsExec(`nix store diff-closures ${fromPath} ${toPath} 2>/dev/null`, (error, stdout) => {
           if (error) {
             // nix store diff-closures might not be available on older systems
@@ -227,7 +226,7 @@ function createGenerationsHandlers(deps = {}) {
         throw new Error(`Generation ${genNumber} not found`);
       }
 
-      return new Promise((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         // First switch the profile, then activate the configuration
         // Use env to set SHELL explicitly to avoid pkexec SHELL validation issues on NixOS
         const cmd = `pkexec env SHELL=/bin/sh /bin/sh -c "nix-env --switch-generation ${genNumber} --profile ${profilePath} && ${genPath}/bin/switch-to-configuration switch"`;
@@ -249,7 +248,7 @@ function createGenerationsHandlers(deps = {}) {
         throw new Error(`Generation ${genNumber} not found`);
       }
 
-      return new Promise((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const cmd = `pkexec env SHELL=/bin/sh nix-env --switch-generation ${genNumber} --profile ${profilePath}`;
 
         depsExec(cmd, { env: { ...process.env, SHELL: '/bin/sh' } }, (error, stdout, stderr) => {
@@ -263,7 +262,7 @@ function createGenerationsHandlers(deps = {}) {
     },
 
     deleteGeneration: async (genNumber) => {
-      return new Promise((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const cmd = `pkexec env SHELL=/bin/sh nix-env --delete-generations ${genNumber} --profile ${profilePath}`;
 
         depsExec(cmd, { env: { ...process.env, SHELL: '/bin/sh' } }, (error, stdout, stderr) => {
@@ -282,7 +281,7 @@ function createGenerationsHandlers(deps = {}) {
  * Register generation IPC handlers
  * @param {GenerationsDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: GenerationsDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createGenerationsHandlers(deps);
 
@@ -311,10 +310,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  createGenerationsHandlers,
-  parseCurrentGenerationLink,
-  parseGenerationEntries,
-  parseClosureDiff,
-};
+export { register, createGenerationsHandlers, parseCurrentGenerationLink, parseGenerationEntries, parseClosureDiff };
+
+export {};

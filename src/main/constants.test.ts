@@ -1,5 +1,4 @@
-const {
-  NIX_PROFILES_DIR,
+import { NIX_PROFILES_DIR,
   NIX_SYSTEM_PROFILE,
   NIX_CURRENT_SYSTEM,
   NIX_FLAKE_REGISTRY,
@@ -10,8 +9,7 @@ const {
   FLAKE_WARN_DAYS,
   DISK_CRITICAL_PCT,
   DISK_WARN_PCT,
-  MAX_GENERATIONS_WARN,
-} = require('./constants');
+  MAX_GENERATIONS_WARN, } from './constants.ts';
 
 describe('constants', () => {
   it('exports Nix system paths', () => {

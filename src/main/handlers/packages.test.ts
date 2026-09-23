@@ -1,27 +1,27 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 function makeTempFlake(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'packages-unit-'));
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = path.join(dir, relPath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content);
+    fs.writeFileSync(fullPath, content as any);
   }
   return dir;
 }
 
 describe('packages handler', () => {
   it('exports register function', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     expect(mod.register).toBeInstanceOf(Function);
   });
 
   it('registers all expected IPC channels via register(deps)', () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
 
     mod.register({ ipcMain });
 
@@ -37,9 +37,9 @@ describe('packages handler', () => {
   });
 
   it('register(deps) forwards injected deps so factory channels use them', async () => {
-    const { ipcMain } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron');
     ipcMain.__resetHandlers();
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
 
     mod.register({ ipcMain, findFlakeDir: () => null });
 
@@ -49,7 +49,7 @@ describe('packages handler', () => {
   });
 
   it('parses nested scoped option changes from git diff', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({
       'modules/cockpit.nix': `
 { ... }:
@@ -91,7 +91,7 @@ index 1111111..2222222 100644
   });
 
   it('categorizes added and removed option assignments', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({
       'configuration.nix': '{ ... }: { }\n'
     });
@@ -124,7 +124,7 @@ index aaaaaaa..bbbbbbb 100644
   });
 
   it('ignores non-assignment diff lines and escaped newline markers', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({ 'a.nix': '{ }\n' });
     const summary = mod.parseOptionDiffSummary(`
 diff --git a/a.nix b/a.nix
@@ -143,7 +143,7 @@ diff --git a/a.nix b/a.nix
   });
 
   it('sorts changed entries by option path', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({ 'b.nix': '{ }\n' });
     const summary = mod.parseOptionDiffSummary(`
 diff --git a/b.nix b/b.nix
@@ -161,7 +161,7 @@ diff --git a/b.nix b/b.nix
   });
 
   it('infers scoped paths from existing file when diff shows only leaf key', () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({
       'modules/portal.nix': `
 { ... }:
@@ -198,7 +198,7 @@ index 1234567..89abcde 100644
   });
 
   it('supports DI-lite via createPackagesHandlers for pending changes flow', async () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const flakeDir = makeTempFlake({
       'configuration.nix': '{\n  services.demo.enable = false;\n}\n'
     });
@@ -238,7 +238,7 @@ diff --git a/configuration.nix b/configuration.nix
   });
 
   it('returns flake-not-found payload from DI-lite getDuplicates', async () => {
-    const mod = require('./packages');
+    const mod = require('./packages.ts');
     const handlers = mod.createPackagesHandlers({ findFlakeDir: () => null });
     const result = await handlers.getDuplicates();
     expect(result).toEqual({ success: false, error: 'Flake directory not found' });

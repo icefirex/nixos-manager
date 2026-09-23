@@ -1,10 +1,11 @@
 // @ts-check
-const { ipcMain } = require('electron');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { runCmd } = require('../utils');
-const { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } = require('../constants');
+import electron from 'electron';
+const { ipcMain } = electron as any;
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { runCmd } from '../utils.ts';
+import { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } from '../constants.ts';
 
 /**
  * Parse VERSION_ID and PRETTY_NAME from os-release content.
@@ -64,26 +65,25 @@ function resolveSpecialization(currentPath, basePath, specEntries, realpath) {
   for (const entry of specEntries) {
     try {
       if (currentPath === realpath(entry)) return entry;
-    } catch (e) {}
+    } catch (e: any) {}
   }
   return 'unknown';
 }
 
-/**
- * @typedef {Object} SystemDeps
- * @property {typeof import('os')} [os]
- * @property {typeof import('fs')} [fs]
- * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
- * @property {string} [profilePath]
- * @property {string} [currentSystem]
- * @property {import('electron').IpcMain} [ipcMain]
- */
+type SystemDeps = {
+  os?: typeof import('os');
+  fs?: typeof import('fs');
+  runCmd?: (cmd: string, timeout?: number) => Promise<string>;
+  profilePath?: string;
+  currentSystem?: string;
+  ipcMain?: import('electron').IpcMain;
+};
 
 /**
  * Create system info handlers with dependency injection support.
  * @param {SystemDeps} [deps]
  */
-function createSystemHandlers(deps = {}) {
+function createSystemHandlers(deps: SystemDeps = {}) {
   const depsOs = deps.os || os;
   const depsFs = deps.fs || fs;
   const depsRunCmd = deps.runCmd || runCmd;
@@ -102,7 +102,7 @@ function createSystemHandlers(deps = {}) {
         const osRelease = depsFs.readFileSync('/etc/os-release', 'utf8');
         const { version } = parseOsRelease(osRelease);
         if (version) nixosVersion = version;
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get kernel version
       let kernelVersion = depsOs.release().split('-')[0];
@@ -113,14 +113,14 @@ function createSystemHandlers(deps = {}) {
         const link = depsFs.readlinkSync(profilePath);
         const match = link.match(/system-(\d+)-link/);
         if (match) generation = parseInt(match[1]);
-      } catch (e) {}
+      } catch (e: any) {}
 
       // Get last build time
       let lastBuild = 'unknown';
       try {
         const stats = depsFs.lstatSync(profilePath);
         lastBuild = formatLastBuildTime(stats.mtimeMs, Date.now());
-      } catch (e) {}
+      } catch (e: any) {}
 
       return {
         profile: username,
@@ -135,7 +135,7 @@ function createSystemHandlers(deps = {}) {
 
     // Detailed system info for modal
     getDetailedSystemInfo: async () => {
-      const info = {};
+      const info: any = {};
 
       // Basic info
       info.hostname = depsOs.hostname();
@@ -149,7 +149,7 @@ function createSystemHandlers(deps = {}) {
         const { version, name } = parseOsRelease(osRelease);
         info.nixosVersion = version || 'unknown';
         info.osName = name || 'NixOS';
-      } catch (e) {
+      } catch (e: any) {
         info.nixosVersion = 'unknown';
         info.osName = 'NixOS';
       }
@@ -176,7 +176,7 @@ function createSystemHandlers(deps = {}) {
         const link = depsFs.readlinkSync(profilePath);
         const match = link.match(/system-(\d+)-link/);
         info.generation = match ? parseInt(match[1]) : 1;
-      } catch (e) {
+      } catch (e: any) {
         info.generation = 1;
       }
 
@@ -184,7 +184,7 @@ function createSystemHandlers(deps = {}) {
       try {
         const stats = depsFs.lstatSync(profilePath);
         info.buildTime = stats.mtime.toLocaleString();
-      } catch (e) {
+      } catch (e: any) {
         info.buildTime = 'unknown';
       }
 
@@ -218,13 +218,13 @@ function createSystemHandlers(deps = {}) {
       try {
         const currentReal = depsFs.realpathSync(currentSystem);
         const baseReal = depsFs.realpathSync(profilePath);
-        let specEntries = [];
+        let specEntries: any[] = [];
         const specDir = `${profilePath}/specialisation`;
         if (depsFs.existsSync(specDir)) {
           specEntries = depsFs.readdirSync(specDir);
         }
         info.specialization = resolveSpecialization(currentReal, baseReal, specEntries, (p) => depsFs.realpathSync(path.join(specDir, p)));
-      } catch (e) {
+      } catch (e: any) {
         info.specialization = 'unknown';
       }
 
@@ -237,7 +237,7 @@ function createSystemHandlers(deps = {}) {
  * Register system info IPC handlers
  * @param {SystemDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: SystemDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createSystemHandlers(deps);
 
@@ -250,12 +250,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = {
-  register,
-  createSystemHandlers,
-  parseOsRelease,
-  formatUptime,
-  buildMemoryInfo,
-  formatLastBuildTime,
-  resolveSpecialization,
-};
+export { register, createSystemHandlers, parseOsRelease, formatUptime, buildMemoryInfo, formatLastBuildTime, resolveSpecialization };
+
+export {};

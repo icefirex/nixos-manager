@@ -1,6 +1,6 @@
 describe('system handler', () => {
   it('exports register, factory, and pure helpers', () => {
-    const mod = require('./system');
+    const mod = require('./system.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.createSystemHandlers).toBeInstanceOf(Function);
     expect(mod.parseOsRelease).toBeInstanceOf(Function);
@@ -11,7 +11,7 @@ describe('system handler', () => {
   });
 
   describe('parseOsRelease', () => {
-    const { parseOsRelease } = require('./system');
+    const {  parseOsRelease  } = require('./system.ts');
 
     it('extracts version and pretty name', () => {
       const content = 'NAME="NixOS"\nVERSION_ID="25.05"\nPRETTY_NAME="NixOS 25.05 (Warbler)"\n';
@@ -29,7 +29,7 @@ describe('system handler', () => {
   });
 
   describe('formatUptime', () => {
-    const { formatUptime } = require('./system');
+    const {  formatUptime  } = require('./system.ts');
 
     it('formats with and without days', () => {
       expect(formatUptime(90061)).toBe('1d 1h 1m');
@@ -39,7 +39,7 @@ describe('system handler', () => {
   });
 
   describe('buildMemoryInfo', () => {
-    const { buildMemoryInfo } = require('./system');
+    const {  buildMemoryInfo  } = require('./system.ts');
     const GIB = 1073741824;
 
     it('computes used/free/percentage', () => {
@@ -53,7 +53,7 @@ describe('system handler', () => {
   });
 
   describe('formatLastBuildTime', () => {
-    const { formatLastBuildTime } = require('./system');
+    const {  formatLastBuildTime  } = require('./system.ts');
     const HOUR = 3600000;
 
     it('formats relative switch times', () => {
@@ -65,7 +65,7 @@ describe('system handler', () => {
   });
 
   describe('resolveSpecialization', () => {
-    const { resolveSpecialization } = require('./system');
+    const {  resolveSpecialization  } = require('./system.ts');
 
     it('detects base, active specialization, and unknown', () => {
       expect(resolveSpecialization('/same', '/same', [], () => '/x')).toBe('base');
@@ -82,7 +82,7 @@ describe('system handler', () => {
   });
 
   describe('createSystemHandlers', () => {
-    const { createSystemHandlers } = require('./system');
+    const {  createSystemHandlers  } = require('./system.ts');
 
     function makeOs(overrides = {}) {
       return {
@@ -200,9 +200,9 @@ describe('system handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers both IPC channels and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./system');
+      const mod = require('./system.ts');
 
       mod.register({
         ipcMain,

@@ -1,10 +1,11 @@
 // @ts-check
-const { app, ipcMain } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
+import electron from 'electron';
+const { app, ipcMain } = electron as any;
+import path from 'path';
+import fs from 'fs';
+import { DatabaseSync } from 'node:sqlite';
 
-let _db = null;
+let _db: any = null;
 
 /**
  * @param {import('node:sqlite').DatabaseSync} db
@@ -86,27 +87,25 @@ function addOptionHistoryEntry(entry) {
   stmt.run(Date.now(), entry.optionPath, entry.action, entry.oldValue || null, entry.newValue || null, entry.file);
 }
 
-/**
- * @typedef {Object} HistoryDeps
- * @property {import('electron').IpcMain} [ipcMain]
- * @property {() => import('node:sqlite').DatabaseSync} [getDb]
- * @property {(entry: OptionHistoryEntry) => void} [addOptionHistoryEntry]
- * @property {() => number} [now]
- */
+type HistoryDeps = {
+  ipcMain?: import('electron').IpcMain;
+  getDb?: () => import('node:sqlite').DatabaseSync;
+  addOptionHistoryEntry?: (entry: OptionHistoryEntry) => void;
+  now?: () => number;
+};
 
-/**
- * @typedef {Object} OptionHistoryEntry
- * @property {string} optionPath
- * @property {'set'|'added'|'removed'|'reverted'} action
- * @property {string} [oldValue]
- * @property {string} [newValue]
- * @property {string} file
- */
+export type OptionHistoryEntry = {
+  optionPath: string;
+  action: 'set'|'added'|'removed'|'reverted';
+  oldValue?: string;
+  newValue?: string;
+  file: string;
+};
 
 /**
  * @param {HistoryDeps} [deps]
  */
-function createHistoryHandlers(deps = {}) {
+function createHistoryHandlers(deps: HistoryDeps = {}) {
   const depsGetDb = deps.getDb || getDb;
   const depsAddOptionHistoryEntry = deps.addOptionHistoryEntry || addOptionHistoryEntry;
   const depsNow = deps.now || Date.now;
@@ -125,7 +124,7 @@ function createHistoryHandlers(deps = {}) {
           LIMIT 500
         `).all();
         return { success: true, entries: rows };
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to read history:', e);
         return { success: false, error: e.message };
       }
@@ -137,7 +136,7 @@ function createHistoryHandlers(deps = {}) {
         const stmt = db.prepare('INSERT INTO history (timestamp, pkgname, action, file, type, user_name) VALUES (?, ?, ?, ?, ?, ?)');
         stmt.run(depsNow(), entry.pkgname, entry.action, entry.file, entry.type || null, entry.userName || null);
         return { success: true };
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to add history entry:', e);
         return { success: false, error: e.message };
       }
@@ -147,7 +146,7 @@ function createHistoryHandlers(deps = {}) {
       try {
         depsAddOptionHistoryEntry(entry);
         return { success: true };
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to add option history entry:', e);
         return { success: false, error: e.message };
       }
@@ -158,7 +157,7 @@ function createHistoryHandlers(deps = {}) {
 /**
  * @param {HistoryDeps} [deps]
  */
-function register(deps = {}) {
+function register(deps: HistoryDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createHistoryHandlers(deps);
 
@@ -175,4 +174,6 @@ function register(deps = {}) {
   });
 }
 
-module.exports = { register, getDb, addOptionHistoryEntry, ensureOptionHistorySchema, createHistoryHandlers };
+export { register, getDb, addOptionHistoryEntry, ensureOptionHistorySchema, createHistoryHandlers };
+
+export {};

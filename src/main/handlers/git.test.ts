@@ -1,6 +1,6 @@
 describe('git handler', () => {
   it('exports register, factory, and pure parsers', () => {
-    const mod = require('./git');
+    const mod = require('./git.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.createGitHandlers).toBeInstanceOf(Function);
     expect(mod.extractRepoName).toBeInstanceOf(Function);
@@ -11,7 +11,7 @@ describe('git handler', () => {
   });
 
   describe('extractRepoName', () => {
-    const { extractRepoName } = require('./git');
+    const {  extractRepoName  } = require('./git.ts');
 
     it('handles HTTPS and SSH URLs with optional .git suffix', () => {
       expect(extractRepoName('https://github.com/ice/nixos-config.git')).toBe('ice/nixos-config');
@@ -27,7 +27,7 @@ describe('git handler', () => {
   });
 
   describe('parseBranchList', () => {
-    const { parseBranchList } = require('./git');
+    const {  parseBranchList  } = require('./git.ts');
 
     it('dedupes, strips origin/ prefix, skips origin/HEAD, sorts current first', () => {
       const output = [
@@ -54,7 +54,7 @@ describe('git handler', () => {
   });
 
   describe('parsePorcelainStatus', () => {
-    const { parsePorcelainStatus } = require('./git');
+    const {  parsePorcelainStatus  } = require('./git.ts');
 
     it('splits staged, modified, and untracked entries', () => {
       const status = parsePorcelainStatus([
@@ -81,7 +81,7 @@ describe('git handler', () => {
   });
 
   describe('parseRecentCommits', () => {
-    const { parseRecentCommits } = require('./git');
+    const {  parseRecentCommits  } = require('./git.ts');
 
     it('parses pipe-delimited log lines', () => {
       const commits = parseRecentCommits('h1|h1|feat: x|Ice|2 days ago\nh2|h2|fix: y|Nix|3 hours ago');
@@ -97,7 +97,7 @@ describe('git handler', () => {
   });
 
   describe('parseCommitInfo', () => {
-    const { parseCommitInfo } = require('./git');
+    const {  parseCommitInfo  } = require('./git.ts');
 
     it('parses message, author, and file changes', () => {
       const commitInfo = [
@@ -132,7 +132,7 @@ describe('git handler', () => {
 
   describe('createGitHandlers', () => {
     it('assembles git info from injected runCmd output', async () => {
-      const { createGitHandlers } = require('./git');
+      const {  createGitHandlers  } = require('./git.ts');
 
       const runCmd = vi.fn(async (cmd) => {
         if (cmd.includes('config user.name')) return 'ice\n';
@@ -164,7 +164,7 @@ describe('git handler', () => {
     });
 
     it('reports failure when switchBranch command fails', async () => {
-      const { createGitHandlers } = require('./git');
+      const {  createGitHandlers  } = require('./git.ts');
 
       const handlers = createGitHandlers({
         findFlakeDir: () => '/tmp/flake',
@@ -176,7 +176,7 @@ describe('git handler', () => {
     });
 
     it('throws injected not-found message when flake dir is missing', async () => {
-      const { createGitHandlers } = require('./git');
+      const {  createGitHandlers  } = require('./git.ts');
 
       const handlers = createGitHandlers({
         findFlakeDir: () => null,
@@ -189,9 +189,9 @@ describe('git handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers all expected IPC channels and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./git');
+      const mod = require('./git.ts');
 
       mod.register({
         ipcMain,

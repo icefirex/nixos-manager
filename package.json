@@ -11,14 +11,15 @@
   "bugs": {
     "url": "https://github.com/icefirex/nixos-manager/issues"
   },
-  "main": "main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:svelte\" \"npm run dev:electron\"",
     "dev:svelte": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && ELECTRON_ENABLE_LOGGING=true electron .",
-    "build": "vite build && electron-builder",
+    "dev:electron": "npm run build:main && wait-on http://localhost:5173 && ELECTRON_ENABLE_LOGGING=true electron .",
+    "build:main": "tsc -p tsconfig.build.json",
+    "build": "npm run build:main && vite build && electron-builder",
     "build:svelte": "vite build",
-    "start": "electron .",
+    "start": "npm run build:main && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -52,10 +53,8 @@
     },
     "files": [
       "dist/**/*",
-      "main.js",
-      "preload.js",
-      "package.json",
-      "src/main/**/*"
+      "dist-electron/**/*",
+      "package.json"
     ]
   },
   "dependencies": {

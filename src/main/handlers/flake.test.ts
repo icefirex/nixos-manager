@@ -1,17 +1,17 @@
 describe('flake handler', () => {
   it('exports register and getInputUpdateStatus', () => {
-    const mod = require('./flake');
+    const mod = require('./flake.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.getInputUpdateStatus).toBeInstanceOf(Function);
   });
 
   it('getInputUpdateStatus returns an object', () => {
-    const { getInputUpdateStatus } = require('./flake');
+    const {  getInputUpdateStatus  } = require('./flake.ts');
     expect(getInputUpdateStatus()).toEqual({});
   });
 
   it('relativeTime formats recent and old timestamps', () => {
-    const { relativeTime } = require('./flake');
+    const {  relativeTime  } = require('./flake.ts');
     const now = Date.now();
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
 
@@ -23,7 +23,7 @@ describe('flake handler', () => {
   });
 
   describe('parseFlakeInputs', () => {
-    const { parseFlakeInputs } = require('./flake');
+    const {  parseFlakeInputs  } = require('./flake.ts');
 
     function makeLock(lastModifiedNixpkgs: number, lastModifiedHm: number) {
       return {
@@ -72,7 +72,7 @@ describe('flake handler', () => {
   });
 
   describe('parseFlakeLockInfo', () => {
-    const { parseFlakeLockInfo } = require('./flake');
+    const {  parseFlakeLockInfo  } = require('./flake.ts');
 
     it('extracts input counts and nixpkgs pin details', () => {
       const nowSec = Math.floor(Date.now() / 1000);

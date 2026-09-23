@@ -1,11 +1,9 @@
-const {
-  extractPackages,
+import { extractPackages,
   extractBareNames,
   parseSystemPackages,
   parseHomePackages,
   parseUserPackages,
-  parseOptions,
-} = require('./parse');
+  parseOptions, } from './parse.ts';
 
 describe('extractPackages', () => {
   it('extracts pkgs.xxx patterns', () => {
@@ -269,7 +267,7 @@ describe('parseOptions', () => {
   });
 
   it('returns null file when not provided', () => {
-    const options = parseOptions('services.foo.enable = true;');
+    const options = parseOptions('services.foo.enable = true;', null);
     expect(options[0].file).toBeNull();
   });
 });

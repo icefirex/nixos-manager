@@ -2,7 +2,7 @@ describe('notifications handler', () => {
   const nowSec = Math.floor(Date.now() / 1000);
 
   it('exports register, factory, and pure builders', () => {
-    const mod = require('./notifications');
+    const mod = require('./notifications.ts');
     expect(mod.register).toBeInstanceOf(Function);
     expect(mod.createNotificationsHandlers).toBeInstanceOf(Function);
     expect(mod.buildGitSyncNotifications).toBeInstanceOf(Function);
@@ -13,7 +13,7 @@ describe('notifications handler', () => {
   });
 
   describe('buildGitSyncNotifications', () => {
-    const { buildGitSyncNotifications } = require('./notifications');
+    const {  buildGitSyncNotifications  } = require('./notifications.ts');
 
     it('emits behind, ahead, and dirty notifications as needed', () => {
       const all = buildGitSyncNotifications('2', '3', 'a\nb\n');
@@ -30,7 +30,7 @@ describe('notifications handler', () => {
   });
 
   describe('collectStaleInputs', () => {
-    const { collectStaleInputs } = require('./notifications');
+    const {  collectStaleInputs  } = require('./notifications.ts');
 
     it('collects only inputs older than the stale threshold, newest first', () => {
       const lock = {
@@ -55,7 +55,7 @@ describe('notifications handler', () => {
   });
 
   describe('buildStaleInputsNotification', () => {
-    const { buildStaleInputsNotification } = require('./notifications');
+    const {  buildStaleInputsNotification  } = require('./notifications.ts');
 
     it('returns null when nothing is stale', () => {
       expect(buildStaleInputsNotification([])).toBe(null);
@@ -77,7 +77,7 @@ describe('notifications handler', () => {
   });
 
   describe('buildDiskNotification', () => {
-    const { buildDiskNotification } = require('./notifications');
+    const {  buildDiskNotification  } = require('./notifications.ts');
 
     it('classifies critical, warning, and healthy usage', () => {
       expect(buildDiskNotification(95).id).toBe('disk-critical');
@@ -88,7 +88,7 @@ describe('notifications handler', () => {
   });
 
   describe('buildFlakeUpdatesNotification', () => {
-    const { buildFlakeUpdatesNotification } = require('./notifications');
+    const {  buildFlakeUpdatesNotification  } = require('./notifications.ts');
 
     it('returns null when no updates', () => {
       expect(buildFlakeUpdatesNotification({})).toBe(null);
@@ -113,7 +113,7 @@ describe('notifications handler', () => {
 
   describe('createNotificationsHandlers', () => {
     it('assembles notifications from injected dependencies', async () => {
-      const { createNotificationsHandlers } = require('./notifications');
+      const {  createNotificationsHandlers  } = require('./notifications.ts');
 
       const runCmd = vi.fn(async (cmd) => {
         if (cmd.includes('fetch --quiet')) return '';
@@ -166,7 +166,7 @@ describe('notifications handler', () => {
     });
 
     it('returns only the last-build entry when there is no flake dir and system is healthy', async () => {
-      const { createNotificationsHandlers } = require('./notifications');
+      const {  createNotificationsHandlers  } = require('./notifications.ts');
 
       const handlers = createNotificationsHandlers({
         findFlakeDir: () => null,
@@ -184,9 +184,9 @@ describe('notifications handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers the get-notifications channel and forwards deps', async () => {
-      const { ipcMain } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron');
       ipcMain.__resetHandlers();
-      const mod = require('./notifications');
+      const mod = require('./notifications.ts');
 
       mod.register({
         ipcMain,
