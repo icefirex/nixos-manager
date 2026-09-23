@@ -1,10 +1,27 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const { spawn, execSync } = require('child_process');
 const { findFlakeDir, updateBuildStatus, getSpawnEnv, flakeDirNotFoundMsg } = require('../utils');
 const { getMainWindow } = require('../window');
 
 /**
+ * @typedef {Object} RebuildDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {() => string | null} [findFlakeDir]
+ * @property {(success: boolean, message: string) => void} [updateBuildStatus]
+ * @property {() => NodeJS.ProcessEnv} [getSpawnEnv]
+ * @property {() => import('electron').BrowserWindow | null} [getMainWindow]
+ * @property {() => string} [flakeDirNotFoundMsg]
+ * @property {typeof import('child_process').spawn} [spawn]
+ * @property {(spawnEnv: NodeJS.ProcessEnv) => string[]} [resolveRebuildCommand]
+ * @property {(spawnEnv: NodeJS.ProcessEnv) => string[]} [resolveEvalCommand]
+ */
+
+/**
  * Check if a command exists on PATH within the given environment.
+ * @param {string} cmd
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {boolean}
  */
 function commandExists(cmd, env) {
   try {
@@ -24,6 +41,8 @@ function commandExists(cmd, env) {
  *   3. nixos-manager-rebuild          — generic fallback bundled with this app
  *
  * Returns an array [cmd, ...baseArgs] ready to spread into spawn().
+ * @param {NodeJS.ProcessEnv} spawnEnv
+ * @returns {string[]}
  */
 function resolveRebuildCommand(spawnEnv) {
   if (process.env.NIXOS_REBUILD_COMMAND) {
@@ -42,6 +61,8 @@ function resolveRebuildCommand(spawnEnv) {
  *   1. NIXOS_EVAL_COMMAND env var  — fully custom, user-supplied command
  *   2. nix-eval-flake               — enhanced evaluator (if present on PATH)
  *   3. nixos-manager-eval           — generic fallback bundled with this app
+ * @param {NodeJS.ProcessEnv} spawnEnv
+ * @returns {string[]}
  */
 function resolveEvalCommand(spawnEnv) {
   if (process.env.NIXOS_EVAL_COMMAND) {
@@ -55,6 +76,7 @@ function resolveEvalCommand(spawnEnv) {
 
 /**
  * Create rebuild handlers with dependency injection support.
+ * @param {RebuildDeps} [deps]
  */
 function createRebuildHandlers(deps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
@@ -66,6 +88,7 @@ function createRebuildHandlers(deps = {}) {
   const depsResolveRebuildCommand = deps.resolveRebuildCommand || resolveRebuildCommand;
   const depsResolveEvalCommand = deps.resolveEvalCommand || resolveEvalCommand;
 
+  /** @type {import('child_process').ChildProcess | null} */
   let runningRebuildProcess = null;
 
   return {
@@ -189,6 +212,7 @@ function createRebuildHandlers(deps = {}) {
 
 /**
  * Register NixOS rebuild IPC handlers
+ * @param {RebuildDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;

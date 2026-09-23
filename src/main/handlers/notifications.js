@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +13,22 @@ const {
 } = require('../constants');
 
 /**
+ * @typedef {Object} NotificationsDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {() => string | null} [findFlakeDir]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {typeof import('fs')} [fs]
+ * @property {() => Record<string, boolean>} [getInputUpdateStatus]
+ * @property {() => import('../utils').BuildStatus | null} [getLastBuildStatus]
+ */
+
+/**
  * Build git sync notifications from ahead/behind counts and porcelain status.
  * Pure.
+ * @param {string} behindCount
+ * @param {string} aheadCount
+ * @param {string | null} status
+ * @returns {Array<{id: string, type: string, title: string, message: string, action: string | null}>}
  */
 function buildGitSyncNotifications(behindCount, aheadCount, status) {
   const notifications = [];
@@ -54,6 +69,8 @@ function buildGitSyncNotifications(behindCount, aheadCount, status) {
 /**
  * Collect stale flake inputs (older than FLAKE_STALE_DAYS) from a parsed lock.
  * Pure. Returns [{ name, days }] sorted by age descending.
+ * @param {any} lockContent
+ * @returns {Array<{name: string, days: number}>}
  */
 function collectStaleInputs(lockContent) {
   const nodes = lockContent?.nodes || {};
@@ -78,6 +95,8 @@ function collectStaleInputs(lockContent) {
 /**
  * Build the stale-inputs notification from collected inputs.
  * Pure. Returns null when nothing is stale.
+ * @param {Array<{name: string, days: number}> | null} staleInputs
+ * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
 function buildStaleInputsNotification(staleInputs) {
   if (!staleInputs || staleInputs.length === 0) return null;
@@ -103,6 +122,8 @@ function buildStaleInputsNotification(staleInputs) {
 /**
  * Build a disk space notification from a usage percentage.
  * Pure. Returns null below the warning threshold.
+ * @param {number} percentage
+ * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
 function buildDiskNotification(percentage) {
   if (percentage > DISK_CRITICAL_PCT) {
@@ -129,6 +150,8 @@ function buildDiskNotification(percentage) {
 /**
  * Build the flake-updates-available notification from cached update status.
  * Pure. Returns null when nothing is updatable.
+ * @param {Record<string, boolean> | undefined} updateStatus
+ * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
 function buildFlakeUpdatesNotification(updateStatus) {
   const updatable = Object.entries(updateStatus || {})
@@ -157,6 +180,7 @@ function buildFlakeUpdatesNotification(updateStatus) {
 
 /**
  * Create notifications handlers with dependency injection support.
+ * @param {NotificationsDeps} [deps]
  */
 function createNotificationsHandlers(deps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
@@ -255,6 +279,7 @@ function createNotificationsHandlers(deps = {}) {
 
 /**
  * Register notifications IPC handlers
+ * @param {NotificationsDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;

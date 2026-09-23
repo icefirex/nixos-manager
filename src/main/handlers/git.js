@@ -1,10 +1,21 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const { findFlakeDir, runCmd, flakeDirNotFoundMsg } = require('../utils');
 const path = require('path');
 const { CMD_TIMEOUT_FAST, CMD_TIMEOUT_NETWORK } = require('../constants');
 
 /**
+ * @typedef {Object} GitDeps
+ * @property {() => string | null} [findFlakeDir]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {() => string} [flakeDirNotFoundMsg]
+ * @property {import('electron').IpcMain} [ipcMain]
+ */
+
+/**
  * Extract "owner/repo" from a git remote URL (HTTPS or SSH).
+ * @param {string | null} remoteUrl
+ * @returns {string | null}
  */
 function extractRepoName(remoteUrl) {
   if (!remoteUrl) return null;
@@ -15,6 +26,9 @@ function extractRepoName(remoteUrl) {
 /**
  * Parse `git branch -a --format=...` output into branch entries,
  * deduped and sorted (current first, local before remote, then by name).
+ * @param {string | null} output
+ * @param {string | null} currentBranch
+ * @returns {Array<{name: string, isRemote: boolean, isCurrent: boolean, upstream: string | null, track: string | null}>}
  */
 function parseBranchList(output, currentBranch) {
   if (!output) return [];
@@ -49,6 +63,8 @@ function parseBranchList(output, currentBranch) {
 
 /**
  * Parse `git status --porcelain` output into staged/modified/untracked lists.
+ * @param {string | null} output
+ * @returns {{staged: Array<{file: string, status: string}>, modified: Array<{file: string, status: string}>, untracked: string[]}}
  */
 function parsePorcelainStatus(output) {
   const status = { staged: [], modified: [], untracked: [] };
@@ -73,6 +89,8 @@ function parsePorcelainStatus(output) {
 
 /**
  * Parse `git log --format='%H|%h|%s|%an|%ar'` output into commit entries.
+ * @param {string | null} logOutput
+ * @returns {Array<{hash: string, shortHash: string, subject: string, author: string, timeAgo: string}>}
  */
 function parseRecentCommits(logOutput) {
   if (!logOutput) return [];
@@ -87,6 +105,8 @@ function parseRecentCommits(logOutput) {
 /**
  * Parse `git show --format='%H%n%s%n%b%n---AUTHOR---...'` output
  * into commit details (message, author, file changes).
+ * @param {string | null} commitInfo
+ * @returns {{fullMessage: string | null, author: string | null, authorEmail: string | null, date: string | null, files: Array<{status: string, file: string}>}}
  */
 function parseCommitInfo(commitInfo) {
   const details = { fullMessage: null, author: null, authorEmail: null, date: null, files: [] };
@@ -119,6 +139,7 @@ function parseCommitInfo(commitInfo) {
 
 /**
  * Create git handlers with dependency injection support.
+ * @param {GitDeps} [deps]
  */
 function createGitHandlers(deps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
@@ -265,6 +286,7 @@ function createGitHandlers(deps = {}) {
 
 /**
  * Register git IPC handlers
+ * @param {GitDeps} [deps]
  */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
