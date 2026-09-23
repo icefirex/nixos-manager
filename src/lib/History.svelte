@@ -748,14 +748,6 @@
     color: var(--red);
   }
 
-  .detail-value.old-value {
-    color: var(--yellow);
-  }
-
-  .detail-value.new-value {
-    color: var(--green);
-  }
-
   .value-bubble {
     display: flex;
     align-items: center;

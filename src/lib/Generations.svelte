@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import { onKeyActivate } from "./a11y.ts";
 
   let generations = $state<any[]>([]);
   let groupedGenerations = $state<any[]>([]);
@@ -639,8 +640,8 @@
 </div>
 
 {#if showConfirmDialog}
-  <div class="modal-overlay" onclick={cancelAction}>
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" role="presentation" onclick={cancelAction} onkeydown={(e) => { if (e.key === 'Escape') cancelAction(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <h3>{getActionTitle()}</h3>
       <p class="modal-description">{getActionDescription()}</p>
 
@@ -676,7 +677,7 @@
 {/if}
 
 {#if actionSuccess}
-  <div class="toast success" onclick={dismissSuccess}>
+  <div class="toast success" role="button" tabindex="0" onclick={dismissSuccess} onkeydown={(e) => onKeyActivate(e, dismissSuccess)}>
     <span class="toast-icon">OK</span>
     <span class="toast-message">{actionSuccess}</span>
   </div>
@@ -882,7 +883,7 @@
                   {@const newVer = versions[1] || ''}
                   {@const isUpgrade = compareVersions(newVer, oldVer) > 0}
                   {@const isDowngrade = compareVersions(newVer, oldVer) < 0}
-                  <div class="diff-item changed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item changed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="version-change">
@@ -904,7 +905,7 @@
                   {@const addParts = pkg.change.split(',')}
                   {@const addVer = addParts[0].trim().replace('∅ → ', '')}
                   {@const addSize = addParts[1]?.trim() || ''}
-                  <div class="diff-item added clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item added clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="ver new">{addVer}</span>
@@ -914,7 +915,7 @@
                     </div>
                   </div>
                 {:else}
-                  <div class="diff-item removed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item removed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="ver old">{pkg.change.replace('→ ∅', '').trim()}</span>
@@ -1802,13 +1803,6 @@
     text-overflow: ellipsis;
   }
 
-  .diff-change {
-    color: var(--overlay0);
-    font-family: monospace;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
   .version-change {
     display: flex;
     align-items: center;
@@ -1873,14 +1867,6 @@
   .dir-badge.down {
     color: var(--yellow);
     background: rgba(var(--yellow-rgb), 0.15);
-  }
-
-  .diff-empty, .diff-empty-state {
-    color: var(--overlay0);
-    font-size: 12px;
-    font-style: italic;
-    text-align: center;
-    padding: 16px;
   }
 
   .diff-pagination {

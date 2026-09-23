@@ -369,18 +369,4 @@
     min-width: 0;
   }
 
-  .placeholder-page {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--overlay0);
-  }
-
-  .placeholder-page h2 {
-    font-size: 24px;
-    text-transform: capitalize;
-    margin-bottom: 8px;
-  }
 </style>

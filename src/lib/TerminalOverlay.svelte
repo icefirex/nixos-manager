@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onKeyActivate } from "./a11y.ts";
   import Terminal from "./Terminal.svelte";
 
   let showTerminal = $state(false);
@@ -178,7 +179,11 @@
     <!-- Drag handle -->
     <div
       class="terminal-drag-handle"
+      role="button"
+      tabindex="0"
+      aria-label="Toggle terminal size"
       onmousedown={handleDragStart}
+      onkeydown={(e) => onKeyActivate(e, () => { terminalExpanded = !terminalExpanded; })}
       class:dragging={isDragging}
     >
       <div class="drag-indicator"></div>
@@ -220,8 +225,8 @@
 
 <!-- Kill confirmation dialog -->
 {#if showKillConfirm}
-  <div class="confirm-overlay" onclick={cancelKill}>
-    <div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="confirm-overlay" role="presentation" onclick={cancelKill} onkeydown={(e) => { if (e.key === "Escape") cancelKill(); }}>
+    <div class="confirm-dialog" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="confirm-header">
         <span class="confirm-icon">⚠️</span>
         <h3>Application Running</h3>

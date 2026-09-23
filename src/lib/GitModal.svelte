@@ -131,8 +131,8 @@
 </script>
 
 {#if show}
-  <div class="modal-backdrop" onclick={onClose}>
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-backdrop" role="presentation" onclick={onClose} onkeydown={(e) => { if (e.key === "Escape") onClose(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <div class="header-left">
           <span class="modal-icon"><Icon name="GitBranch" size={24} /></span>

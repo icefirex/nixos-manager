@@ -506,28 +506,6 @@
     margin: 0;
   }
 
-  .drift-actions {
-    flex-shrink: 0;
-  }
-
-  .rebuild-btn {
-    padding: 8px 16px;
-    background: rgba(var(--yellow-rgb), 0.1);
-    border: 1px solid rgba(var(--yellow-rgb), 0.3);
-    border-radius: 8px;
-    color: var(--yellow);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-
-  .rebuild-btn:hover {
-    background: rgba(var(--yellow-rgb), 0.2);
-    border-color: rgba(var(--yellow-rgb), 0.5);
-  }
-
   .timestamps {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -704,12 +682,6 @@
     color: var(--mauve);
     border-color: rgba(var(--mauve-rgb), 0.35);
     background: rgba(var(--mauve-rgb), 0.1);
-  }
-
-  .option-file {
-    font-size: 11px;
-    color: var(--overlay0);
-    font-family: "JetBrains Mono", "Fira Code", monospace;
   }
 
   .option-expand {

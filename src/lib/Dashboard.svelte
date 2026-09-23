@@ -3,6 +3,7 @@
   import ProgressCard from "./ProgressCard.svelte";
   import SidePanel from "./SidePanel.svelte";
   import Icon from "./Icon.svelte";
+  import { onKeyActivate } from "./a11y.ts";
 
   let { systemInfo = {} }: { systemInfo?: any } = $props();
 
@@ -176,7 +177,7 @@
 
 <div class="dashboard">
   {#if pendingChanges?.hasDrift}
-    <div class="drift-banner" onclick={() => window.dispatchEvent(new CustomEvent('navigate-to-changes'))}>
+    <div class="drift-banner" role="button" tabindex="0" onclick={() => window.dispatchEvent(new CustomEvent('navigate-to-changes'))} onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('navigate-to-changes')))}>
       <Icon name="AlertTriangle" size={16} />
       <div class="drift-banner-content">
         <strong>Unapplied config changes detected</strong>
@@ -226,6 +227,7 @@
       <label class="toggle-item">
         <span class="toggle-label">Update flake inputs</span>
         <button
+          aria-label="Update flake inputs"
           class="toggle-switch"
           class:active={updateInputs}
           disabled={isBuilding}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
+  import { onKeyActivate } from "./a11y.ts";
 
   let specializations = $state<any[]>([]);
   let flakeInputs = $state<any[]>([]);
@@ -173,12 +174,15 @@
     </div>
     <div class="input-list">
       {#each flakeInputs as input}
-        <button
+        <div
           class="input-item"
           class:selected={selectedInput === input.name}
           class:updating={isUpdatingInput && selectedInput === input.name}
-          onclick={() => selectInput(input.name)}
-          disabled={isUpdatingInput}
+          role="button"
+          tabindex={isUpdatingInput ? -1 : 0}
+          aria-disabled={isUpdatingInput}
+          onclick={() => { if (!isUpdatingInput) selectInput(input.name); }}
+          onkeydown={(e) => { if (!isUpdatingInput) onKeyActivate(e, () => selectInput(input.name)); }}
         >
           <span class="input-left">
             <span class="input-name">{input.name}</span>
@@ -199,7 +203,7 @@
           {#if isUpdatingInput && selectedInput === input.name}
             <span class="input-spinner"></span>
           {/if}
-        </button>
+        </div>
       {/each}
     </div>
     <button class="update-btn" onclick={updateAllInputs} disabled={isUpdatingInput}>
@@ -214,8 +218,8 @@
 </div>
 
 {#if showConfirmDialog}
-  <div class="modal-overlay" onclick={cancelSwitch}>
-    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" role="presentation" onclick={cancelSwitch} onkeydown={(e) => { if (e.key === 'Escape') cancelSwitch(); }}>
+    <div class="modal-content" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="modal-header">Switch Specialization</div>
       <div class="modal-body">
         <p>Switch from <strong>{getCurrentSpecName()}</strong> to <strong>{pendingSwitch}</strong>?</p>
@@ -359,6 +363,8 @@
   }
 
   .input-item {
+    cursor: pointer;
+    user-select: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -373,7 +379,7 @@
     color: inherit;
   }
 
-  .input-item:hover:not(:disabled) {
+  .input-item:hover:not(.updating) {
     background: rgba(var(--surface0-rgb), 0.5);
   }
 
@@ -386,7 +392,7 @@
     opacity: 0.7;
   }
 
-  .input-item:disabled {
+  .input-item[aria-disabled="true"] {
     cursor: not-allowed;
     opacity: 0.6;
   }

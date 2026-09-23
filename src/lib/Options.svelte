@@ -544,7 +544,7 @@
             {#if sourceMode === 'config' && isBooleanOption()}
               {@const currentBool = parseBoolValue(optionInfo.currentValue)}
               <div class="bool-editor">
-                <button class="value-toggle" class:active={currentBool === true} onclick={toggleBooleanOption} disabled={savingOption}>
+                <button class="value-toggle" class:active={currentBool === true} onclick={toggleBooleanOption} disabled={savingOption} aria-label="Toggle boolean value">
                   <span class="toggle-knob"></span>
                 </button>
                 <span class="bool-label">{currentBool === true ? 'true' : 'false'}</span>

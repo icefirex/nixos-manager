@@ -655,85 +655,6 @@
 {/snippet}
 
 <style>
-  .pending-changes {
-    margin: 0 24px 8px;
-    border: 1px solid rgba(var(--yellow-rgb), 0.25);
-    border-radius: 8px;
-    background: rgba(var(--yellow-rgb), 0.05);
-    overflow: hidden;
-  }
-
-  .pending-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 14px;
-    background: none;
-    border: none;
-    color: var(--yellow);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .pending-toggle span {
-    flex: 1;
-  }
-
-  .pending-details {
-    padding: 0 14px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .pending-info {
-    font-size: 12px;
-    color: var(--text);
-    line-height: 1.6;
-    opacity: 0.85;
-  }
-
-  .pending-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .pending-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .pending-label.add { color: var(--green); }
-  .pending-label.remove { color: var(--red); }
-
-  .pending-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .pending-pkg {
-    font-family: monospace;
-    font-size: 11px;
-    padding: 2px 8px;
-    background: rgba(var(--white-rgb), 0.04);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--text);
-  }
-
-  .pending-more {
-    font-size: 11px;
-    color: var(--overlay0);
-    align-self: center;
-  }
-
   .packages-page {
     flex: 1;
     display: flex;
@@ -1072,25 +993,6 @@
     overflow: hidden;
   }
 
-  .loading-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 4px;
-    width: 40%;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--blue) 30%,
-      var(--lavender) 50%,
-      var(--blue) 70%,
-      transparent 100%
-    );
-    box-shadow: 0 0 10px rgba(var(--blue-rgb), 0.8), 0 0 20px rgba(var(--blue-rgb), 0.4);
-    animation: loading-slide 0.8s ease-in-out infinite;
-    border-radius: 2px;
-  }
-
   @keyframes loading-slide {
     0% {
       left: -40%;
@@ -1127,23 +1029,9 @@
     color: var(--blue);
   }
 
-  .package-item.loading {
-    background: rgba(var(--blue-rgb), 0.1);
-    border-color: rgba(var(--blue-rgb), 0.2);
-  }
-
   .package-item:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-
-  .item-spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(var(--blue-rgb), 0.2);
-    border-top-color: var(--blue);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
   }
 
   .package-item-wrapper.external {
@@ -1218,24 +1106,6 @@
       opacity: 1;
       transform: translateY(0);
     }
-  }
-
-  .detail-loading {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    color: var(--overlay0);
-    font-size: 13px;
-  }
-
-  .mini-spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(var(--blue-rgb), 0.2);
-    border-top-color: var(--blue);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
   }
 
   .detail-content {
@@ -1426,21 +1296,6 @@
     font-family: monospace;
   }
 
-  .config-locations {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .config-location {
-    font-family: "JetBrains Mono", "Fira Code", monospace;
-    font-size: 12px;
-    color: var(--yellow);
-    background: rgba(var(--yellow-rgb), 0.1);
-    padding: 4px 8px;
-    border-radius: 4px;
-  }
-
   .detail-actions {
     display: flex;
     gap: 8px;
@@ -1622,16 +1477,6 @@
   .remove-loc-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-  }
-
-  .spinner-sm {
-    width: 12px;
-    height: 12px;
-    border: 2px solid rgba(var(--red-rgb), 0.3);
-    border-top-color: var(--red);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: inline-block;
   }
 
   @keyframes spin {

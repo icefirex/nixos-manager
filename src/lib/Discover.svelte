@@ -710,8 +710,8 @@
 
 <!-- Modal -->
 {#if selectedPackage}
-  <div class="modal-overlay" onclick={closeModal} role="dialog" aria-modal="true">
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" onclick={closeModal} role="dialog" aria-modal="true" tabindex="-1" onkeydown={(e) => { if (e.key === "Escape") closeModal(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <button class="modal-close" onclick={closeModal}>×</button>
 
       <div class="modal-header">
@@ -902,8 +902,8 @@
 
 <!-- Kill confirmation dialog -->
 {#if showKillConfirm}
-  <div class="confirm-overlay" onclick={cancelKill}>
-    <div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="confirm-overlay" role="presentation" onclick={cancelKill} onkeydown={(e) => { if (e.key === 'Escape') cancelKill(); }}>
+    <div class="confirm-dialog" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="confirm-header">
         <span class="confirm-icon"><Icon name="AlertTriangle" size={24} /></span>
         <h3>Application Running</h3>
@@ -936,8 +936,8 @@
 </div>
 
 {#if diffOverlay}
-  <div class="diff-overlay" onclick={closeDiffOverlay}>
-    <div class="diff-overlay-content" onclick={(e) => e.stopPropagation()}>
+  <div class="diff-overlay" role="presentation" onclick={closeDiffOverlay} onkeydown={(e) => { if (e.key === 'Escape') closeDiffOverlay(); }}>
+    <div class="diff-overlay-content" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <button class="diff-overlay-close" onclick={closeDiffOverlay}>✕</button>
       <pre>{diffOverlay}</pre>
     </div>
@@ -1301,6 +1301,7 @@
     color: var(--overlay0);
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;
@@ -1649,19 +1650,6 @@
     cursor: not-allowed;
   }
 
-  .install-result {
-    font-size: 12px;
-    margin: 8px 0 0 0;
-    padding: 6px 10px;
-    border-radius: 6px;
-  }
-
-  .install-result.success {
-    color: var(--green);
-    background: rgba(var(--green-rgb), 0.1);
-    border: 1px solid rgba(var(--green-rgb), 0.2);
-  }
-
   .toast-container {
     position: fixed;
     bottom: 20px;
@@ -1906,12 +1894,6 @@
   }
 
 
-
-  .install-result:not(.success) {
-    color: var(--red);
-    background: rgba(var(--red-rgb), 0.1);
-    border: 1px solid rgba(var(--red-rgb), 0.2);
-  }
 
   .modal-actions {
     display: flex;
@@ -2198,45 +2180,6 @@
     font-style: italic;
   }
 
-  .search-nixpkgs-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    background: rgba(var(--blue-rgb), 0.15);
-    border: 1px solid rgba(var(--blue-rgb), 0.3);
-    border-radius: 10px;
-    color: var(--blue);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .search-nixpkgs-btn:hover:not(:disabled) {
-    background: rgba(var(--blue-rgb), 0.25);
-    border-color: rgba(var(--blue-rgb), 0.5);
-  }
-
-  .search-nixpkgs-btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
-  }
-
-  .search-nixpkgs-btn.secondary {
-    padding: 8px 16px;
-    font-size: 13px;
-    background: rgba(var(--surface0-rgb), 0.5);
-    border-color: rgba(var(--surface1-rgb), 0.5);
-    color: var(--subtext0);
-  }
-
-  .search-nixpkgs-btn.secondary:hover:not(:disabled) {
-    background: rgba(var(--blue-rgb), 0.15);
-    border-color: rgba(var(--blue-rgb), 0.3);
-    color: var(--blue);
-  }
-
   .spinner-sm {
     width: 16px;
     height: 16px;
@@ -2244,22 +2187,6 @@
     border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-  }
-
-  .search-more {
-    display: flex;
-    justify-content: center;
-    padding: 16px 0;
-  }
-
-  .nixpkgs-header {
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(var(--surface1-rgb), 0.3);
-  }
-
-  .nixpkgs-header h2 {
-    color: var(--lavender);
   }
 
   /* Kill Confirmation Dialog */
