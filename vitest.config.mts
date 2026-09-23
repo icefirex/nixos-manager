@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [svelte({ preprocess: vitePreprocess() })],
   test: {
     include: ['src/main/**/*.test.{js,ts}', 'src/lib/**/*.test.ts', 'tests/**/*.test.{js,ts}'],
     globals: true,
