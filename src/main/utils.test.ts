@@ -106,3 +106,5 @@ describe('runCmd', () => {
     expect(result).toBe('');
   });
 });
+
+export {};

@@ -1,7 +1,52 @@
+// @ts-check
 const fs = require('fs');
 const path = require('path');
 const { findFlakeDir } = require('./utils');
 
+/**
+ * @typedef {Object} NixPackageFile
+ * @property {string} file
+ * @property {string} relativePath
+ * @property {string[]} system
+ * @property {string[]} homeManager
+ * @property {Record<string, string[]>} users
+ */
+
+/**
+ * @typedef {Object} PackageLocation
+ * @property {string} file
+ * @property {string} relativePath
+ */
+
+/**
+ * @typedef {Object} PackageFindResult
+ * @property {string} file
+ * @property {string} relativePath
+ * @property {string[]} sections
+ * @property {number[]} lines
+ */
+
+/**
+ * @typedef {Object} DuplicateFileEntry
+ * @property {string} file
+ * @property {string} relativePath
+ * @property {string} [user]
+ */
+
+/**
+ * @typedef {Object} DuplicateResult
+ * @property {string} pkgname
+ * @property {string} scope
+ * @property {DuplicateFileEntry[]} files
+ * @property {string[]} [users]
+ * @property {boolean} crossUser
+ */
+
+/**
+ * Extract package names from a packages list block.
+ * @param {string} content
+ * @returns {string[]}
+ */
 function extractFromList(content) {
   const found = new Set();
   const pkgsPattern = /(?:pkgs|pkgs-stable|pkgs-unstable|pkgs-[a-z0-9]+)\.([a-zA-Z0-9_-]+)/g;
@@ -22,6 +67,12 @@ function extractFromList(content) {
   return [...found];
 }
 
+/**
+ * Replace string literal contents with NUL bytes so downstream parsing
+ * ignores text inside quotes.
+ * @param {string} content
+ * @returns {string}
+ */
 function stripStrings(content) {
   let result = '';
   let i = 0;
@@ -70,6 +121,12 @@ function stripStrings(content) {
   return result;
 }
 
+/**
+ * Extract the balanced list block following a section pattern match.
+ * @param {string} content
+ * @param {RegExp} pattern
+ * @returns {string | null}
+ */
 function extractListBlock(content, pattern) {
   const match = content.match(pattern);
   if (!match) return null;
@@ -87,6 +144,12 @@ function extractListBlock(content, pattern) {
   return null;
 }
 
+/**
+ * Extract the balanced list block starting at a given index.
+ * @param {string} content
+ * @param {number} startIndex
+ * @returns {string | null}
+ */
 function extractListBlockAt(content, startIndex) {
   const stripped = stripStrings(content);
   const openBracket = stripped.indexOf('[', startIndex);
@@ -104,7 +167,8 @@ function extractListBlockAt(content, startIndex) {
 
 /**
  * Scan all .nix files under a directory and extract package definitions.
- * Returns: [{ file, relativePath, system: string[], homeManager: string[], users: { [name]: string[] } }]
+ * @param {string} flakeDir
+ * @returns {NixPackageFile[]}
  */
 function scanNixPackages(flakeDir) {
   const results = [];
@@ -158,7 +222,7 @@ function scanNixPackages(flakeDir) {
 
 /**
  * Get all packages as flat lists per scope.
- * Returns: { system: string[], user: string[], homeManager: string[] }
+ * @returns {{ system: string[], user: string[], homeManager: string[] }}
  */
 function getAllPackages() {
   const flakeDir = findFlakeDir();
@@ -186,7 +250,8 @@ function getAllPackages() {
 
 /**
  * Find which files contain a specific package.
- * Returns: [{ file, relativePath, sections: string[], lines: number[] }]
+ * @param {string} pkgname
+ * @returns {PackageFindResult[]}
  */
 function findPackage(pkgname) {
   const flakeDir = findFlakeDir();
@@ -211,6 +276,12 @@ function findPackage(pkgname) {
   return results;
 }
 
+/**
+ * Find the 1-based line numbers where a package appears inside package sections.
+ * @param {string} filePath
+ * @param {string} pkgname
+ * @returns {number[]}
+ */
 function findPackageLines(filePath, pkgname) {
   const lines = [];
   const pkgRef = `pkgs.${pkgname}`;
@@ -309,7 +380,7 @@ function findPackageLines(filePath, pkgname) {
 /**
  * Find packages defined in more than one file within the same scope,
  * or the same package in multiple different user scopes.
- * Returns: [{ pkgname, scope, files: [{file, relativePath}], crossUser: boolean }]
+ * @returns {DuplicateResult[]}
  */
 function findDuplicates() {
   const flakeDir = findFlakeDir();

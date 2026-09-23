@@ -273,3 +273,5 @@ describe('parseOptions', () => {
     expect(options[0].file).toBeNull();
   });
 });
+
+export {};

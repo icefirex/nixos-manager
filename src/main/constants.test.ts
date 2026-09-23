@@ -37,3 +37,5 @@ describe('constants', () => {
     expect(MAX_GENERATIONS_WARN).toBe(20);
   });
 });
+
+export {};
