@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +15,16 @@ const OPTION_ABSOLUTE_ROOTS = new Set([
   'services', 'programs', 'hardware', 'networking', 'boot', 'system',
   'virtualisation', 'security', 'users', 'fonts', 'environment', 'nixpkgs', 'nix', 'home', 'xdg'
 ]);
+
+/**
+ * @typedef {Object} OptionsDeps
+ * @property {import('electron').IpcMain} [ipcMain]
+ * @property {() => string | null} [findFlakeDir]
+ * @property {(cmd: string, timeout?: number) => Promise<string>} [runCmd]
+ * @property {() => string} [flakeDirNotFoundMsg]
+ * @property {(entry: import('./history').OptionHistoryEntry) => void} [addOptionHistoryEntry]
+ * @property {(query: string, channel?: string, limit?: number) => Promise<Array<{path: string, description: string | null, type: string | null, default: string | null, example: string | null, declared: string | null}>>} [searchOptionCatalog]
+ */
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -56,6 +67,20 @@ function resolveScopePath(paths) {
   return full;
 }
 
+/**
+ * @typedef {Object} ScopedAssignment
+ * @property {number} lineIndex
+ * @property {string} lhs
+ * @property {string} fullPath
+ * @property {string} indent
+ * @property {string} value
+ * @property {string} comment
+ */
+
+/**
+ * @param {string} content
+ * @returns {ScopedAssignment[]}
+ */
 function buildScopedAssignments(content) {
   const lines = content.split('\n');
   const stack = [];
@@ -103,6 +128,11 @@ function buildScopedAssignments(content) {
   return entries;
 }
 
+/**
+ * @param {string} filePath
+ * @param {string} optionPath
+ * @param {string | null} [preferredFile]
+ */
 function chooseOptionFile(flakeDir, preferredFile = null) {
   const files = findNixFiles(flakeDir);
   if (files.length === 0) return null;
@@ -114,6 +144,11 @@ function chooseOptionFile(flakeDir, preferredFile = null) {
   return cfg || files[0];
 }
 
+/**
+ * @param {string} flakeDir
+ * @param {string | null | undefined} filePath
+ * @returns {string | null}
+ */
 function resolveTargetFilePath(flakeDir, filePath) {
   if (!filePath) return null;
   const candidates = [];
@@ -153,6 +188,14 @@ async function resolveGitContext(targetFile, flakeDir) {
   return null;
 }
 
+/**
+ * Update an option assignment in a nix file (or create it when allowed).
+ * @param {string} filePath
+ * @param {string} optionPath
+ * @param {string} newValueRaw
+ * @param {boolean} [allowCreate]
+ * @returns {{action: 'set'|'added', oldValue: string|null, newValue: string}}
+ */
 function updateOptionInFile(filePath, optionPath, newValueRaw, allowCreate = true) {
   const escapedPath = escapeRegExp(optionPath);
   const assignRegex = new RegExp(`^(\\s*)${escapedPath}\\s*=\\s*(.*?)\\s*;\\s*(#.*)?$`);
@@ -299,6 +342,12 @@ function updateOptionInFile(filePath, optionPath, newValueRaw, allowCreate = tru
   return { action: 'added', oldValue: null, newValue };
 }
 
+/**
+ * Extract the current value of an option from file content.
+ * @param {string} content
+ * @param {string} optionPath
+ * @returns {string | null}
+ */
 function extractOptionValueFromContent(content, optionPath) {
   const lines = content.split('\n');
   const escapedPath = escapeRegExp(optionPath);
@@ -438,7 +487,8 @@ function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
 }
 
 /**
- * Register options management IPC handlers
+ * Create options management handlers with dependency injection support.
+ * @param {OptionsDeps} [deps]
  */
 function createOptionsHandlers(deps = {}) {
   const depsFindFlakeDir = deps.findFlakeDir || findFlakeDir;
@@ -908,6 +958,10 @@ function createOptionsHandlers(deps = {}) {
   };
 }
 
+/**
+ * Register options management IPC handlers
+ * @param {OptionsDeps} [deps]
+ */
 function register(deps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createOptionsHandlers(deps);

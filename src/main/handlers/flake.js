@@ -1,3 +1,4 @@
+// @ts-check
 const { ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -6,10 +7,14 @@ const { findFlakeDir, getSpawnEnv, execAsync, runCmd, flakeDirNotFoundMsg } = re
 const { getMainWindow } = require('../window');
 const { FLAKE_WARN_DAYS, CMD_TIMEOUT_FAST, NIX_SYSTEM_PROFILE } = require('../constants');
 
-// Per-input update availability cache  { inputName: boolean }
+/** @type {Record<string, boolean>} */
 let inputUpdateStatus = {};
 
-/** Human-readable relative time from epoch ms */
+/**
+ * Human-readable relative time from epoch ms
+ * @param {number} ms
+ * @returns {string}
+ */
 function relativeTime(ms) {
   const diff = Date.now() - ms;
   const h = Math.floor(diff / 3600000);
@@ -29,6 +34,9 @@ function getInputUpdateStatus() {
 /**
  * Build the flake input list from a parsed flake.lock.
  * Pure: no fs/network access.
+ * @param {any} lockContent
+ * @param {Record<string, boolean>} [updateStatus]
+ * @returns {Array<{name: string, status: string, age: string, hasUpdate: boolean}>}
  */
 function parseFlakeInputs(lockContent, updateStatus = {}) {
   const inputs = [];
@@ -69,6 +77,8 @@ function parseFlakeInputs(lockContent, updateStatus = {}) {
 /**
  * Extract lock metadata for the flake info modal from a parsed flake.lock.
  * Pure: no fs/network access.
+ * @param {any} lock
+ * @returns {Record<string, any>}
  */
 function parseFlakeLockInfo(lock) {
   const info = {};
