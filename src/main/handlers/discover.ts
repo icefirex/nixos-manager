@@ -46,7 +46,7 @@ const TTY_ERROR_PATTERNS = [
 /**
  * Check if a command is available on PATH without using a shell.
  */
-function isCommandAvailable(cmd) {
+function isCommandAvailable(cmd: any) {
   try {
     execFileSync('which', [cmd], { stdio: 'ignore', env: getSpawnEnv() });
     return true;
@@ -59,7 +59,7 @@ function isCommandAvailable(cmd) {
  * Run `nix eval --raw nixpkgs#<attrPath>` safely (no shell injection).
  * Returns the stdout trimmed, or '' on any error.
  */
-function nixEvalRaw(attrPath) {
+function nixEvalRaw(attrPath: any) {
   return new Promise<any>((resolve) => {
     let stdout = '';
     const proc = spawn('nix', ['eval', '--raw', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
@@ -75,7 +75,7 @@ function nixEvalRaw(attrPath) {
  * Run `nix eval --json nixpkgs#<attrPath>` safely (no shell injection).
  * Returns parsed JSON or null on any error.
  */
-function nixEvalJson(attrPath) {
+function nixEvalJson(attrPath: any) {
   return new Promise<any>((resolve) => {
     let stdout = '';
     const proc = spawn('nix', ['eval', '--json', `${NIX_FLAKE_REGISTRY}#${attrPath}`], {
@@ -92,7 +92,7 @@ function nixEvalJson(attrPath) {
 /**
  * Check if stderr output indicates a TTY/terminal error
  */
-function isTTYError(stderr) {
+function isTTYError(stderr: any) {
   return TTY_ERROR_PATTERNS.some(pattern => pattern.test(stderr));
 }
 
@@ -102,12 +102,12 @@ function isTTYError(stderr) {
  */
 function detectTerminal() {
   const terminals = [
-    { cmd: 'foot', buildArgs: (args) => args },
-    { cmd: 'kitty', buildArgs: (args) => ['--', ...args] },
-    { cmd: 'alacritty', buildArgs: (args) => ['-e', ...args] },
-    { cmd: 'gnome-terminal', buildArgs: (args) => ['--wait', '--', ...args] },
-    { cmd: 'konsole', buildArgs: (args) => ['-e', ...args] },
-    { cmd: 'xterm', buildArgs: (args) => ['-e', ...args] },
+    { cmd: 'foot', buildArgs: (args: any) => args },
+    { cmd: 'kitty', buildArgs: (args: any) => ['--', ...args] },
+    { cmd: 'alacritty', buildArgs: (args: any) => ['-e', ...args] },
+    { cmd: 'gnome-terminal', buildArgs: (args: any) => ['--wait', '--', ...args] },
+    { cmd: 'konsole', buildArgs: (args: any) => ['-e', ...args] },
+    { cmd: 'xterm', buildArgs: (args: any) => ['-e', ...args] },
   ];
 
   // Check $TERMINAL env var first — only accept simple command names (no metacharacters)
@@ -131,7 +131,7 @@ function detectTerminal() {
 /**
  * Launch a package in an external terminal emulator
  */
-function launchInTerminal(terminal, pkgname, mainProgram, mainWindow) {
+function launchInTerminal(terminal: any, pkgname: any, mainProgram: any, mainWindow: any) {
   const shellCmd = `NIXPKGS_ALLOW_UNFREE=1 nix-shell -p ${pkgname} --run ${mainProgram}`;
   const termArgs = terminal.buildArgs(['bash', '-c', shellCmd]);
 
@@ -173,7 +173,7 @@ function launchInTerminal(terminal, pkgname, mainProgram, mainWindow) {
 /**
  * Download a file from URL to local path
  */
-function downloadFile(url, destPath) {
+function downloadFile(url: any, destPath: any) {
   return new Promise<any>((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
     https.get(url, (response) => {
@@ -287,7 +287,7 @@ async function ensureAppStreamData() {
 /**
  * Parse AppStream XML into components
  */
-function parseAppStreamXML(xmlContent) {
+function parseAppStreamXML(xmlContent: any) {
   const components: any[] = [];
 
   // Simple regex-based XML parsing (good enough for this structure)
@@ -318,7 +318,7 @@ function parseAppStreamXML(xmlContent) {
   return components;
 }
 
-function extractTag(xml, tagName) {
+function extractTag(xml: any, tagName: any) {
   // First try to find tag without xml:lang (English default)
   const defaultRegex = new RegExp(`<${tagName}(?![^>]*xml:lang)[^>]*>([^<]*)</${tagName}>`);
   const defaultMatch = xml.match(defaultRegex);
@@ -332,7 +332,7 @@ function extractTag(xml, tagName) {
   return match ? decodeXmlEntities(match[1].trim()) : null;
 }
 
-function extractDescription(xml) {
+function extractDescription(xml: any) {
   // Try to find description without xml:lang (English default)
   let match = xml.match(/<description(?![^>]*xml:lang)[^>]*>([\s\S]*?)<\/description>/);
   if (!match) {
@@ -349,7 +349,7 @@ function extractDescription(xml) {
   return pMatch ? decodeXmlEntities(pMatch[1].trim()) : null;
 }
 
-function extractCategories(xml) {
+function extractCategories(xml: any) {
   const categories: any[] = [];
   const catRegex = /<category>([^<]*)<\/category>/g;
   let match;
@@ -359,7 +359,7 @@ function extractCategories(xml) {
   return categories;
 }
 
-function extractIcon(xml) {
+function extractIcon(xml: any) {
   // Look for cached icon (preferred)
   const cachedMatch = xml.match(/<icon[^>]*type="cached"[^>]*>([^<]*)<\/icon>/);
   if (cachedMatch) {
@@ -375,13 +375,13 @@ function extractIcon(xml) {
   return null;
 }
 
-function extractUrl(xml, type) {
+function extractUrl(xml: any, type: any) {
   const regex = new RegExp(`<url[^>]*type="${type}"[^>]*>([^<]*)</url>`);
   const match = xml.match(regex);
   return match ? match[1].trim() : null;
 }
 
-function extractScreenshots(xml) {
+function extractScreenshots(xml: any) {
   const screenshots: any[] = [];
   const imgRegex = /<image[^>]*>([^<]*)<\/image>/g;
   let match;
@@ -391,7 +391,7 @@ function extractScreenshots(xml) {
   return screenshots.slice(0, 5); // Limit to 5
 }
 
-function decodeXmlEntities(str) {
+function decodeXmlEntities(str: any) {
   return str
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -459,7 +459,7 @@ function resetComponentsCache() {
 /**
  * Build a pkgname -> component lookup index. Pure.
  */
-function buildPkgnameIndex(components) {
+function buildPkgnameIndex(components: any) {
   const index = new Map();
   for (const comp of components) {
     index.set(comp.pkgname, comp);
@@ -470,7 +470,7 @@ function buildPkgnameIndex(components) {
 /**
  * Build the sorted category list from components. Pure.
  */
-function buildCategoriesList(components) {
+function buildCategoriesList(components: any) {
   const catSet = new Set();
   for (const comp of components) {
     for (const cat of comp.categories) {
@@ -483,11 +483,11 @@ function buildCategoriesList(components) {
 /**
  * Filter, sort, and slice components for a search query. Pure.
  */
-function searchComponents(components, query, options: any = {}) {
+function searchComponents(components: any, query: any, options: any = {}) {
   const { category, limit = 50 } = options;
   const q = (query || '').toLowerCase();
 
-  const results = components.filter(comp => {
+  const results = components.filter((comp: any) => {
     // Category filter
     if (category && !comp.categories.includes(category)) {
       return false;
@@ -503,7 +503,7 @@ function searchComponents(components, query, options: any = {}) {
   });
 
   // Sort by relevance (exact name match first, then alphabetical)
-  results.sort((a, b) => {
+  results.sort((a: any, b: any) => {
     if (q) {
       const aExact = a.name.toLowerCase() === q || a.pkgname === q;
       const bExact = b.name.toLowerCase() === q || b.pkgname === q;
@@ -519,7 +519,7 @@ function searchComponents(components, query, options: any = {}) {
 /**
  * Parse `nix search --json` stdout into result entries. Pure.
  */
-function parseNixpkgsSearchResults(stdout) {
+function parseNixpkgsSearchResults(stdout: any) {
   if (!stdout || stdout.trim() === '{}' || stdout.trim() === '') return [];
   try {
     const packages: any = JSON.parse(stdout);
@@ -549,7 +549,7 @@ function parseNixpkgsSearchResults(stdout) {
 /**
  * Resolve the config section for a package type. Pure.
  */
-function resolvePackageSection(packageType, userName) {
+function resolvePackageSection(packageType: any, userName: any) {
   switch (packageType) {
     case 'system':
       return { ok: true, sectionPrefix: 'environment.systemPackages' };
@@ -569,7 +569,7 @@ function resolvePackageSection(packageType, userName) {
 /**
  * Remove a package reference from nix config file content. Pure.
  */
-function removePackageFromContent(content, pkgname) {
+function removePackageFromContent(content: any, pkgname: any) {
   const pkgRef = `pkgs.${pkgname}`;
   const escapedRef = pkgRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const escapedName = pkgname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -593,7 +593,7 @@ function removePackageFromContent(content, pkgname) {
 /**
  * Add a package reference to nix config file content under a section. Pure.
  */
-function addPackageToContent(content, pkgname, sectionPrefix) {
+function addPackageToContent(content: any, pkgname: any, sectionPrefix: any) {
   const pkgRef = `pkgs.${pkgname}`;
 
   // Find the opening bracket of the section and insert before the closing ]
@@ -645,9 +645,9 @@ function addPackageToContent(content, pkgname, sectionPrefix) {
 /**
  * Scan a flake directory for .nix config files and their package sections.
  */
-function scanNixConfigFiles(flakeDir, depsFs = fs) {
+function scanNixConfigFiles(flakeDir: any, depsFs = fs) {
   const nixFiles: any[] = [];
-  function scanDir(dir) {
+  function scanDir(dir: any) {
     let entries;
     try {
       entries = depsFs.readdirSync(dir, { withFileTypes: true });
@@ -756,16 +756,16 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       return depsGetCategories() || [];
     },
 
-    search: async (query, options: any = {}) => {
+    search: async (query: any, options: any = {}) => {
       await depsLoadComponents();
       return searchComponents(depsGetComponentsCache() || [], query, options);
     },
 
-    byCategory: async (category, limit = 50) => {
+    byCategory: async (category: any, limit = 50) => {
       await depsLoadComponents();
       return (depsGetComponentsCache() || [])
-        .filter(comp => comp.categories.includes(category))
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .filter((comp: any) => comp.categories.includes(category))
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
         .slice(0, limit);
     },
 
@@ -804,7 +804,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       return results;
     },
 
-    getIcon: async (iconName) => {
+    getIcon: async (iconName: any) => {
       const iconsDir = path.join(depsCacheDir, 'icons');
       const iconPath = path.join(iconsDir, iconName);
 
@@ -823,7 +823,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       return null;
     },
 
-    getDetails: async (pkgname) => {
+    getDetails: async (pkgname: any) => {
       await depsLoadComponents();
 
       const component = depsGetComponentsByPkgname()?.get(pkgname);
@@ -849,12 +849,12 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
           homepage: nixMeta.homepage || null,
           description: nixMeta.description || null,
           platforms: nixMeta.platforms?.slice(0, 5) || [],
-          maintainers: nixMeta.maintainers?.map(m => m.name || m).slice(0, 3) || []
+          maintainers: nixMeta.maintainers?.map((m: any) => m.name || m).slice(0, 3) || []
         }
       };
     },
 
-    searchNixpkgs: async (query) => {
+    searchNixpkgs: async (query: any) => {
       if (!query || typeof query !== 'string' || !query.trim()) return [];
 
       return new Promise<any>((resolve) => {
@@ -903,7 +903,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       return { success: true, files: scanNixConfigFiles(flakeDir, depsFs) };
     },
 
-    checkNixpkgsPackage: async (pkgname) => {
+    checkNixpkgsPackage: async (pkgname: any) => {
       try {
         const result = await depsNixEvalRaw(`${pkgname}.meta.description`);
         return { exists: !!result };
@@ -912,7 +912,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       }
     },
 
-    findPackageHandler: async (pkgname) => {
+    findPackageHandler: async (pkgname: any) => {
       const flakeDir = depsFindFlakeDir();
       if (!flakeDir) {
         return { success: false, error: depsFlakeDirNotFoundMsg() };
@@ -942,7 +942,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       return { success: true, packages: allPackages };
     },
 
-    removePackage: async (options) => {
+    removePackage: async (options: any) => {
       const { pkgname, filePath } = options;
 
       if (!filePath || !depsFs.existsSync(filePath)) {
@@ -983,7 +983,7 @@ function createDiscoverHandlers(deps: DiscoverDeps = {}) {
       };
     },
 
-    addPackage: async (options) => {
+    addPackage: async (options: any) => {
       const { pkgname, filePath, packageType, userName } = options;
 
       if (!filePath || !depsFs.existsSync(filePath)) {
@@ -1058,32 +1058,32 @@ function register(deps: DiscoverDeps = {}) {
   });
 
   // Search packages
-  depsIpcMain.handle('discover-search', async (event, query, options = {}) => {
+  depsIpcMain.handle('discover-search', async (event: any, query: any, options = {}) => {
     return handlers.search(query, options);
   });
 
   // Get packages by category
-  depsIpcMain.handle('discover-by-category', async (event, category, limit = 50) => {
+  depsIpcMain.handle('discover-by-category', async (event: any, category: any, limit = 50) => {
     return handlers.byCategory(category, limit);
   });
 
   // Get featured/random packages
-  depsIpcMain.handle('discover-featured', async (event, limit = 12) => {
+  depsIpcMain.handle('discover-featured', async (event: any, limit = 12) => {
     return handlers.featured(limit);
   });
 
   // Get icon path for a package
-  depsIpcMain.handle('discover-get-icon', async (event, iconName) => {
+  depsIpcMain.handle('discover-get-icon', async (event: any, iconName: any) => {
     return handlers.getIcon(iconName);
   });
 
   // Get detailed info for a package (combines AppStream + nix eval)
-  depsIpcMain.handle('discover-get-details', async (event, pkgname) => {
+  depsIpcMain.handle('discover-get-details', async (event: any, pkgname: any) => {
     return handlers.getDetails(pkgname);
   });
 
   // Search full nixpkgs (not just AppStream packages)
-  depsIpcMain.handle('discover-search-nixpkgs', async (event, query) => {
+  depsIpcMain.handle('discover-search-nixpkgs', async (event: any, query: any) => {
     return handlers.searchNixpkgs(query);
   });
 
@@ -1124,7 +1124,7 @@ function register(deps: DiscoverDeps = {}) {
   });
 
   // Try/run a package in nix-shell
-  depsIpcMain.handle('discover-try-package', async (event, pkgname) => {
+  depsIpcMain.handle('discover-try-package', async (event: any, pkgname: any) => {
     const mainWindow = depsGetMainWindow();
 
     // Get the main program name (binary) — use spawn-based helper (no shell injection)
@@ -1222,12 +1222,12 @@ function register(deps: DiscoverDeps = {}) {
   });
 
   // Check if a package name exists in nixpkgs (home-manager validation)
-  depsIpcMain.handle('discover-check-nixpkgs-package', async (event, pkgname) => {
+  depsIpcMain.handle('discover-check-nixpkgs-package', async (event: any, pkgname: any) => {
     return handlers.checkNixpkgsPackage(pkgname);
   });
 
   // Find which config files contain a specific package
-  depsIpcMain.handle('discover-find-package', async (event, pkgname) => {
+  depsIpcMain.handle('discover-find-package', async (event: any, pkgname: any) => {
     return handlers.findPackageHandler(pkgname);
   });
 
@@ -1237,12 +1237,12 @@ function register(deps: DiscoverDeps = {}) {
   });
 
   // Remove a package from a nix config file
-  depsIpcMain.handle('discover-remove-package', async (event, options) => {
+  depsIpcMain.handle('discover-remove-package', async (event: any, options: any) => {
     return handlers.removePackage(options);
   });
 
   // Add a package to a nix config file
-  depsIpcMain.handle('discover-add-package', async (event, options) => {
+  depsIpcMain.handle('discover-add-package', async (event: any, options: any) => {
     return handlers.addPackage(options);
   });
 }

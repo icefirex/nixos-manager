@@ -11,7 +11,7 @@ import { NIX_SYSTEM_PROFILE, NIX_CURRENT_SYSTEM } from '../constants.ts';
  * Parse VERSION_ID and PRETTY_NAME from os-release content.
  * Pure.
  */
-function parseOsRelease(content) {
+function parseOsRelease(content: any) {
   const versionMatch = (content || '').match(/VERSION_ID="?([^"\n]+)"?/);
   const nameMatch = (content || '').match(/PRETTY_NAME="?([^"\n]+)"?/);
   return {
@@ -24,7 +24,7 @@ function parseOsRelease(content) {
  * Format an uptime in seconds as 'Xd Xh Xm' or 'Xh Xm'.
  * Pure.
  */
-function formatUptime(uptimeSeconds) {
+function formatUptime(uptimeSeconds: any) {
   const days = Math.floor(uptimeSeconds / 86400);
   const hours = Math.floor((uptimeSeconds % 86400) / 3600);
   const minutes = Math.floor((uptimeSeconds % 3600) / 60);
@@ -35,7 +35,7 @@ function formatUptime(uptimeSeconds) {
  * Build memory info from total/free bytes.
  * Pure.
  */
-function buildMemoryInfo(totalMem, freeMem) {
+function buildMemoryInfo(totalMem: any, freeMem: any) {
   const usedMem = totalMem - freeMem;
   return {
     total: (totalMem / 1073741824).toFixed(1) + ' GB',
@@ -49,7 +49,7 @@ function buildMemoryInfo(totalMem, freeMem) {
  * Format the time since the last system switch.
  * Pure.
  */
-function formatLastBuildTime(mtimeMs, nowMs) {
+function formatLastBuildTime(mtimeMs: any, nowMs: any) {
   const hours = Math.floor((nowMs - mtimeMs) / 3600000);
   if (hours < 1) return 'just now';
   if (hours < 24) return `${hours}h ago`;
@@ -60,7 +60,7 @@ function formatLastBuildTime(mtimeMs, nowMs) {
  * Resolve the active specialization name.
  * Pure (realpath is injected). Returns 'base', the entry name, or 'unknown'.
  */
-function resolveSpecialization(currentPath, basePath, specEntries, realpath) {
+function resolveSpecialization(currentPath: any, basePath: any, specEntries: any, realpath: any) {
   if (currentPath === basePath) return 'base';
   for (const entry of specEntries) {
     try {
@@ -223,7 +223,7 @@ function createSystemHandlers(deps: SystemDeps = {}) {
         if (depsFs.existsSync(specDir)) {
           specEntries = depsFs.readdirSync(specDir);
         }
-        info.specialization = resolveSpecialization(currentReal, baseReal, specEntries, (p) => depsFs.realpathSync(path.join(specDir, p)));
+        info.specialization = resolveSpecialization(currentReal, baseReal, specEntries, (p: any) => depsFs.realpathSync(path.join(specDir, p)));
       } catch (e: any) {
         info.specialization = 'unknown';
       }

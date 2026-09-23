@@ -5,14 +5,14 @@
   let terminalExpanded = $state(true);
   let terminalHeight = $state(320);
   let isDragging = $state(false);
-  let terminalComponent = $state(null);
+  let terminalComponent = $state<any>(null);
   let terminalTitle = $state('Terminal');
   let isRunning = $state(false);
   let hasError = $state(false);
   let isTryProcess = $state(false);
   let showKillConfirm = $state(false);
-  let pendingAction = $state(null); // 'close' or 'new-try'
-  let pendingTryCallback = $state(null); // stored callback for 'new-try' action
+  let pendingAction = $state<any>(null); // 'close' or 'new-try'
+  let pendingTryCallback = $state<any>(null); // stored callback for 'new-try' action
 
   // Clamp terminal height when window resizes
   $effect(() => {
@@ -158,7 +158,7 @@
   }
 
   // Export method to request killing before new try
-  export function requestKillForNewTry(callback) {
+  export function requestKillForNewTry(callback: any) {
     if (isTryProcess && isRunning) {
       pendingAction = 'new-try';
       showKillConfirm = true;

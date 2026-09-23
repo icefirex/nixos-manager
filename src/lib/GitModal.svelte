@@ -4,14 +4,14 @@
 
   let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
 
-  let gitInfo = $state(null);
+  let gitInfo = $state<any>(null);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let activeTab = $state('status');
-  let selectedCommit = $state(null);
-  let commitDetails = $state(null);
+  let selectedCommit = $state<any>(null);
+  let commitDetails = $state<any>(null);
   let loadingCommit = $state(false);
-  let actionMessage = $state(null);
+  let actionMessage = $state<any>(null);
   let actionLoading = $state(false);
 
   const tabs = [
@@ -32,14 +32,14 @@
     actionMessage = null;
     try {
       gitInfo = await window.electronAPI.getGitInfo();
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
     } finally {
       loading = false;
     }
   }
 
-  async function selectCommit(commit) {
+  async function selectCommit(commit: any) {
     if (selectedCommit?.hash === commit.hash) {
       selectedCommit = null;
       commitDetails = null;
@@ -49,14 +49,14 @@
     loadingCommit = true;
     try {
       commitDetails = await window.electronAPI.getCommitDetails(commit.hash);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load commit:', e);
     } finally {
       loadingCommit = false;
     }
   }
 
-  async function switchBranch(branchName) {
+  async function switchBranch(branchName: any) {
     actionLoading = true;
     actionMessage = null;
     try {
@@ -65,7 +65,7 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
@@ -81,7 +81,7 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
@@ -97,14 +97,14 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
     }
   }
 
-  function getStatusIcon(status) {
+  function getStatusIcon(status: any) {
     switch (status) {
       case 'M': return '~';
       case 'A': return '+';
@@ -114,7 +114,7 @@
     }
   }
 
-  function getStatusColor(status) {
+  function getStatusColor(status: any) {
     switch (status) {
       case 'M': return '#f9e2af';
       case 'A': return '#a6e3a1';
@@ -282,7 +282,7 @@
             {:else if activeTab === 'branches'}
               <div class="branches-section">
                 <div class="branch-list">
-                  {#each gitInfo.branches.filter(b => !b.isRemote) as branch}
+                  {#each gitInfo.branches.filter((b: any) => !b.isRemote) as branch}
                     <div class="branch-item" class:current={branch.isCurrent}>
                       <div class="branch-info">
                         <span class="branch-name">
@@ -308,10 +308,10 @@
                   {/each}
                 </div>
 
-                {#if gitInfo.branches.filter(b => b.isRemote).length > 0}
+                {#if gitInfo.branches.filter((b: any) => b.isRemote).length > 0}
                   <h4 class="remote-header">Remote Branches</h4>
                   <div class="branch-list remote">
-                    {#each gitInfo.branches.filter(b => b.isRemote) as branch}
+                    {#each gitInfo.branches.filter((b: any) => b.isRemote) as branch}
                       <div class="branch-item remote">
                         <span class="branch-name">{branch.name}</span>
                         <button

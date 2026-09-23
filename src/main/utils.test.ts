@@ -62,7 +62,7 @@ describe('getSpawnEnv', () => {
 });
 
 describe('findFlakeDir', () => {
-  let originalFlakeDir;
+  let originalFlakeDir: any;
 
   beforeEach(() => {
     originalFlakeDir = process.env.FLAKE_DIR;

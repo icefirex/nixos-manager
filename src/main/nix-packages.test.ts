@@ -11,7 +11,7 @@ import { stripStrings,
   findDuplicates,
   getAllPackages, } from './nix-packages.ts';
 
-function makeTempDir(files) {
+function makeTempDir(files: any) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nix-test-'));
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = path.join(dir, relPath);
@@ -21,7 +21,7 @@ function makeTempDir(files) {
   return dir;
 }
 
-function cleanup(dir) {
+function cleanup(dir: any) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
@@ -207,7 +207,7 @@ describe('extractListBlockAt', () => {
 });
 
 describe('scanNixPackages', () => {
-  let dir;
+  let dir: any;
 
   afterEach(() => {
     if (dir) cleanup(dir);
@@ -385,7 +385,7 @@ describe('scanNixPackages', () => {
 });
 
 describe('findPackageLines', () => {
-  let dir;
+  let dir: any;
 
   afterEach(() => {
     if (dir) cleanup(dir);
@@ -467,7 +467,7 @@ home.packages = [
 });
 
 describe('integration: scan + extract with complex config', () => {
-  let dir;
+  let dir: any;
 
   afterEach(() => {
     if (dir) cleanup(dir);
@@ -547,8 +547,8 @@ describe('integration: scan + extract with complex config', () => {
 });
 
 describe('getAllPackages', () => {
-  let dir;
-  let originalFlakeDir;
+  let dir: any;
+  let originalFlakeDir: any;
 
   beforeEach(() => {
     originalFlakeDir = process.env.FLAKE_DIR;
@@ -609,8 +609,8 @@ describe('getAllPackages', () => {
 });
 
 describe('findPackage', () => {
-  let dir;
-  let originalFlakeDir;
+  let dir: any;
+  let originalFlakeDir: any;
 
   beforeEach(() => {
     originalFlakeDir = process.env.FLAKE_DIR;
@@ -686,8 +686,8 @@ describe('findPackage', () => {
 });
 
 describe('findDuplicates', () => {
-  let dir;
-  let originalFlakeDir;
+  let dir: any;
+  let originalFlakeDir: any;
 
   beforeEach(() => {
     originalFlakeDir = process.env.FLAKE_DIR;

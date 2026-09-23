@@ -1,11 +1,11 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let data = $state(null);
+  let data = $state<any>(null);
   let loading = $state(true);
   let refreshTrigger = $state(0);
-  let expandedOption = $state(null);
-  let revertingOptionKey = $state(null);
+  let expandedOption = $state<any>(null);
+  let revertingOptionKey = $state<any>(null);
 
   function formatTime(ts: number): string {
     if (!ts) return '';
@@ -44,7 +44,7 @@
     return `${change.optionPath}:${change.file}:${idx}`;
   }
 
-  async function revertOptionChange(change, idx) {
+  async function revertOptionChange(change: any, idx: any) {
     if (!change || change.oldValue == null || change.action !== 'set') return;
     const key = optionChangeKey(change, idx);
     revertingOptionKey = key;
@@ -69,7 +69,7 @@
       window.dispatchEvent(new CustomEvent('pending-changes'));
       window.dispatchEvent(new CustomEvent('packages-changed'));
       await loadChanges();
-    } catch (e) {
+    } catch (e: any) {
       alert(e.message || 'Failed to revert option');
     } finally {
       revertingOptionKey = null;
@@ -91,7 +91,7 @@
   function getChangedLinePairs(oldValue: string, newValue: string, max = 12) {
     const oldLines = String(oldValue || '').split('\n');
     const newLines = String(newValue || '').split('\n');
-    const pairs = [];
+    const pairs: any[] = [];
     const total = Math.max(oldLines.length, newLines.length);
     for (let i = 0; i < total; i++) {
       const from = oldLines[i] ?? '';
@@ -108,7 +108,7 @@
     loading = true;
     try {
       data = await window.electronAPI.getPendingChanges();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load changes:', e);
     } finally {
       loading = false;

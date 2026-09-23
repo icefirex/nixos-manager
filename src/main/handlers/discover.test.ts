@@ -60,7 +60,7 @@ describe('discover handler', () => {
 `);
 
     expect(parsed.length).toBeGreaterThanOrEqual(1);
-    const gimp = parsed.find(p => p.pkgname === 'gimp');
+    const gimp = parsed.find((p: any) => p.pkgname === 'gimp');
     expect(gimp).toBeTruthy();
     expect(gimp.name).toBe('GIMP');
     expect(gimp.summary).toBe('Image editor');
@@ -228,10 +228,10 @@ describe('discover handler', () => {
       const files = scanNixConfigFiles(dir);
 
       expect(files).toHaveLength(2);
-      const cfg = files.find(f => f.relativePath === 'configuration.nix');
+      const cfg = files.find((f: any) => f.relativePath === 'configuration.nix');
       expect(cfg.sections).toEqual(['system', 'user']);
       expect(cfg.users).toEqual(['ice']);
-      const home = files.find(f => f.relativePath === path.join('modules', 'home.nix'));
+      const home = files.find((f: any) => f.relativePath === path.join('modules', 'home.nix'));
       expect(home.sections).toEqual(['homeManager']);
 
       fs.rmSync(dir, { recursive: true, force: true });

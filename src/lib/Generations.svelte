@@ -1,14 +1,14 @@
 <script lang="ts">
   import { tick } from "svelte";
 
-  let generations = $state([]);
-  let groupedGenerations = $state([]);
+  let generations = $state<any[]>([]);
+  let groupedGenerations = $state<any[]>([]);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
 
   // Search index state - using array for reliable Svelte 5 reactivity
   // Each entry: { genNumber, added, removed, changed, fromGen }
-  let searchIndexArray = $state([]);
+  let searchIndexArray = $state<any[]>([]);
   let indexingProgress = $state({ current: 0, total: 0, complete: false });
   let masterSearch = $state("");
   let isIndexing = $state(false);
@@ -18,9 +18,9 @@
   // the loadGenerations $effect to subscribe to it via `++indexingToken`, creating
   // an infinite re-run loop (effect_update_depth_exceeded).
   let indexingToken = 0;
-  let selectedGeneration = $state(null);
-  let generationInfo = $state(null);
-  let generationDiff = $state(null);
+  let selectedGeneration = $state<any>(null);
+  let generationInfo = $state<any>(null);
+  let generationDiff = $state<any>(null);
   let loadingInfo = $state(false);
 
   // Diff tab state
@@ -47,9 +47,9 @@
     // Find all generations that have matching packages
     for (const entry of searchIndexArray) {
       const allPackages = [
-        ...entry.added.map(p => p.name),
-        ...entry.removed.map(p => p.name),
-        ...entry.changed.map(p => p.name)
+        ...entry.added.map((p: any) => p.name),
+        ...entry.removed.map((p: any) => p.name),
+        ...entry.changed.map((p: any) => p.name)
       ];
       if (allPackages.some(name => name.toLowerCase().includes(query))) {
         matchingGenNumbers.add(entry.genNumber);
@@ -57,10 +57,10 @@
     }
 
     // Filter groups to only include matching generations
-    const filtered = [];
+    const filtered: any[] = [];
     for (const group of groupedGenerations) {
       const primaryMatches = matchingGenNumbers.has(group.primary.number);
-      const matchingIdentical = group.identical.filter(g => matchingGenNumbers.has(g.number));
+      const matchingIdentical = group.identical.filter((g: any) => matchingGenNumbers.has(g.number));
 
       if (primaryMatches || matchingIdentical.length > 0) {
         if (group.isGroup) {
@@ -95,11 +95,11 @@
 
   // Action state
   let showConfirmDialog = $state(false);
-  let confirmAction = $state(null);
-  let pendingGeneration = $state(null);
+  let confirmAction = $state<any>(null);
+  let pendingGeneration = $state<any>(null);
   let isActioning = $state(false);
-  let actionError = $state(null);
-  let actionSuccess = $state(null);
+  let actionError = $state<any>(null);
+  let actionSuccess = $state<any>(null);
 
   async function loadGenerations() {
     loading = true;
@@ -119,7 +119,7 @@
       groupedGenerations = await computeGroups(generations);
       // Start background indexing for search — pass token so it can self-cancel
       startBackgroundIndexing(myToken);
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
       console.error("Failed to load generations:", e);
     } finally {
@@ -130,9 +130,9 @@
   async function computeGroups(gens: any) {
     if (gens.length === 0) return [];
 
-    const groups = [];
-    const newSearchIndex = []; // Build array for proper reactivity
-    let currentGroup = null;
+    const groups: any[] = [];
+    const newSearchIndex: any[] = []; // Build array for proper reactivity
+    let currentGroup: any = null;
 
     for (let i = 0; i < gens.length; i++) {
       const gen = gens[i];
@@ -173,7 +173,7 @@
             currentGroup.isGroup = true;
             continue;
           }
-        } catch (e) {
+        } catch (e: any) {
           // If diff fails, treat as different
         }
       }
@@ -232,7 +232,7 @@
             // Update searchIndexArray reactively after each new entry
             searchIndexArray = [...workingIndex];
           }
-        } catch (e) {
+        } catch (e: any) {
           // Skip failed diffs
         }
       }
@@ -261,9 +261,9 @@
     const query = masterSearch.toLowerCase();
     const diff = entry;
     const matches = {
-      added: diff.added.filter(p => p.name.toLowerCase().includes(query)),
-      removed: diff.removed.filter(p => p.name.toLowerCase().includes(query)),
-      changed: diff.changed.filter(p => p.name.toLowerCase().includes(query))
+      added: diff.added.filter((p: any) => p.name.toLowerCase().includes(query)),
+      removed: diff.removed.filter((p: any) => p.name.toLowerCase().includes(query)),
+      changed: diff.changed.filter((p: any) => p.name.toLowerCase().includes(query))
     };
 
     const total = matches.added.length + matches.removed.length + matches.changed.length;
@@ -318,12 +318,12 @@
         if (prevGen) {
           try {
             generationDiff = await window.electronAPI.getGenerationDiff(prevGen.number, gen.number);
-          } catch (e) {
+          } catch (e: any) {
             console.error("Failed to load diff:", e);
           }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load generation info:", e);
       if (selectedGeneration?.number === gen.number) {
         generationInfo = { number: gen.number, error: e.message };
@@ -372,7 +372,7 @@
     }
   }
 
-  function requestAction(action, gen) {
+  function requestAction(action: any, gen: any) {
     confirmAction = action;
     pendingGeneration = gen;
     showConfirmDialog = true;
@@ -411,17 +411,17 @@
 
       // Reload generations after action
       await loadGenerations();
-    } catch (e) {
+    } catch (e: any) {
       actionError = e.message;
     } finally {
       isActioning = false;
     }
   }
 
-  function formatDate(dateStr) {
+  function formatDate(dateStr: any) {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
+      const date: Date = new Date(dateStr);
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
@@ -434,12 +434,12 @@
     }
   }
 
-  function getRelativeTime(dateStr) {
+  function getRelativeTime(dateStr: any) {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now - date;
+      const date: Date = new Date(dateStr);
+      const now: Date = new Date();
+      const diffMs = now.getTime() - date.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) return 'Today';
@@ -547,9 +547,9 @@
       {#if matchingEntries.length > 0 && matchingEntries.length <= 10}
         <div class="search-match-summary">
           {#each matchingEntries as entry}
-            {@const addedMatches = entry.added.filter(p => p.name.toLowerCase().includes(query))}
-            {@const removedMatches = entry.removed.filter(p => p.name.toLowerCase().includes(query))}
-            {@const changedMatches = entry.changed.filter(p => p.name.toLowerCase().includes(query))}
+            {@const addedMatches = entry.added.filter((p: any) => p.name.toLowerCase().includes(query))}
+            {@const removedMatches = entry.removed.filter((p: any) => p.name.toLowerCase().includes(query))}
+            {@const changedMatches = entry.changed.filter((p: any) => p.name.toLowerCase().includes(query))}
             <div class="match-entry">
               <span class="match-gen">#{entry.genNumber}</span>
               {#each addedMatches as pkg}<span class="match-pkg added">+{pkg.name}</span>{/each}
@@ -682,7 +682,7 @@
   </div>
 {/if}
 
-{#snippet generationItem(gen, isInGroup)}
+{#snippet generationItem(gen: any, isInGroup: any)}
   {@const searchMatches = getSearchMatchInfo(gen.number)}
   <div class="generation-item-wrapper" class:in-group={isInGroup}>
     <button
@@ -731,7 +731,7 @@
   </div>
 {/snippet}
 
-{#snippet generationDetailPanel(gen)}
+{#snippet generationDetailPanel(gen: any)}
   <div class="detail-content">
     {#if !generationInfo}
       <div class="skeleton-loading">
@@ -877,7 +877,7 @@
                   {@const changeParts = pkg.change.split(',')}
                   {@const versionPart = changeParts[0].trim()}
                   {@const sizePart = changeParts[1]?.trim() || ''}
-                  {@const versions = versionPart.split('→').map(v => v.trim())}
+                  {@const versions = versionPart.split('→').map((v: any) => v.trim())}
                   {@const oldVer = versions[0] || ''}
                   {@const newVer = versions[1] || ''}
                   {@const isUpgrade = compareVersions(newVer, oldVer) > 0}

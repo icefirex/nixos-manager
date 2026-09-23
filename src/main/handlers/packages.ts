@@ -81,7 +81,7 @@ function createPackagesHandlers(deps: PackagesDeps = {}) {
       // Get last config file modification time
       let lastConfigChange: any = null;
       try {
-        function findNewestNix(dir) {
+        function findNewestNix(dir: any) {
           let newest: any = null;
           let entries;
           try { entries = depsFs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
@@ -105,7 +105,7 @@ function createPackagesHandlers(deps: PackagesDeps = {}) {
 
       const mtimeDrift = !!(lastRebuild && lastConfigChange && new Date(lastConfigChange) > new Date(lastRebuild));
 
-      const normalizeFile = (filePath) => {
+      const normalizeFile = (filePath: any) => {
         if (!filePath) return '';
         if (path.isAbsolute(filePath)) {
           try {
@@ -235,9 +235,9 @@ function createPackagesHandlers(deps: PackagesDeps = {}) {
       }
 
       const gitPaths = new Set([
-        ...optionDiffSummary.changed.map(c => c.optionPath),
-        ...optionDiffSummary.added.map(c => c.optionPath),
-        ...optionDiffSummary.removed.map(c => c.optionPath)
+        ...optionDiffSummary.changed.map((c: any) => c.optionPath),
+        ...optionDiffSummary.added.map((c: any) => c.optionPath),
+        ...optionDiffSummary.removed.map((c: any) => c.optionPath)
       ]);
 
       if (gitPaths.size > 0) {
@@ -251,7 +251,7 @@ function createPackagesHandlers(deps: PackagesDeps = {}) {
         }
       }
 
-      function upsertGitOptionChange(action, change) {
+      function upsertGitOptionChange(action: any, change: any) {
         const file = normalizeFile(change.file);
 
         for (const [existingKey, existing] of optionChangesByKey.entries()) {
@@ -347,7 +347,7 @@ function register(deps: PackagesDeps = {}) {
   });
 
   // Get package metadata from nixpkgs
-  depsIpcMain.handle('get-package-info', async (event, packageName) => {
+  depsIpcMain.handle('get-package-info', async (event: any, packageName: any) => {
     const flakeDir = findFlakeDir();
 
     const info: any = {
@@ -381,7 +381,7 @@ function register(deps: PackagesDeps = {}) {
         if (typeof meta.license === 'string') {
           info.license = meta.license;
         } else if (Array.isArray(meta.license)) {
-          info.license = meta.license.map(l => l.spdxId || l.shortName || l.fullName || l).join(', ');
+          info.license = meta.license.map((l: any) => l.spdxId || l.shortName || l.fullName || l).join(', ');
         } else if (meta.license.spdxId || meta.license.shortName) {
           info.license = meta.license.spdxId || meta.license.shortName || meta.license.fullName;
         }
@@ -444,14 +444,14 @@ function register(deps: PackagesDeps = {}) {
       homeManager: []
     };
 
-    function extractPackageName(storePath) {
+    function extractPackageName(storePath: any) {
       const basename = path.basename(storePath);
       const withoutHash = basename.substring(33);
       const match = withoutHash.match(/^(.+?)-\d/);
       return match ? match[1] : withoutHash;
     }
 
-    function parseRefs(output) {
+    function parseRefs(output: any) {
       return output ? output.split('\n').filter(Boolean) : [];
     }
 
@@ -494,9 +494,9 @@ function register(deps: PackagesDeps = {}) {
     }
 
     // Sort all lists
-    packages.system.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    packages.user.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    packages.homeManager.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    packages.system.sort((a: any, b: any) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    packages.user.sort((a: any, b: any) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    packages.homeManager.sort((a: any, b: any) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
     return packages;
   });
@@ -518,7 +518,7 @@ function register(deps: PackagesDeps = {}) {
  * @param {(p: string) => string} [readFile]
  * @returns {{added: Array<{optionPath: string, file: string | null, to: string}>, removed: Array<{optionPath: string, file: string | null, from: string}>, changed: Array<{optionPath: string, file: string | null, from: string, to: string}>}}
  */
-function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFileSync(p, 'utf8')) {
+function parseOptionDiffSummary(diffOut: any, flakeDir: any, readFile = (p: any) => fs.readFileSync(p, 'utf8')) {
   const lineMap = new Map();
   let currentFile: any = null;
   let braceDepth = 0;
@@ -530,13 +530,13 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
   ]);
   const fileScopedKeyCache = new Map();
 
-  function countChar(str, ch) {
+  function countChar(str: any, ch: any) {
     let count = 0;
     for (const c of str) if (c === ch) count++;
     return count;
   }
 
-  function resolveScopePath(paths) {
+  function resolveScopePath(paths: any) {
     let full = '';
     for (const p of paths) {
       if (!p) continue;
@@ -558,7 +558,7 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
     return resolveScopePath(scopeStack.map(s => s.path));
   }
 
-  function getScopedKeyMap(relFile) {
+  function getScopedKeyMap(relFile: any) {
     if (!relFile) return new Map();
     if (fileScopedKeyCache.has(relFile)) return fileScopedKeyCache.get(relFile);
 
@@ -673,9 +673,9 @@ function parseOptionDiffSummary(diffOut, flakeDir, readFile = (p) => fs.readFile
       optionDiffSummary.removed.push({ optionPath: delta.optionPath, file: delta.file, from: delta.removed });
     }
   }
-  optionDiffSummary.added.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
-  optionDiffSummary.removed.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
-  optionDiffSummary.changed.sort((a, b) => a.optionPath.localeCompare(b.optionPath));
+  optionDiffSummary.added.sort((a: any, b: any) => a.optionPath.localeCompare(b.optionPath));
+  optionDiffSummary.removed.sort((a: any, b: any) => a.optionPath.localeCompare(b.optionPath));
+  optionDiffSummary.changed.sort((a: any, b: any) => a.optionPath.localeCompare(b.optionPath));
   return optionDiffSummary;
 }
 

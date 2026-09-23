@@ -16,7 +16,7 @@ let inputUpdateStatus: Record<string, boolean> = {};
  * @param {number} ms
  * @returns {string}
  */
-function relativeTime(ms) {
+function relativeTime(ms: any) {
   const diff = Date.now() - ms;
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
@@ -39,7 +39,7 @@ function getInputUpdateStatus() {
  * @param {Record<string, boolean>} [updateStatus]
  * @returns {Array<{name: string, status: string, age: string, hasUpdate: boolean}>}
  */
-function parseFlakeInputs(lockContent, updateStatus = {}) {
+function parseFlakeInputs(lockContent: any, updateStatus: Record<string, boolean> = {}) {
   const inputs: any[] = [];
   const nodes = lockContent?.nodes || {};
   const rootInputs: any = nodes.root?.inputs || {};
@@ -81,7 +81,7 @@ function parseFlakeInputs(lockContent, updateStatus = {}) {
  * @param {any} lock
  * @returns {Record<string, any>}
  */
-function parseFlakeLockInfo(lock) {
+function parseFlakeLockInfo(lock: any) {
   const info: any = {};
   const nodes = lock?.nodes || {};
   const rootInputs: any = nodes.root?.inputs || {};
@@ -113,7 +113,7 @@ function parseFlakeLockInfo(lock) {
  * Check each GitHub-type flake input for upstream changes using git ls-remote.
  * Writes results into inputUpdateStatus in-place.
  */
-async function runUpdateChecks(flakeDir) {
+async function runUpdateChecks(flakeDir: any) {
   const lockPath = path.join(flakeDir, 'flake.lock');
   if (!fs.existsSync(lockPath)) return;
 
@@ -217,7 +217,7 @@ function register() {
   });
 
   // Update a single flake input
-  ipcMain.handle('update-flake-input', async (event, inputName) => {
+  ipcMain.handle('update-flake-input', async (event: any, inputName: any) => {
     const flakeDir = findFlakeDir();
     if (!flakeDir) {
       throw new Error(flakeDirNotFoundMsg());

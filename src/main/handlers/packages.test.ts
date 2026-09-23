@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-function makeTempFlake(files) {
+function makeTempFlake(files: any) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'packages-unit-'));
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = path.join(dir, relPath);
@@ -156,7 +156,7 @@ diff --git a/b.nix b/b.nix
 +alpha.a = true;
 `, flakeDir);
 
-    expect(summary.changed.map(c => c.optionPath)).toEqual(['alpha.a', 'zeta.a']);
+    expect(summary.changed.map((c: any) => c.optionPath)).toEqual(['alpha.a', 'zeta.a']);
     fs.rmSync(flakeDir, { recursive: true, force: true });
   });
 
@@ -205,7 +205,7 @@ index 1234567..89abcde 100644
 
     const handlers = mod.createPackagesHandlers({
       findFlakeDir: () => flakeDir,
-      runCmd: async (cmd) => {
+      runCmd: async (cmd: any) => {
         if (cmd.includes('diff --name-only')) return 'configuration.nix\n';
         if (cmd.includes("diff --unified=20 -- '*.nix'")) {
           return `

@@ -39,7 +39,7 @@ describe('specializations handler', () => {
     });
 
     it('matches an entry via injected realpath', () => {
-      const realpath = (p) => `/specs/${p}`;
+      const realpath = (p: any) => `/specs/${p}`;
       expect(determineActiveSpec('/specs/office', '/base', ['gaming', 'office'], realpath)).toBe('office');
     });
 
@@ -50,7 +50,7 @@ describe('specializations handler', () => {
     });
 
     it('continues past entries whose realpath throws', () => {
-      const realpath = (p) => (p === 'broken' ? (() => { throw new Error('boom'); })() : `/specs/${p}`);
+      const realpath = (p: any) => (p === 'broken' ? (() => { throw new Error('boom'); })() : `/specs/${p}`);
       expect(determineActiveSpec('/specs/ok', '/base', ['broken', 'ok'], realpath)).toBe('ok');
     });
   });
@@ -59,7 +59,7 @@ describe('specializations handler', () => {
     const {  buildSpecializationList  } = require('./specializations.ts');
 
     it('lists base first plus directory entries with active flags', () => {
-      const list = buildSpecializationList('gaming', ['gaming', 'notes.txt'], (e) => e !== 'notes.txt');
+      const list = buildSpecializationList('gaming', ['gaming', 'notes.txt'], (e: any) => e !== 'notes.txt');
       expect(list).toEqual([
         { name: 'base', active: false },
         { name: 'gaming', active: true }

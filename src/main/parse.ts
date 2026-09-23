@@ -13,7 +13,7 @@ type NixOption = {
  * @param {string} content
  * @returns {string[]}
  */
-function extractPackages(content) {
+function extractPackages(content: any) {
   const pkgs: string[] = [];
   const pkgMatches = content.matchAll(/(?:pkgs|pkgs-stable|pkgs-[a-z]+)\.([a-zA-Z0-9_-]+)/g);
   for (const match of pkgMatches) {
@@ -30,7 +30,7 @@ function extractPackages(content) {
  * @param {string} block
  * @returns {string[]}
  */
-function extractBareNames(block) {
+function extractBareNames(block: any) {
   const names: string[] = [];
   const bareMatches = block.match(/^\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*$/gm);
   if (bareMatches) {
@@ -49,7 +49,7 @@ function extractBareNames(block) {
  * @param {string} content
  * @returns {string[]}
  */
-function parseSystemPackages(content) {
+function parseSystemPackages(content: any) {
   const packages: string[] = [];
   const match = content.match(/environment\.systemPackages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
   if (match) {
@@ -71,7 +71,7 @@ function parseSystemPackages(content) {
  * @param {string} content
  * @returns {string[]}
  */
-function parseHomePackages(content) {
+function parseHomePackages(content: any) {
   const packages: string[] = [];
   const match = content.match(/home\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/s);
   if (match) {
@@ -93,7 +93,7 @@ function parseHomePackages(content) {
  * @param {string} content
  * @returns {string[]}
  */
-function parseUserPackages(content) {
+function parseUserPackages(content: any) {
   const packages: string[] = [];
   const matches = content.matchAll(/users\.users\.[^.]+\.packages\s*=\s*(?:with\s+pkgs;\s*)?\[([^\]]*)\]/gs);
   for (const match of matches) {
@@ -117,12 +117,12 @@ function parseUserPackages(content) {
  * @param {string|null} relativePath
  * @returns {NixOption[]}
  */
-function parseOptions(content, relativePath) {
+function parseOptions(content: any, relativePath: any) {
   const options: any[] = [];
   const lines = content.split('\n');
   const optionRegex = /^\s*(services|programs|hardware|networking|boot|system|virtualisation|security|users|fonts|environment|nixpkgs|nix|home)\.([a-zA-Z0-9._-]+)\s*=\s*(.+?);?\s*$/;
 
-  lines.forEach((line, idx) => {
+  lines.forEach((line: any, idx: any) => {
     const match = line.match(optionRegex);
     if (match) {
       const category = match[1];

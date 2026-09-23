@@ -17,7 +17,7 @@ type GitDeps = {
  * @param {string | null} remoteUrl
  * @returns {string | null}
  */
-function extractRepoName(remoteUrl) {
+function extractRepoName(remoteUrl: any) {
   if (!remoteUrl) return null;
   const match = remoteUrl.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
   return match ? match[1] : remoteUrl;
@@ -30,7 +30,7 @@ function extractRepoName(remoteUrl) {
  * @param {string | null} currentBranch
  * @returns {Array<{name: string, isRemote: boolean, isCurrent: boolean, upstream: string | null, track: string | null}>}
  */
-function parseBranchList(output, currentBranch) {
+function parseBranchList(output: any, currentBranch: any) {
   if (!output) return [];
   const branches: any[] = [];
   const lines = output.split('\n').filter(Boolean);
@@ -66,7 +66,7 @@ function parseBranchList(output, currentBranch) {
  * @param {string | null} output
  * @returns {{staged: Array<{file: string, status: string}>, modified: Array<{file: string, status: string}>, untracked: string[]}}
  */
-function parsePorcelainStatus(output) {
+function parsePorcelainStatus(output: any) {
   const status: any = { staged: [], modified: [], untracked: [] };
   if (!output) return status;
   for (const line of output.split('\n').filter(Boolean)) {
@@ -92,7 +92,7 @@ function parsePorcelainStatus(output) {
  * @param {string | null} logOutput
  * @returns {Array<{hash: string, shortHash: string, subject: string, author: string, timeAgo: string}>}
  */
-function parseRecentCommits(logOutput) {
+function parseRecentCommits(logOutput: any) {
   if (!logOutput) return [];
   const commits: any[] = [];
   for (const line of logOutput.split('\n').filter(Boolean)) {
@@ -108,7 +108,7 @@ function parseRecentCommits(logOutput) {
  * @param {string | null} commitInfo
  * @returns {{fullMessage: string | null, author: string | null, authorEmail: string | null, date: string | null, files: Array<{status: string, file: string}>}}
  */
-function parseCommitInfo(commitInfo) {
+function parseCommitInfo(commitInfo: any) {
   const details: any = { fullMessage: null, author: null, authorEmail: null, date: null, files: [] };
   if (!commitInfo) return details;
 
@@ -221,7 +221,7 @@ function createGitHandlers(deps: GitDeps = {}) {
       return info;
     },
 
-    getCommitDetails: async (hash) => {
+    getCommitDetails: async (hash: any) => {
       const flakeDir = requireFlakeDir();
 
       const details = {
@@ -249,7 +249,7 @@ function createGitHandlers(deps: GitDeps = {}) {
       return details;
     },
 
-    switchBranch: async (branchName) => {
+    switchBranch: async (branchName: any) => {
       const flakeDir = requireFlakeDir();
 
       try {
@@ -296,11 +296,11 @@ function register(deps: GitDeps = {}) {
     return handlers.getGitInfo();
   });
 
-  depsIpcMain.handle('get-commit-details', async (_event, hash) => {
+  depsIpcMain.handle('get-commit-details', async (_event: any, hash: any) => {
     return handlers.getCommitDetails(hash);
   });
 
-  depsIpcMain.handle('git-switch-branch', async (_event, branchName) => {
+  depsIpcMain.handle('git-switch-branch', async (_event: any, branchName: any) => {
     return handlers.switchBranch(branchName);
   });
 

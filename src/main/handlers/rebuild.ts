@@ -23,7 +23,7 @@ type RebuildDeps = {
  * @param {NodeJS.ProcessEnv} env
  * @returns {boolean}
  */
-function commandExists(cmd, env) {
+function commandExists(cmd: any, env: any) {
   try {
     execSync(`command -v ${cmd}`, { stdio: 'pipe', env, shell: '/bin/sh' });
     return true;
@@ -44,7 +44,7 @@ function commandExists(cmd, env) {
  * @param {NodeJS.ProcessEnv} spawnEnv
  * @returns {string[]}
  */
-function resolveRebuildCommand(spawnEnv) {
+function resolveRebuildCommand(spawnEnv: any) {
   if (process.env.NIXOS_REBUILD_COMMAND) {
     return process.env.NIXOS_REBUILD_COMMAND.trim().split(/\s+/);
   }
@@ -64,7 +64,7 @@ function resolveRebuildCommand(spawnEnv) {
  * @param {NodeJS.ProcessEnv} spawnEnv
  * @returns {string[]}
  */
-function resolveEvalCommand(spawnEnv) {
+function resolveEvalCommand(spawnEnv: any) {
   if (process.env.NIXOS_EVAL_COMMAND) {
     return process.env.NIXOS_EVAL_COMMAND.trim().split(/\s+/);
   }
@@ -92,7 +92,7 @@ function createRebuildHandlers(deps: RebuildDeps = {}) {
   let runningRebuildProcess: any = null;
 
   return {
-    nixosRebuild: async ({ action, updateInputs }) => {
+    nixosRebuild: async ({ action, updateInputs }: { action: string; updateInputs?: boolean }) => {
       const flakeDir = depsFindFlakeDir();
       if (!flakeDir) {
         throw new Error(depsFlakeDirNotFoundMsg());
@@ -153,7 +153,7 @@ function createRebuildHandlers(deps: RebuildDeps = {}) {
         args.push('--update');
       }
 
-      const actionTitles = {
+      const actionTitles: Record<string, string> = {
         'switch': 'Switching Configuration',
         'boot': 'Building for Next Boot',
         'test': 'Testing Configuration'
@@ -218,7 +218,7 @@ function register(deps: RebuildDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createRebuildHandlers(deps);
 
-  depsIpcMain.handle('nixos-rebuild', async (_event, payload) => {
+  depsIpcMain.handle('nixos-rebuild', async (_event: any, payload: any) => {
     return handlers.nixosRebuild(payload);
   });
 

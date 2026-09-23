@@ -6,7 +6,7 @@
 
   hljs.registerLanguage('nix', nix);
 
-  let options = $state({
+  let options = $state<any>({
     services: [],
     programs: [],
     hardware: [],
@@ -16,21 +16,21 @@
     other: []
   });
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let searchQuery = $state("");
   let activeTab = $state("services");
   let sourceMode = $state("config"); // "config" or "live"
   let savingOption = $state(false);
-  let editingOptionKey = $state(null);
+  let editingOptionKey = $state<any>(null);
   let editDraftValue = $state("");
   let catalogSearching = $state(false);
   let catalogSearched = $state("");
-  let catalogResults = $state([]);
-  let catalogError = $state(null);
+  let catalogResults = $state<any[]>([]);
+  let catalogError = $state<any>(null);
 
   // Option detail state
-  let selectedOption = $state(null);
-  let optionInfo = $state(null);
+  let selectedOption = $state<any>(null);
+  let optionInfo = $state<any>(null);
   let loadingInfo = $state(false);
 
   const tabs = [
@@ -45,14 +45,14 @@
 
   // Derived filtered options for each category - ensures reactivity
   let filteredByCategory = $derived.by(() => {
-    const result = {};
+    const result: Record<string, any> = {};
     const q = searchQuery.trim().toLowerCase();
     for (const tab of tabs) {
       const list = options[tab.id] || [];
       if (!q) {
         result[tab.id] = list;
       } else {
-        result[tab.id] = list.filter(opt =>
+        result[tab.id] = list.filter((opt: any) =>
           opt.path.toLowerCase().includes(q) ||
           (opt.value && opt.value.toLowerCase().includes(q))
         );
@@ -87,7 +87,7 @@
       } else {
         options = await window.electronAPI.getOptions();
       }
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
       console.error("Failed to load options:", e);
     } finally {
@@ -99,14 +99,14 @@
     loadOptions();
   });
 
-  function switchSource(mode) {
+  function switchSource(mode: any) {
     if (mode !== sourceMode) {
       sourceMode = mode;
       loadOptions();
     }
   }
 
-  async function selectOption(opt) {
+  async function selectOption(opt: any) {
     const optKey = `${opt.path}:${opt.file || opt.source}`;
     if (selectedOption === optKey) {
       selectedOption = null;
@@ -128,7 +128,7 @@
       if (selectedOption === optKey) {
         optionInfo = { ...info, currentValue: opt.value, currentFile: opt.file, currentLine: opt.line };
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load option info:", e);
       if (selectedOption === optKey) {
         optionInfo = { path: opt.path, error: e.message };
@@ -138,17 +138,17 @@
     }
   }
 
-  function openUrl(url) {
+  function openUrl(url: any) {
     if (url) {
       window.open(url, '_blank');
     }
   }
 
-  function getTabCount(tab) {
+  function getTabCount(tab: any) {
     return options[tab]?.length || 0;
   }
 
-  function getFilteredCount(tab) {
+  function getFilteredCount(tab: any) {
     return filteredByCategory[tab]?.length || 0;
   }
 
@@ -160,25 +160,25 @@
     return total;
   }
 
-  function formatValue(value) {
+  function formatValue(value: any) {
     if (!value) return '';
     if (value.length > 60) return value.substring(0, 57) + '...';
     return value;
   }
 
-  function stripHtml(value) {
+  function stripHtml(value: any) {
     if (!value) return '';
     return String(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  function parseBoolValue(value) {
+  function parseBoolValue(value: any) {
     const v = normalizeValue(value).toLowerCase();
     if (v === 'true') return true;
     if (v === 'false') return false;
     return null;
   }
 
-  function normalizeValue(value) {
+  function normalizeValue(value: any) {
     if (!value) return '';
     return String(value).trim().replace(/;$/, '').trim();
   }
@@ -207,7 +207,7 @@
     editDraftValue = '';
   }
 
-  async function saveOptionValue(optionPath, newValue, filePath = null) {
+  async function saveOptionValue(optionPath: any, newValue: any, filePath = null) {
     savingOption = true;
     try {
       const result = await window.electronAPI.setOptionValue({
@@ -225,7 +225,7 @@
       window.dispatchEvent(new CustomEvent('packages-changed'));
       await loadOptions();
       return true;
-    } catch (e) {
+    } catch (e: any) {
       alert(e.message || 'Failed to save option value');
       return false;
     } finally {
@@ -271,7 +271,7 @@
     }
   }
 
-  function getSuggestedValue(result) {
+  function getSuggestedValue(result: any) {
     const type = (result?.type || '').toLowerCase();
     if (type.includes('bool')) return 'true';
     if (result?.example) return normalizeValue(stripHtml(result.example));
@@ -293,14 +293,14 @@
         return;
       }
       catalogResults = result.results || [];
-    } catch (e) {
+    } catch (e: any) {
       catalogError = e.message || 'Search failed';
     } finally {
       catalogSearching = false;
     }
   }
 
-  async function addOptionFromCatalog(result) {
+  async function addOptionFromCatalog(result: any) {
     if (!result?.path) return;
     const value = getSuggestedValue(result);
     const ok = await saveOptionValue(result.path, value, null);
@@ -311,19 +311,19 @@
     }
   }
 
-  function isBlockValue(value) {
+  function isBlockValue(value: any) {
     if (!value) return false;
     // Any structured value (blocks, lists) or multi-line content
     if (value.startsWith('{') || value.startsWith('[') || value.includes('\n')) return true;
     return false;
   }
 
-  function getOptionKey(opt) {
+  function getOptionKey(opt: any) {
     return `${opt.path}:${opt.file || opt.source}`;
   }
 
   // Nix syntax highlighting using highlight.js
-  function highlightNix(code) {
+  function highlightNix(code: any) {
     if (!code) return '';
     try {
       return hljs.highlight(code, { language: 'nix' }).value;

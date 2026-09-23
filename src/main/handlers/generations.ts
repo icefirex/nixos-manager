@@ -10,7 +10,7 @@ import { NIX_PROFILES_DIR, NIX_SYSTEM_PROFILE } from '../constants.ts';
  * Parse the current generation number from a profile symlink target.
  * Pure: no fs access.
  */
-function parseCurrentGenerationLink(link) {
+function parseCurrentGenerationLink(link: any) {
   const match = (link || '').match(/system-(\d+)-link/);
   return match ? parseInt(match[1], 10) : null;
 }
@@ -19,7 +19,7 @@ function parseCurrentGenerationLink(link) {
  * Map profile directory entries into generation records.
  * Pure: date extraction is delegated to the injected getMtimeIso callback.
  */
-function parseGenerationEntries(entries, currentGeneration, profileDir, getMtimeIso: ((p: string) => string) | null = null) {
+function parseGenerationEntries(entries: any, currentGeneration: any, profileDir: any, getMtimeIso: ((p: string) => string) | null = null) {
   const generations: any[] = [];
   for (const entry of entries) {
     const match = entry.match(/^system-(\d+)-link$/);
@@ -48,8 +48,8 @@ function parseGenerationEntries(entries, currentGeneration, profileDir, getMtime
  * Parse `nix store diff-closures` output (ANSI stripped) into
  * added/removed/changed buckets. Pure.
  */
-function parseClosureDiff(stdout) {
-  const stripAnsi = (str) => str.replace(/\x1b\[[0-9;]*m/g, '');
+function parseClosureDiff(stdout: any) {
+  const stripAnsi = (str: any) => str.replace(/\x1b\[[0-9;]*m/g, '');
   const cleanOutput = stripAnsi(stdout || '');
 
   const diff: any = {
@@ -59,7 +59,7 @@ function parseClosureDiff(stdout) {
     raw: cleanOutput
   };
 
-  const lines = cleanOutput.split('\n').filter(line => line.trim());
+  const lines = cleanOutput.split('\n').filter((line: any) => line.trim());
   for (const line of lines) {
     // Parse lines like: "package: 1.0 → 2.0, +10.0 MiB" or "package: ∅ → 1.0" or "package: 1.0 → ∅"
     const match = line.match(/^([^:]+):\s*(.+)$/);
@@ -105,7 +105,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
   const profileDir = deps.profileDir || NIX_PROFILES_DIR;
   const profilePath = deps.profilePath || NIX_SYSTEM_PROFILE;
 
-  const genPathFor = (genNumber) => `${profilePath}-${genNumber}-link`;
+  const genPathFor = (genNumber: any) => `${profilePath}-${genNumber}-link`;
 
   return {
     getGenerations: async () => {
@@ -136,7 +136,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
       return generations;
     },
 
-    getGenerationInfo: async (genNumber) => {
+    getGenerationInfo: async (genNumber: any) => {
       const genPath = genPathFor(genNumber);
 
       // Check if generation exists
@@ -199,7 +199,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
       return info;
     },
 
-    getGenerationDiff: async (fromGen, toGen) => {
+    getGenerationDiff: async (fromGen: any, toGen: any) => {
       const fromPath = genPathFor(fromGen);
       const toPath = genPathFor(toGen);
 
@@ -219,7 +219,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
       });
     },
 
-    switchGeneration: async (genNumber) => {
+    switchGeneration: async (genNumber: any) => {
       const genPath = genPathFor(genNumber);
 
       if (!depsFs.existsSync(genPath)) {
@@ -241,7 +241,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
       });
     },
 
-    bootGeneration: async (genNumber) => {
+    bootGeneration: async (genNumber: any) => {
       const genPath = genPathFor(genNumber);
 
       if (!depsFs.existsSync(genPath)) {
@@ -261,7 +261,7 @@ function createGenerationsHandlers(deps: GenerationsDeps = {}) {
       });
     },
 
-    deleteGeneration: async (genNumber) => {
+    deleteGeneration: async (genNumber: any) => {
       return new Promise<any>((resolve, reject) => {
         const cmd = `pkexec env SHELL=/bin/sh nix-env --delete-generations ${genNumber} --profile ${profilePath}`;
 
@@ -289,23 +289,23 @@ function register(deps: GenerationsDeps = {}) {
     return handlers.getGenerations();
   });
 
-  depsIpcMain.handle('get-generation-info', async (_event, genNumber) => {
+  depsIpcMain.handle('get-generation-info', async (_event: any, genNumber: any) => {
     return handlers.getGenerationInfo(genNumber);
   });
 
-  depsIpcMain.handle('get-generation-diff', async (_event, fromGen, toGen) => {
+  depsIpcMain.handle('get-generation-diff', async (_event: any, fromGen: any, toGen: any) => {
     return handlers.getGenerationDiff(fromGen, toGen);
   });
 
-  depsIpcMain.handle('switch-generation', async (_event, genNumber) => {
+  depsIpcMain.handle('switch-generation', async (_event: any, genNumber: any) => {
     return handlers.switchGeneration(genNumber);
   });
 
-  depsIpcMain.handle('boot-generation', async (_event, genNumber) => {
+  depsIpcMain.handle('boot-generation', async (_event: any, genNumber: any) => {
     return handlers.bootGeneration(genNumber);
   });
 
-  depsIpcMain.handle('delete-generation', async (_event, genNumber) => {
+  depsIpcMain.handle('delete-generation', async (_event: any, genNumber: any) => {
     return handlers.deleteGeneration(genNumber);
   });
 }

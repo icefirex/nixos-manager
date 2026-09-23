@@ -17,7 +17,7 @@ describe('notifications handler', () => {
 
     it('emits behind, ahead, and dirty notifications as needed', () => {
       const all = buildGitSyncNotifications('2', '3', 'a\nb\n');
-      expect(all.map(n => n.id)).toEqual(['git-behind', 'git-ahead', 'git-dirty']);
+      expect(all.map((n: any) => n.id)).toEqual(['git-behind', 'git-ahead', 'git-dirty']);
       expect(all[0].type).toBe('warning');
       expect(all[1].action).toBe('git push');
       expect(all[2].message).toContain('2 file(s)');
@@ -44,7 +44,7 @@ describe('notifications handler', () => {
 
       const stale = collectStaleInputs(lock);
 
-      expect(stale.map(i => i.name)).toEqual(['older', 'old']);
+      expect(stale.map((i: any) => i.name)).toEqual(['older', 'old']);
       expect(stale[0].days).toBeGreaterThanOrEqual(40);
     });
 
@@ -147,7 +147,7 @@ describe('notifications handler', () => {
       });
 
       const notifications = await handlers.getNotifications();
-      const ids = notifications.map(n => n.id);
+      const ids = notifications.map((n: any) => n.id);
 
       expect(ids).toEqual([
         'git-ahead',
@@ -158,7 +158,7 @@ describe('notifications handler', () => {
         'flake-updates-available',
         'last-build'
       ]);
-      expect(notifications.find(n => n.id === 'last-build')).toMatchObject({
+      expect(notifications.find((n: any) => n.id === 'last-build')).toMatchObject({
         type: 'error',
         message: 'build boom',
         time: 123
@@ -199,7 +199,7 @@ describe('notifications handler', () => {
 
       expect(typeof ipcMain.__getHandler('get-notifications')).toBe('function');
       const result = await ipcMain.__getHandler('get-notifications')();
-      expect(result.map(n => n.id)).toEqual(['disk-warning']);
+      expect(result.map((n: any) => n.id)).toEqual(['disk-warning']);
     });
   });
 });

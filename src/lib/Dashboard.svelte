@@ -8,9 +8,9 @@
 
   let updateInputs = $state(false);
   let isBuilding = $state(false);
-  let currentAction = $state(null);
-  let buildError = $state(null);
-  let pendingChanges = $state(null);
+  let currentAction = $state<any>(null);
+  let buildError = $state<any>(null);
+  let pendingChanges = $state<any>(null);
 
   function getDriftSummary() {
     if (!pendingChanges) return '';
@@ -30,7 +30,7 @@
   });
 
   $effect(() => {
-    const handler = (e) => {
+    const handler = (e: any) => {
       if (e.detail) return; // ignore our own dispatch
       window.electronAPI.getPendingChanges().then(data => {
         pendingChanges = data;
@@ -60,7 +60,7 @@
 
   // Listen for flake update events from SidePanel
   $effect(() => {
-    function handleFlakeUpdateStart(e: Event) {
+    function handleFlakeUpdateStart(e: CustomEvent) {
       const { inputName } = e.detail;
       isBuilding = true;
 
@@ -74,7 +74,7 @@
       };
     }
 
-    function handleFlakeUpdateComplete(e: Event) {
+    function handleFlakeUpdateComplete(e: CustomEvent) {
       const { inputName, success, error } = e.detail;
       isBuilding = false;
 
@@ -88,16 +88,16 @@
       }
     }
 
-    window.addEventListener('flake-update-start', handleFlakeUpdateStart);
-    window.addEventListener('flake-update-complete', handleFlakeUpdateComplete);
+    window.addEventListener('flake-update-start', handleFlakeUpdateStart as EventListener);
+    window.addEventListener('flake-update-complete', handleFlakeUpdateComplete as EventListener);
 
     return () => {
-      window.removeEventListener('flake-update-start', handleFlakeUpdateStart);
-      window.removeEventListener('flake-update-complete', handleFlakeUpdateComplete);
+      window.removeEventListener('flake-update-start', handleFlakeUpdateStart as EventListener);
+      window.removeEventListener('flake-update-complete', handleFlakeUpdateComplete as EventListener);
     };
   });
 
-  function updateProgressFromOutput(data) {
+  function updateProgressFromOutput(data: any) {
     const lowerData = data.toLowerCase();
 
     // Detect stages from nixos-rebuild-wrapper output
@@ -129,7 +129,7 @@
   }
 
   function getActionTitle(action: string): string {
-    const titles = {
+    const titles: Record<string, string> = {
       'switch': 'Switching System Configuration',
       'boot': 'Building for Next Boot',
       'test': 'Testing Configuration (Dry Run)',
@@ -161,7 +161,7 @@
       buildProgress.percentage = 100;
       buildProgress.currentStep = 5;
       buildProgress.eta = "Complete!";
-    } catch (e) {
+    } catch (e: any) {
       console.error("Rebuild failed:", e);
       buildError = e.message || "Build failed";
       buildProgress.eta = "Failed";

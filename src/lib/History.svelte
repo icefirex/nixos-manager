@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let entries = $state([]);
+  let entries = $state<any[]>([]);
   let loading = $state(true);
-  let selectedId = $state(null);
+  let selectedId = $state<any>(null);
   let refreshTrigger = $state(0);
   let searchQuery = $state('');
   let typeFilter = $state('all');
@@ -45,7 +45,7 @@
   function getChangedLinePairs(oldValue: string, newValue: string, max = 12) {
     const oldLines = String(oldValue || '').split('\n');
     const newLines = String(newValue || '').split('\n');
-    const pairs = [];
+    const pairs: any[] = [];
     const total = Math.max(oldLines.length, newLines.length);
     for (let i = 0; i < total; i++) {
       const from = oldLines[i] ?? '';
@@ -69,7 +69,7 @@
     return true;
   }
 
-  function entryMatches(entry, q) {
+  function entryMatches(entry: any, q: any) {
     if (!q) return true;
     const subject = String(entry.subject || '').toLowerCase();
     const type = String(entry.entry_type || '').toLowerCase();
@@ -90,7 +90,7 @@
       if (result.success) {
         entries = result.entries;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load history:', e);
     } finally {
       loading = false;

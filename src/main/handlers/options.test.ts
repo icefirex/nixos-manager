@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-function makeTempFile(content) {
+function makeTempFile(content: any) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'options-unit-'));
   const filePath = path.join(dir, 'config.nix');
   fs.writeFileSync(filePath, content);
@@ -117,7 +117,7 @@ describe('options handler', () => {
 }
 `);
 
-    const hit = entries.find(e => e.lhs === 'AllowUnencrypted');
+    const hit = entries.find((e: any) => e.lhs === 'AllowUnencrypted');
     expect(hit).toBeTruthy();
     expect(hit.fullPath).toBe('services.cockpit.settings.WebService.AllowUnencrypted');
     expect(hit.value).toBe('true');
@@ -189,11 +189,11 @@ describe('options handler', () => {
     const handlers = mod.createOptionsHandlers({
       findFlakeDir: () => dir,
       flakeDirNotFoundMsg: () => 'missing flake dir',
-      runCmd: async (cmd) => {
+      runCmd: async (cmd: any) => {
         runCmdCalls.push(cmd);
         return cmd.includes(' diff ') ? 'diff --git a/configuration.nix b/configuration.nix' : '';
       },
-      addOptionHistoryEntry: (entry) => historyCalls.push(entry)
+      addOptionHistoryEntry: (entry: any) => historyCalls.push(entry)
     });
 
     const result = await handlers.setOptionValue({

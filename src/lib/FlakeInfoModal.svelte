@@ -1,6 +1,6 @@
 <script lang="ts">
   let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
-  let info = $state(null);
+  let info = $state<any>(null);
   let loading = $state(true);
 
   $effect(() => {
@@ -11,7 +11,7 @@
     loading = true;
     try {
       info = await window.electronAPI.getFlakeInfo();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load flake info:', e);
       info = null;
     } finally {
@@ -19,11 +19,11 @@
     }
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: any) {
     if (e.key === 'Escape') onClose();
   }
 
-  function formatInputList(names) {
+  function formatInputList(names: any) {
     if (!names?.length) return '—';
     if (names.length <= 4) return names.join(', ');
     return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`;

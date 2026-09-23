@@ -5,14 +5,14 @@
   import { onMount } from 'svelte';
   import { TERMINAL_THEMES, initTheme, onThemeChange } from './themes.ts';
 
-  let terminalElement = $state(null);
-  let terminal = $state(null);
-  let fitAddon = $state(null);
+  let terminalElement = $state<any>(null);
+  let terminal = $state<any>(null);
+  let fitAddon = $state<any>(null);
 
   // Context menu state
   let showContextMenu = $state(false);
   let contextMenuPos = $state({ x: 0, y: 0 });
-  let contextMenuEl = $state(null);
+  let contextMenuEl = $state<any>(null);
 
   // Create/update portal for context menu
   $effect(() => {
@@ -33,7 +33,7 @@
         contextMenuEl.style.display = 'block';
 
         // Handle clicks on menu items
-        const handleMenuClick = (e) => {
+        const handleMenuClick = (e: any) => {
           const action = e.target.dataset.action;
           if (action === 'copy') {
             const selection = terminal?.getSelection();
@@ -94,7 +94,7 @@
     setTimeout(() => fitAddon.fit(), 50);
 
     // Handle keyboard shortcuts for copy
-    terminal.attachCustomKeyEventHandler((event) => {
+    terminal.attachCustomKeyEventHandler((event: any) => {
       // Ctrl+Shift+C to copy
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const selection = terminal.getSelection();
@@ -115,7 +115,7 @@
     });
 
     // Right-click context menu
-    terminalElement.addEventListener('contextmenu', (e) => {
+    terminalElement.addEventListener('contextmenu', (e: any) => {
       e.preventDefault();
 
       // Calculate position and clamp to viewport bounds
@@ -171,7 +171,7 @@
     }
   }
 
-  export function write(data) {
+  export function write(data: any) {
     terminal?.write(data);
   }
 </script>

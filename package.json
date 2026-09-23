@@ -20,7 +20,8 @@
     "build": "npm run build:main && vite build && electron-builder",
     "build:svelte": "vite build",
     "start": "npm run build:main && electron .",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
@@ -30,6 +31,7 @@
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "svelte": "^5.0.0",
+    "svelte-check": "^4.7.6",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vitest": "^4.1.9",

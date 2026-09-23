@@ -18,7 +18,7 @@
 
   const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes', 'settings']);
   // UX-09: restore last active tab; fall back to dashboard for unknown values
-  const _savedPage = localStorage.getItem('nixos-manager:active-tab');
+  const _savedPage = localStorage.getItem('nixos-manager:active-tab') ?? '';
   let currentPage = $state(VALID_PAGES.has(_savedPage) ? _savedPage : 'dashboard');
 
   // Persist active tab whenever it changes
@@ -63,7 +63,7 @@
   async function loadSystemInfo() {
     try {
       systemInfo = await window.electronAPI.getSystemInfo();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load system info:", e);
     }
   }
@@ -78,8 +78,8 @@
         const raw = sessionStorage.getItem('nixos-manager:dismissed-notifications');
         if (raw) dismissed = new Set(JSON.parse(raw));
       } catch {}
-      notificationCount = notifications.filter(n => !dismissed.has(n.id)).length;
-    } catch (e) {
+      notificationCount = notifications.filter((n: any) => !dismissed.has(n.id)).length;
+    } catch (e: any) {
       console.error("Failed to load notifications:", e);
       notificationCount = 0;
     }

@@ -70,7 +70,7 @@ describe('system handler', () => {
     it('detects base, active specialization, and unknown', () => {
       expect(resolveSpecialization('/same', '/same', [], () => '/x')).toBe('base');
 
-      const realpath = (p) => `/specs/${p}`;
+      const realpath = (p: any) => `/specs/${p}`;
       expect(resolveSpecialization('/specs/gaming', '/base', ['gaming', 'office'], realpath)).toBe('gaming');
       expect(resolveSpecialization('/other', '/base', ['gaming'], realpath)).toBe('unknown');
       expect(resolveSpecialization('/other', '/base', [], realpath)).toBe('unknown');

@@ -1,6 +1,6 @@
 <script lang="ts">
   let { show = false, onClose, onCountChange }: { show?: boolean; onClose: () => void; onCountChange: (n: number) => void } = $props();
-  let notifications = $state([]);
+  let notifications = $state<any[]>([]);
   let loading = $state(true);
 
   const STORAGE_KEY = 'nixos-manager:dismissed-notifications';
@@ -16,7 +16,7 @@
     }
   }
 
-  function saveDismissed(ids) {
+  function saveDismissed(ids: any) {
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
     } catch {}
@@ -35,9 +35,9 @@
     try {
       const allNotifications = await window.electronAPI.getNotifications();
       // Filter out dismissed notifications
-      notifications = allNotifications.filter(n => !dismissedIds.has(n.id));
+      notifications = allNotifications.filter((n: any) => !dismissedIds.has(n.id));
       onCountChange?.(notifications.length);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load notifications:', e);
       notifications = [];
       onCountChange?.(0);
@@ -46,7 +46,7 @@
     }
   }
 
-  function dismissNotification(id) {
+  function dismissNotification(id: any) {
     dismissedIds.add(id);
     saveDismissed(dismissedIds);
     notifications = notifications.filter(n => n.id !== id);
@@ -60,11 +60,11 @@
     onCountChange?.(0);
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: any) {
     if (e.key === 'Escape') onClose();
   }
 
-  function getTypeIcon(type) {
+  function getTypeIcon(type: any) {
     switch (type) {
       case 'error': return '!';
       case 'warning': return '!';
@@ -74,7 +74,7 @@
     }
   }
 
-  function copyAction(action) {
+  function copyAction(action: any) {
     navigator.clipboard.writeText(action);
   }
 </script>

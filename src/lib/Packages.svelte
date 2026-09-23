@@ -4,26 +4,26 @@
 
   let { pendingPackage = null, onPendingConsumed = () => {} }: { pendingPackage?: any; onPendingConsumed?: () => void } = $props();
 
-  let packages = $state({
+  let packages = $state<any>({
     system: [],
     user: [],
     homeManager: []
   });
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let searchQuery = $state("");
   let activeTab = $state("system");
   let sourceMode = $state("config"); // "config" or "live"
 
   // Package detail state
-  let selectedPackage = $state(null);
-  let packageInfo = $state(null);
+  let selectedPackage = $state<any>(null);
+  let packageInfo = $state<any>(null);
   let loadingInfo = $state(false);
 
   // Duplicates
-  let duplicates = $state([]);
+  let duplicates = $state<any[]>([]);
   let showDuplicatesOnly = $state(false);
-  let removingPkg = $state(null);
+  let removingPkg = $state<any>(null);
 
   $effect(() => {
     function onPackagesChanged() {
@@ -46,7 +46,7 @@
   });
 
   $effect(() => {
-    function onExternalSelect(e) {
+    function onExternalSelect(e: any) {
       const detail = e.detail;
       const pkg = typeof detail === 'object' ? detail.pkg : detail;
       const source = typeof detail === 'object' ? detail.source : null;
@@ -81,7 +81,7 @@
 
       // Find which tab this package belongs to
       const allTabs = { system: 'system', user: 'user', homeManager: 'homeManager' };
-      let foundTab = null;
+      let foundTab: any = null;
       for (const [tabId, tabKey] of Object.entries(allTabs)) {
         if (packages[tabKey]?.includes(pkg)) {
           foundTab = tabId;
@@ -131,7 +131,7 @@
 
   let duplicateSet = $derived(new Set(duplicates.map(d => d.pkgname)));
 
-  function isDuplicate(pkg) {
+  function isDuplicate(pkg: any) {
     return duplicateSet.has(pkg);
   }
 
@@ -143,17 +143,17 @@
 
   // Derived filtered packages for each category - ensures reactivity
   let filteredByCategory = $derived.by(() => {
-    const result = {};
+    const result: Record<string, any> = {};
     const q = searchQuery.trim().toLowerCase();
     for (const tab of tabs) {
       let list = packages[tab.id] || [];
       if (showDuplicatesOnly && sourceMode === 'config') {
-        list = list.filter(pkg => duplicateSet.has(pkg));
+        list = list.filter((pkg: any) => duplicateSet.has(pkg));
       }
       if (!q) {
         result[tab.id] = list;
       } else {
-        result[tab.id] = list.filter(pkg => pkg.toLowerCase().includes(q));
+        result[tab.id] = list.filter((pkg: any) => pkg.toLowerCase().includes(q));
       }
     }
     return result;
@@ -212,7 +212,7 @@
       } else {
         packages = await window.electronAPI.getPackages();
       }
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
       console.error("Failed to load packages:", e);
     } finally {
@@ -226,7 +226,7 @@
       if (result.success) {
         duplicates = result.duplicates;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load duplicates:', e);
     }
   }
@@ -237,7 +237,7 @@
   });
 
   // Reload when source mode changes
-  function switchSource(mode) {
+  function switchSource(mode: any) {
     if (mode !== sourceMode) {
       sourceMode = mode;
       loadPackages();
@@ -246,7 +246,7 @@
     }
   }
 
-  async function removeLocation(relPath) {
+  async function removeLocation(relPath: any) {
     if (!selectedPackage) return;
     removingPkg = selectedPackage;
     try {
@@ -255,7 +255,7 @@
         alert(`Package '${selectedPackage}' not found in any config file`);
         return;
       }
-      const match = findResult.files.find(f => f.relativePath === relPath || f.path.endsWith(relPath));
+      const match = findResult.files.find((f: any) => f.relativePath === relPath || f.path.endsWith(relPath));
       if (!match) {
         alert(`Could not find file: ${relPath}`);
         return;
@@ -276,7 +276,7 @@
       } else {
         alert(result.error || 'Failed to remove package');
       }
-    } catch (e) {
+    } catch (e: any) {
       alert(e.message || 'Failed to remove package');
     } finally {
       removingPkg = null;
@@ -284,10 +284,10 @@
   }
 
   // Track which package is currently loading
-  let loadingPackage = $state(null);
+  let loadingPackage = $state<any>(null);
 
   // Load package details
-  async function selectPackage(pkg) {
+  async function selectPackage(pkg: any) {
     if (selectedPackage === pkg) {
       // Toggle off if clicking same package
       selectedPackage = null;
@@ -313,7 +313,7 @@
       if (selectedPackage === pkg) {
         packageInfo = info;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load package info:", e);
       if (selectedPackage === pkg) {
         packageInfo = { name: pkg, error: e.message };
@@ -323,17 +323,17 @@
     }
   }
 
-  function openUrl(url) {
+  function openUrl(url: any) {
     if (url) {
       window.open(url, '_blank');
     }
   }
 
-  function getTabCount(tab) {
+  function getTabCount(tab: any) {
     return packages[tab]?.length || 0;
   }
 
-  function getFilteredCount(tab) {
+  function getFilteredCount(tab: any) {
     return filteredByCategory[tab]?.length || 0;
   }
 
@@ -345,7 +345,7 @@
     return total;
   }
 
-  function getSourceInfo(tab) {
+  function getSourceInfo(tab: any) {
     if (sourceMode === "config") {
       switch (tab) {
         case "system": return "environment.systemPackages";
@@ -362,7 +362,7 @@
     return "";
   }
 
-  function getEmptyMessage(tab) {
+  function getEmptyMessage(tab: any) {
     switch (tab) {
       case "system": return "No system packages found";
       case "user": return "No user packages found";
@@ -600,7 +600,7 @@
             <span class="field-label">Defined In ({packageInfo.configLocations.length})</span>
             {#if dupEntry}
               {@const locCount = packageInfo.configLocations.length}
-              {@const multiFile = new Set(dupEntry.files.map(f => f.file)).size > 1}
+              {@const multiFile = new Set(dupEntry.files.map((f: any) => f.file)).size > 1}
               <p class="dup-suggestion">
                 <Icon name="AlertTriangle" size={12} />
                 {#if dupEntry.crossUser}

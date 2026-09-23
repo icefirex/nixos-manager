@@ -16,108 +16,108 @@ const electronAPI = {
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   getDetailedSystemInfo: () => ipcRenderer.invoke('get-detailed-system-info'),
   getNotifications: () => ipcRenderer.invoke('get-notifications'),
-  nixosRebuild: (options) => ipcRenderer.invoke('nixos-rebuild', options),
+  nixosRebuild: (options: any) => ipcRenderer.invoke('nixos-rebuild', options),
   cancelRebuild: () => ipcRenderer.invoke('cancel-rebuild'),
-  switchSpecialization: (name) => ipcRenderer.invoke('switch-specialization', name),
+  switchSpecialization: (name: any) => ipcRenderer.invoke('switch-specialization', name),
   updateFlakeInputs: () => ipcRenderer.invoke('update-flake-inputs'),
-  updateFlakeInput: (name) => ipcRenderer.invoke('update-flake-input', name),
+  updateFlakeInput: (name: any) => ipcRenderer.invoke('update-flake-input', name),
   checkFlakeInputUpdates: () => ipcRenderer.invoke('check-flake-input-updates'),
   getSpecializations: () => ipcRenderer.invoke('get-specializations'),
   getFlakeInputs: () => ipcRenderer.invoke('get-flake-inputs'),
   getFlakeInfo: () => ipcRenderer.invoke('get-flake-info'),
   getPackages: () => ipcRenderer.invoke('get-packages'),
   getLivePackages: () => ipcRenderer.invoke('get-live-packages'),
-  getPackageInfo: (name) => ipcRenderer.invoke('get-package-info', name),
+  getPackageInfo: (name: any) => ipcRenderer.invoke('get-package-info', name),
   packagesGetDuplicates: () => ipcRenderer.invoke('packages-get-duplicates'),
   getPendingChanges: () => ipcRenderer.invoke('get-pending-changes'),
 
   // Options
   getOptions: () => ipcRenderer.invoke('get-options'),
   getLiveOptions: () => ipcRenderer.invoke('get-live-options'),
-  getOptionInfo: (optionPath) => ipcRenderer.invoke('get-option-info', optionPath),
-  setOptionValue: (payload) => ipcRenderer.invoke('set-option-value', payload),
-  revertOptionFromGit: (payload) => ipcRenderer.invoke('revert-option-from-git', payload),
+  getOptionInfo: (optionPath: any) => ipcRenderer.invoke('get-option-info', optionPath),
+  setOptionValue: (payload: any) => ipcRenderer.invoke('set-option-value', payload),
+  revertOptionFromGit: (payload: any) => ipcRenderer.invoke('revert-option-from-git', payload),
   optionsListFiles: () => ipcRenderer.invoke('options-list-files'),
-  searchOptionsCatalog: (query, opts = {}) => ipcRenderer.invoke('search-options-catalog', query, opts),
+  searchOptionsCatalog: (query: any, opts = {}) => ipcRenderer.invoke('search-options-catalog', query, opts),
 
   // Generations
   getGenerations: () => ipcRenderer.invoke('get-generations'),
-  getGenerationInfo: (num) => ipcRenderer.invoke('get-generation-info', num),
-  getGenerationDiff: (from, to) => ipcRenderer.invoke('get-generation-diff', from, to),
-  switchGeneration: (num) => ipcRenderer.invoke('switch-generation', num),
-  bootGeneration: (num) => ipcRenderer.invoke('boot-generation', num),
-  deleteGeneration: (num) => ipcRenderer.invoke('delete-generation', num),
+  getGenerationInfo: (num: any) => ipcRenderer.invoke('get-generation-info', num),
+  getGenerationDiff: (from: any, to: any) => ipcRenderer.invoke('get-generation-diff', from, to),
+  switchGeneration: (num: any) => ipcRenderer.invoke('switch-generation', num),
+  bootGeneration: (num: any) => ipcRenderer.invoke('boot-generation', num),
+  deleteGeneration: (num: any) => ipcRenderer.invoke('delete-generation', num),
 
   // Git operations
   getGitInfo: () => ipcRenderer.invoke('get-git-info'),
-  getCommitDetails: (hash) => ipcRenderer.invoke('get-commit-details', hash),
-  gitSwitchBranch: (branch) => ipcRenderer.invoke('git-switch-branch', branch),
+  getCommitDetails: (hash: any) => ipcRenderer.invoke('get-commit-details', hash),
+  gitSwitchBranch: (branch: any) => ipcRenderer.invoke('git-switch-branch', branch),
   gitPull: () => ipcRenderer.invoke('git-pull'),
   gitFetch: () => ipcRenderer.invoke('git-fetch'),
 
   // Discover (AppStream)
   discoverInit: () => ipcRenderer.invoke('discover-init'),
   discoverGetCategories: () => ipcRenderer.invoke('discover-get-categories'),
-  discoverSearch: (query, options) => ipcRenderer.invoke('discover-search', query, options),
-  discoverByCategory: (category, limit) => ipcRenderer.invoke('discover-by-category', category, limit),
-  discoverFeatured: (limit) => ipcRenderer.invoke('discover-featured', limit),
-  discoverGetIcon: (iconName) => ipcRenderer.invoke('discover-get-icon', iconName),
-  discoverGetDetails: (pkgname) => ipcRenderer.invoke('discover-get-details', pkgname),
+  discoverSearch: (query: any, options: any) => ipcRenderer.invoke('discover-search', query, options),
+  discoverByCategory: (category: any, limit: any) => ipcRenderer.invoke('discover-by-category', category, limit),
+  discoverFeatured: (limit: any) => ipcRenderer.invoke('discover-featured', limit),
+  discoverGetIcon: (iconName: any) => ipcRenderer.invoke('discover-get-icon', iconName),
+  discoverGetDetails: (pkgname: any) => ipcRenderer.invoke('discover-get-details', pkgname),
   discoverRefresh: () => ipcRenderer.invoke('discover-refresh'),
-  discoverSearchNixpkgs: (query) => ipcRenderer.invoke('discover-search-nixpkgs', query),
-  discoverTryPackage: (pkgname) => ipcRenderer.invoke('discover-try-package', pkgname),
+  discoverSearchNixpkgs: (query: any) => ipcRenderer.invoke('discover-search-nixpkgs', query),
+  discoverTryPackage: (pkgname: any) => ipcRenderer.invoke('discover-try-package', pkgname),
   discoverIsTrying: () => ipcRenderer.invoke('discover-is-trying'),
   discoverKillTry: () => ipcRenderer.invoke('discover-kill-try'),
-  discoverFindPackage: (pkgname) => ipcRenderer.invoke('discover-find-package', pkgname),
+  discoverFindPackage: (pkgname: any) => ipcRenderer.invoke('discover-find-package', pkgname),
   discoverGetConfigFiles: () => ipcRenderer.invoke('discover-get-config-files'),
-  discoverCheckNixpkgsPackage: (pkgname) => ipcRenderer.invoke('discover-check-nixpkgs-package', pkgname),
-  discoverAddPackage: (options) => ipcRenderer.invoke('discover-add-package', options),
+  discoverCheckNixpkgsPackage: (pkgname: any) => ipcRenderer.invoke('discover-check-nixpkgs-package', pkgname),
+  discoverAddPackage: (options: any) => ipcRenderer.invoke('discover-add-package', options),
   discoverGetConfigured: () => ipcRenderer.invoke('discover-get-configured'),
-  discoverRemovePackage: (options) => ipcRenderer.invoke('discover-remove-package', options),
+  discoverRemovePackage: (options: any) => ipcRenderer.invoke('discover-remove-package', options),
 
   // History (persistent audit log)
   historyGet: () => ipcRenderer.invoke('history-get'),
-  historyAdd: (entry) => ipcRenderer.invoke('history-add', entry),
-  historyAddOption: (entry) => ipcRenderer.invoke('history-add-option', entry),
+  historyAdd: (entry: any) => ipcRenderer.invoke('history-add', entry),
+  historyAddOption: (entry: any) => ipcRenderer.invoke('history-add-option', entry),
 
   // Build output listener — returns a cleanup function to remove the listener
-  onBuildOutput: (callback) => {
-    const handler = (_event, data) => callback(data);
+  onBuildOutput: (callback: any) => {
+    const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on('build-output', handler);
     return () => ipcRenderer.removeListener('build-output', handler);
   },
 
   // Build complete listener — returns a cleanup function
-  onBuildComplete: (callback) => {
-    const handler = (_event, data) => callback(data);
+  onBuildComplete: (callback: any) => {
+    const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on('build-complete', handler);
     return () => ipcRenderer.removeListener('build-complete', handler);
   },
 
   // Terminal show listener — returns a cleanup function
-  onTerminalShow: (callback) => {
-    const handler = (_event, data) => callback(data);
+  onTerminalShow: (callback: any) => {
+    const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on('terminal-show', handler);
     return () => ipcRenderer.removeListener('terminal-show', handler);
   },
 
   // Try process ended listener — returns a cleanup function
-  onTryProcessEnded: (callback) => {
+  onTryProcessEnded: (callback: any) => {
     const handler = () => callback();
     ipcRenderer.on('try-process-ended', handler);
     return () => ipcRenderer.removeListener('try-process-ended', handler);
   },
 
   // Show updates listener — returns a cleanup function
-  onShowUpdates: (callback) => {
+  onShowUpdates: (callback: any) => {
     const handler = () => callback();
     ipcRenderer.on('show-updates', handler);
     return () => ipcRenderer.removeListener('show-updates', handler);
   },
 
   // Flake update check completed — returns a cleanup function
-  onFlakeUpdateCheckComplete: (callback) => {
-    const handler = (_event, status) => callback(status);
+  onFlakeUpdateCheckComplete: (callback: any) => {
+    const handler = (_event: any, status: any) => callback(status);
     ipcRenderer.on('flake-update-check-complete', handler);
     return () => ipcRenderer.removeListener('flake-update-check-complete', handler);
   }

@@ -1,13 +1,13 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let specializations = $state([]);
-  let flakeInputs = $state([]);
+  let specializations = $state<any[]>([]);
+  let flakeInputs = $state<any[]>([]);
   let showConfirmDialog = $state(false);
-  let pendingSwitch = $state(null);
+  let pendingSwitch = $state<any>(null);
   let isSwitching = $state(false);
-  let switchError = $state(null);
-  let selectedInput = $state(null);
+  let switchError = $state<any>(null);
+  let selectedInput = $state<any>(null);
   let isUpdatingInput = $state(false);
 
   // Load real data on mount
@@ -24,7 +24,7 @@
   async function loadSpecializations() {
     try {
       specializations = await window.electronAPI.getSpecializations();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load specializations:", e);
     }
   }
@@ -32,12 +32,12 @@
   async function loadFlakeInputs() {
     try {
       flakeInputs = await window.electronAPI.getFlakeInputs();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load flake inputs:", e);
     }
   }
 
-  function requestSwitch(name) {
+  function requestSwitch(name: any) {
     // Don't switch if already active
     const current = specializations.find(s => s.active);
     if (current?.name === name) return;
@@ -60,7 +60,7 @@
         ...s,
         active: s.name === pendingSwitch,
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to switch:", e);
       switchError = e.message || "Failed to switch specialization";
     } finally {
@@ -74,12 +74,12 @@
     pendingSwitch = null;
   }
 
-  function selectInput(name) {
+  function selectInput(name: any) {
     if (isUpdatingInput) return;
     selectedInput = selectedInput === name ? null : name;
   }
 
-  async function updateSingleInput(name) {
+  async function updateSingleInput(name: any) {
     if (isUpdatingInput) return;
 
     isUpdatingInput = true;
@@ -98,7 +98,7 @@
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: name, success: true }
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to update:", e);
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: name, success: false, error: e.message }
@@ -127,7 +127,7 @@
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: 'all', success: true }
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to update:", e);
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: 'all', success: false, error: e.message }

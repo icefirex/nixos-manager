@@ -10,7 +10,7 @@ let _db: any = null;
 /**
  * @param {import('node:sqlite').DatabaseSync} db
  */
-function ensureOptionHistorySchema(db) {
+function ensureOptionHistorySchema(db: any) {
   const table = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='option_history'").get();
   if (!table || !table.sql) return;
 
@@ -81,7 +81,7 @@ function getDb() {
 /**
  * @param {OptionHistoryEntry} entry
  */
-function addOptionHistoryEntry(entry) {
+function addOptionHistoryEntry(entry: any) {
   const db = getDb();
   const stmt = db.prepare('INSERT INTO option_history (timestamp, option_path, action, old_value, new_value, file) VALUES (?, ?, ?, ?, ?, ?)');
   stmt.run(Date.now(), entry.optionPath, entry.action, entry.oldValue || null, entry.newValue || null, entry.file);
@@ -130,7 +130,7 @@ function createHistoryHandlers(deps: HistoryDeps = {}) {
       }
     },
 
-    historyAdd: async (entry) => {
+    historyAdd: async (entry: any) => {
       try {
         const db = depsGetDb();
         const stmt = db.prepare('INSERT INTO history (timestamp, pkgname, action, file, type, user_name) VALUES (?, ?, ?, ?, ?, ?)');
@@ -142,7 +142,7 @@ function createHistoryHandlers(deps: HistoryDeps = {}) {
       }
     },
 
-    historyAddOption: async (entry) => {
+    historyAddOption: async (entry: any) => {
       try {
         depsAddOptionHistoryEntry(entry);
         return { success: true };
@@ -165,11 +165,11 @@ function register(deps: HistoryDeps = {}) {
     return handlers.historyGet();
   });
 
-  depsIpcMain.handle('history-add', async (_event, entry) => {
+  depsIpcMain.handle('history-add', async (_event: any, entry: any) => {
     return handlers.historyAdd(entry);
   });
 
-  depsIpcMain.handle('history-add-option', async (_event, entry) => {
+  depsIpcMain.handle('history-add-option', async (_event: any, entry: any) => {
     return handlers.historyAddOption(entry);
   });
 }

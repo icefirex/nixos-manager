@@ -43,7 +43,7 @@ function findFlakeDir() {
  * @param {number} [timeout]
  * @returns {Promise<string>}
  */
-async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
+async function runCmd(cmd: any, timeout = CMD_TIMEOUT_DEFAULT) {
   try {
     const { stdout } = await execAsync(cmd, {
       encoding: 'utf8',
@@ -66,7 +66,7 @@ async function runCmd(cmd, timeout = CMD_TIMEOUT_DEFAULT) {
  * @param {string} message
  * @returns {void}
  */
-function updateBuildStatus(success, message) {
+function updateBuildStatus(success: any, message: any) {
   lastBuildStatus = {
     success,
     message,

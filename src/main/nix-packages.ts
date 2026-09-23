@@ -42,7 +42,7 @@ export type DuplicateResult = {
  * @param {string} content
  * @returns {string[]}
  */
-function extractFromList(content) {
+function extractFromList(content: any) {
   const found = new Set();
   const pkgsPattern = /(?:pkgs|pkgs-stable|pkgs-unstable|pkgs-[a-z0-9]+)\.([a-zA-Z0-9_-]+)/g;
   let m;
@@ -68,7 +68,7 @@ function extractFromList(content) {
  * @param {string} content
  * @returns {string}
  */
-function stripStrings(content) {
+function stripStrings(content: any) {
   let result = '';
   let i = 0;
   while (i < content.length) {
@@ -122,7 +122,7 @@ function stripStrings(content) {
  * @param {RegExp} pattern
  * @returns {string | null}
  */
-function extractListBlock(content, pattern) {
+function extractListBlock(content: any, pattern: any) {
   const match = content.match(pattern);
   if (!match) return null;
   const stripped = stripStrings(content);
@@ -145,7 +145,7 @@ function extractListBlock(content, pattern) {
  * @param {number} startIndex
  * @returns {string | null}
  */
-function extractListBlockAt(content, startIndex) {
+function extractListBlockAt(content: any, startIndex: any) {
   const stripped = stripStrings(content);
   const openBracket = stripped.indexOf('[', startIndex);
   if (openBracket === -1) return null;
@@ -165,10 +165,10 @@ function extractListBlockAt(content, startIndex) {
  * @param {string} flakeDir
  * @returns {NixPackageFile[]}
  */
-function scanNixPackages(flakeDir) {
+function scanNixPackages(flakeDir: any) {
   const results: any[] = [];
 
-  function processFile(fullPath) {
+  function processFile(fullPath: any) {
       let content;
       try { content = fs.readFileSync(fullPath, 'utf8'); } catch { return; }
 
@@ -198,7 +198,7 @@ function scanNixPackages(flakeDir) {
       }
     }
 
-  function scanDir(dir) {
+  function scanDir(dir: any) {
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const entry of entries) {
@@ -248,7 +248,7 @@ function getAllPackages() {
  * @param {string} pkgname
  * @returns {PackageFindResult[]}
  */
-function findPackage(pkgname) {
+function findPackage(pkgname: any) {
   const flakeDir = findFlakeDir();
   if (!flakeDir) return [];
 
@@ -277,13 +277,13 @@ function findPackage(pkgname) {
  * @param {string} pkgname
  * @returns {number[]}
  */
-function findPackageLines(filePath, pkgname) {
+function findPackageLines(filePath: any, pkgname: any) {
   const lines: any[] = [];
   const pkgRef = `pkgs.${pkgname}`;
   let content;
   try { content = fs.readFileSync(filePath, 'utf8'); } catch { return lines; }
 
-  function stripNixStrings(str) {
+  function stripNixStrings(str: any) {
     let result = '';
     let i = 0;
     while (i < str.length) {
@@ -316,7 +316,7 @@ function findPackageLines(filePath, pkgname) {
   const stripped = stripNixStrings(content);
   const allLines = content.split('\n');
 
-  function getBlockRange(startIndex) {
+  function getBlockRange(startIndex: any) {
     const openBracket = stripped.indexOf('[', startIndex);
     if (openBracket === -1) return null;
     let depth = 0;
@@ -340,7 +340,7 @@ function findPackageLines(filePath, pkgname) {
     if (pattern.global) {
       let m;
       while ((m = pattern.exec(content)) !== null) {
-        const range = getBlockRange(m.index + m[0].length);
+        const range = getBlockRange((m.index ?? 0) + m[0].length);
         if (!range) continue;
         const startLine = content.slice(0, range.start).split('\n').length;
         const endLine = content.slice(0, range.end).split('\n').length;
@@ -354,7 +354,7 @@ function findPackageLines(filePath, pkgname) {
     } else {
       const m = content.match(pattern);
       if (m) {
-        const range = getBlockRange(m.index + m[0].length);
+        const range = getBlockRange((m.index ?? 0) + m[0].length);
         if (!range) continue;
         const startLine = content.slice(0, range.start).split('\n').length;
         const endLine = content.slice(0, range.end).split('\n').length;
@@ -385,10 +385,10 @@ function findDuplicates() {
 
   // scope -> pkgname -> Set of files
   const scopeMap: any = {};
-  function add(scope, pkg, file, relPath) {
+  function add(scope: any, pkg: any, file: any, relPath: any) {
     if (!scopeMap[scope]) scopeMap[scope] = {};
     if (!scopeMap[scope][pkg]) scopeMap[scope][pkg] = [];
-    if (!scopeMap[scope][pkg].some(e => e.file === file)) {
+    if (!scopeMap[scope][pkg].some((e: any) => e.file === file)) {
       scopeMap[scope][pkg].push({ file, relativePath: relPath });
     }
   }
@@ -430,8 +430,8 @@ function findDuplicates() {
         duplicates.push({
           pkgname,
           scope: 'cross-user',
-          files: entries.flatMap(e => e.files.map(f => ({ ...f, user: e.user }))),
-          users: entries.map(e => e.user),
+          files: entries.flatMap((e: any) => e.files.map((f: any) => ({ ...f, user: e.user }))),
+          users: entries.map((e: any) => e.user),
           crossUser: true
         });
       }

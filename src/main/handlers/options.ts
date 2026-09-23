@@ -26,11 +26,11 @@ type OptionsDeps = {
   searchOptionCatalog?: (query: string, channel?: string, limit?: number) => Promise<Array<{path: string, description: string | null, type: string | null, default: string | null, example: string | null, declared: string | null}>>;
 };
 
-function escapeRegExp(str) {
+function escapeRegExp(str: any) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findNixFiles(dir, files: any[] = []) {
+function findNixFiles(dir: any, files: any[] = []) {
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -45,12 +45,12 @@ function findNixFiles(dir, files: any[] = []) {
   return files;
 }
 
-function normalizeOptionValue(value) {
+function normalizeOptionValue(value: any) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/;$/, '').trim();
 }
 
-function resolveScopePath(paths) {
+function resolveScopePath(paths: any) {
   let full = '';
   for (const p of paths) {
     if (!p) continue;
@@ -80,13 +80,13 @@ type ScopedAssignment = {
  * @param {string} content
  * @returns {ScopedAssignment[]}
  */
-function buildScopedAssignments(content) {
+function buildScopedAssignments(content: any) {
   const lines = content.split('\n');
   const stack: any[] = [];
   let depth = 0;
   const entries: any[] = [];
 
-  function countChar(str, ch) {
+  function countChar(str: any, ch: any) {
     let count = 0;
     for (const c of str) if (c === ch) count++;
     return count;
@@ -132,7 +132,7 @@ function buildScopedAssignments(content) {
  * @param {string} optionPath
  * @param {string | null} [preferredFile]
  */
-function chooseOptionFile(flakeDir, preferredFile = null) {
+function chooseOptionFile(flakeDir: any, preferredFile = null) {
   const files = findNixFiles(flakeDir);
   if (files.length === 0) return null;
   if (preferredFile) {
@@ -148,7 +148,7 @@ function chooseOptionFile(flakeDir, preferredFile = null) {
  * @param {string | null | undefined} filePath
  * @returns {string | null}
  */
-function resolveTargetFilePath(flakeDir, filePath) {
+function resolveTargetFilePath(flakeDir: any, filePath: any) {
   if (!filePath) return null;
   const candidates: any[] = [];
 
@@ -174,7 +174,7 @@ function resolveTargetFilePath(flakeDir, filePath) {
   return null;
 }
 
-async function resolveGitContext(targetFile, flakeDir) {
+async function resolveGitContext(targetFile: any, flakeDir: any) {
   const dirs = [path.dirname(targetFile), flakeDir].filter(Boolean);
   for (const dir of dirs) {
     const root = await runCmd(`git -C "${dir}" rev-parse --show-toplevel`);
@@ -195,7 +195,7 @@ async function resolveGitContext(targetFile, flakeDir) {
  * @param {boolean} [allowCreate]
  * @returns {{action: 'set'|'added', oldValue: string|null, newValue: string}}
  */
-function updateOptionInFile(filePath, optionPath, newValueRaw, allowCreate = true) {
+function updateOptionInFile(filePath: any, optionPath: any, newValueRaw: any, allowCreate = true) {
   const escapedPath = escapeRegExp(optionPath);
   const assignRegex = new RegExp(`^(\\s*)${escapedPath}\\s*=\\s*(.*?)\\s*;\\s*(#.*)?$`);
   const prefixRegex = new RegExp(`^(\\s*)${escapedPath}\\s*=`);
@@ -347,7 +347,7 @@ function updateOptionInFile(filePath, optionPath, newValueRaw, allowCreate = tru
  * @param {string} optionPath
  * @returns {string | null}
  */
-function extractOptionValueFromContent(content, optionPath) {
+function extractOptionValueFromContent(content: any, optionPath: any) {
   const lines = content.split('\n');
   const escapedPath = escapeRegExp(optionPath);
   const assignRegex = new RegExp(`^(\\s*)${escapedPath}\\s*=\\s*(.*?)\\s*;\\s*(#.*)?$`);
@@ -411,7 +411,7 @@ function extractOptionValueFromContent(content, optionPath) {
   return null;
 }
 
-function searchOptionCatalog(query, channel = 'unstable', limit = 20) {
+function searchOptionCatalog(query: any, channel = 'unstable', limit = 20) {
   const payload = JSON.stringify({
     from: 0,
     size: Math.max(1, Math.min(limit, 100)),
@@ -517,7 +517,7 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
       const nixFiles = findNixFiles(flakeDir);
 
       // Helper to extract multi-line block/list from source
-      function extractMultilineValue(lines, startIdx, startValue) {
+      function extractMultilineValue(lines: any, startIdx: any, startValue: any) {
         // Count initial brackets
         let braceCount = 0;
         let bracketCount = 0;
@@ -599,31 +599,31 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
 
               // Categorize the option
               if (category === 'services') {
-                if (!options.services.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.services.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.services.push(optionEntry);
                 }
               } else if (category === 'programs') {
-                if (!options.programs.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.programs.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.programs.push(optionEntry);
                 }
               } else if (category === 'hardware') {
-                if (!options.hardware.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.hardware.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.hardware.push(optionEntry);
                 }
               } else if (category === 'networking') {
-                if (!options.networking.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.networking.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.networking.push(optionEntry);
                 }
               } else if (category === 'boot') {
-                if (!options.boot.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.boot.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.boot.push(optionEntry);
                 }
               } else if (category === 'system') {
-                if (!options.system.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.system.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.system.push(optionEntry);
                 }
               } else {
-                if (!options.other.find(o => o.path === optionPath && o.file === relativePath)) {
+                if (!options.other.find((o: any) => o.path === optionPath && o.file === relativePath)) {
                   options.other.push(optionEntry);
                 }
               }
@@ -636,14 +636,14 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
 
       // Sort all lists by option path
       for (const category of Object.keys(options)) {
-        options[category].sort((a, b) => a.path.localeCompare(b.path));
+        options[category].sort((a: any, b: any) => a.path.localeCompare(b.path));
       }
 
       return options;
     },
 
     // Get option info from NixOS options
-    getOptionInfo: async (optionPath) => {
+    getOptionInfo: async (optionPath: any) => {
       const flakeDir = depsFindFlakeDir();
 
       const info: any = {
@@ -719,7 +719,7 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
       return { success: true, files };
     },
 
-    setOptionValue: async (payload) => {
+    setOptionValue: async (payload: any) => {
       const flakeDir = depsFindFlakeDir();
       if (!flakeDir) {
         return { success: false, error: depsFlakeDirNotFoundMsg() };
@@ -775,7 +775,7 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
       }
     },
 
-    revertOptionFromGit: async (payload) => {
+    revertOptionFromGit: async (payload: any) => {
       const flakeDir = depsFindFlakeDir();
       if (!flakeDir) {
         return { success: false, error: depsFlakeDirNotFoundMsg() };
@@ -839,7 +839,7 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
       }
     },
 
-    searchOptionsCatalog: async (query, opts: any = {}) => {
+    searchOptionsCatalog: async (query: any, opts: any = {}) => {
       if (!query || typeof query !== 'string' || !query.trim()) {
         return { success: true, results: [] };
       }
@@ -949,7 +949,7 @@ function createOptionsHandlers(deps: OptionsDeps = {}) {
 
       // Sort all lists
       for (const category of Object.keys(options)) {
-        options[category].sort((a, b) => a.path.localeCompare(b.path));
+        options[category].sort((a: any, b: any) => a.path.localeCompare(b.path));
       }
 
       return options;
@@ -969,7 +969,7 @@ function register(deps: OptionsDeps = {}) {
     return handlers.getOptions();
   });
 
-  depsIpcMain.handle('get-option-info', async (_event, optionPath) => {
+  depsIpcMain.handle('get-option-info', async (_event: any, optionPath: any) => {
     return handlers.getOptionInfo(optionPath);
   });
 
@@ -977,15 +977,15 @@ function register(deps: OptionsDeps = {}) {
     return handlers.optionsListFiles();
   });
 
-  depsIpcMain.handle('set-option-value', async (_event, payload) => {
+  depsIpcMain.handle('set-option-value', async (_event: any, payload: any) => {
     return handlers.setOptionValue(payload);
   });
 
-  depsIpcMain.handle('revert-option-from-git', async (_event, payload) => {
+  depsIpcMain.handle('revert-option-from-git', async (_event: any, payload: any) => {
     return handlers.revertOptionFromGit(payload);
   });
 
-  depsIpcMain.handle('search-options-catalog', async (_event, query, opts = {}) => {
+  depsIpcMain.handle('search-options-catalog', async (_event: any, query: any, opts = {}) => {
     return handlers.searchOptionsCatalog(query, opts);
   });
 

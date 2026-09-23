@@ -28,7 +28,7 @@ type NotificationsDeps = {
  * @param {string | null} status
  * @returns {Array<{id: string, type: string, title: string, message: string, action: string | null}>}
  */
-function buildGitSyncNotifications(behindCount, aheadCount, status) {
+function buildGitSyncNotifications(behindCount: any, aheadCount: any, status: any) {
   const notifications: any[] = [];
 
   if (parseInt(behindCount) > 0) {
@@ -51,7 +51,7 @@ function buildGitSyncNotifications(behindCount, aheadCount, status) {
   }
 
   if (status) {
-    const lines = status.split('\n').filter(l => l).length;
+    const lines = status.split('\n').filter((l: any) => l).length;
     notifications.push({
       id: 'git-dirty',
       type: 'info',
@@ -70,7 +70,7 @@ function buildGitSyncNotifications(behindCount, aheadCount, status) {
  * @param {any} lockContent
  * @returns {Array<{name: string, days: number}>}
  */
-function collectStaleInputs(lockContent) {
+function collectStaleInputs(lockContent: any) {
   const nodes = lockContent?.nodes || {};
   const rootInputs: any = nodes.root?.inputs || {};
 
@@ -96,15 +96,15 @@ function collectStaleInputs(lockContent) {
  * @param {Array<{name: string, days: number}> | null} staleInputs
  * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
-function buildStaleInputsNotification(staleInputs) {
+function buildStaleInputsNotification(staleInputs: any) {
   if (!staleInputs || staleInputs.length === 0) return null;
 
   // UX-05: list all stale input names; truncate beyond 3
   let nameList;
   if (staleInputs.length <= 3) {
-    nameList = staleInputs.map(i => `${i.name} (${i.days}d)`).join(', ');
+    nameList = staleInputs.map((i: any) => `${i.name} (${i.days}d)`).join(', ');
   } else {
-    nameList = staleInputs.slice(0, 2).map(i => `${i.name} (${i.days}d)`).join(', ')
+    nameList = staleInputs.slice(0, 2).map((i: any) => `${i.name} (${i.days}d)`).join(', ')
       + ` +${staleInputs.length - 2} more`;
   }
 
@@ -123,7 +123,7 @@ function buildStaleInputsNotification(staleInputs) {
  * @param {number} percentage
  * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
-function buildDiskNotification(percentage) {
+function buildDiskNotification(percentage: any) {
   if (percentage > DISK_CRITICAL_PCT) {
     return {
       id: 'disk-critical',
@@ -151,7 +151,7 @@ function buildDiskNotification(percentage) {
  * @param {Record<string, boolean> | undefined} updateStatus
  * @returns {{id: string, type: string, title: string, message: string, action: string} | null}
  */
-function buildFlakeUpdatesNotification(updateStatus) {
+function buildFlakeUpdatesNotification(updateStatus: any) {
   const updatable = Object.entries(updateStatus || {})
     .filter(([, hasUpdate]) => hasUpdate)
     .map(([name]) => name);

@@ -3,26 +3,26 @@
   import Icon from "./Icon.svelte";
 
   let searchQuery = $state('');
-  let selectedCategory = $state(null);
-  let categories = $state([]);
-  let allPackages = $state([]);
-  let featuredPackages = $state([]);
+  let selectedCategory = $state<any>(null);
+  let categories = $state<any[]>([]);
+  let allPackages = $state<any[]>([]);
+  let featuredPackages = $state<any[]>([]);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let stats = $state({ totalApps: 0, categories: 0 });
-  let selectedPackage = $state(null);
-  let packageDetails = $state(null);
+  let selectedPackage = $state<any>(null);
+  let packageDetails = $state<any>(null);
   let loadingDetails = $state(false);
   let trying = $state(false);
-  let iconCache = $state({});
+  let iconCache = $state<Record<string, string | null>>({});
 
   // Add to configuration
-  let configFiles = $state([]);
+  let configFiles = $state<any[]>([]);
   let configFilesLoaded = $state(false);
   let installFile = $state('');
   let installType = $state('system');
   let installUser = $state('');
-  let availableUsers = $state([]);
+  let availableUsers = $state<any[]>([]);
   let adding = $state(false);
   let installSuccess = $state(false);
   let installDiff = $state('');
@@ -31,13 +31,13 @@
   let currentView = $state('details');
   let configuredPackages = $state(new Set());
   let removing = $state(false);
-  let packageLocations = $state([]);
-  let auditLog = $state([]);
-  let toasts = $state([]);
-  let diffOverlay = $state(null);
+  let packageLocations = $state<any[]>([]);
+  let auditLog = $state<any[]>([]);
+  let toasts = $state<any[]>([]);
+  let diffOverlay = $state<any>(null);
   let installFilter = $state('all'); // all | installed
 
-  function showToast(message, type, diff) {
+  function showToast(message: string, type?: string, diff?: string) {
     const id = Date.now() + Math.random();
     toasts = [...toasts, { id, message, type, diff }];
     if (type !== 'error') {
@@ -53,7 +53,7 @@
 
   let isConfigured = $derived(selectedPackage ? configuredPackages.has(selectedPackage.pkgname) : false);
 
-  function matchesInstallFilter(pkg) {
+  function matchesInstallFilter(pkg: any) {
     const installed = configuredPackages.has(pkg.pkgname);
     if (installFilter === 'installed') return installed;
     return true;
@@ -73,7 +73,7 @@
     packageLocations.some(p => p.path === installFile)
   );
 
-  function formatTime(ts) {
+  function formatTime(ts: any) {
     const diff = Date.now() - ts;
     if (diff < 60000) return 'just now';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
@@ -82,12 +82,12 @@
   }
 
   // Nixpkgs extended search
-  let nixpkgsResults = $state([]);
+  let nixpkgsResults = $state<any[]>([]);
   let searchingNixpkgs = $state(false);
   let nixpkgsSearched = $state(false);
   let showNixpkgsTab = $state(false);
   // Category display names and icons
-  const categoryMeta = {
+  const categoryMeta: Record<string, any> = {
     'AudioVideo': { name: 'Media', icon: 'Film' },
     'Audio': { name: 'Audio', icon: 'Music' },
     'Video': { name: 'Video', icon: 'Video' },
@@ -155,7 +155,7 @@
 
   // Category counts
   let categoryCounts = $derived.by(() => {
-    const counts = {};
+    const counts: Record<string, number> = {};
     const q = searchQuery.trim().toLowerCase();
 
     for (const cat of categories) {
@@ -205,7 +205,7 @@
         window.electronAPI.discoverFeatured(24)
       ]);
 
-      categories = cats.filter(c => categoryMeta[c]);
+      categories = cats.filter((c: any) => categoryMeta[c]);
       allPackages = pkgs;
       featuredPackages = featured;
 
@@ -222,7 +222,7 @@
           loadIcon(pkg.icon.name);
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
     } finally {
       loading = false;
@@ -235,7 +235,7 @@
       if (result.success) {
         configuredPackages = new Set(result.packages);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load configured packages:', e);
     }
   }
@@ -255,13 +255,13 @@
             const secs = first.sections;
             if (secs.includes('system')) installType = 'system';
             else if (secs.includes('homeManager')) installType = 'homeManager';
-            else if (secs.some(s => s.type === 'user')) {
+            else if (secs.some((s: any) => s.type === 'user')) {
               installType = 'user';
-              installUser = secs.find(s => s.type === 'user').userName;
+              installUser = secs.find((s: any) => s.type === 'user').userName;
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to find package:', e);
       }
     }
@@ -292,14 +292,14 @@
       } else {
         showToast(result.error || 'Failed to remove package', 'error');
       }
-    } catch (e) {
+    } catch (e: any) {
       showToast(e.message || 'Failed to remove package', 'error');
     } finally {
       removing = false;
     }
   }
 
-  async function loadIcon(iconName) {
+  async function loadIcon(iconName: any) {
     if (iconCache[iconName]) return;
 
     try {
@@ -307,12 +307,12 @@
       if (dataUrl) {
         iconCache = { ...iconCache, [iconName]: dataUrl };
       }
-    } catch (e) {
+    } catch (e: any) {
       // Ignore icon load errors
     }
   }
 
-  function selectCategory(cat) {
+  function selectCategory(cat: any) {
     selectedCategory = cat === selectedCategory ? null : cat;
     showNixpkgsTab = false;
   }
@@ -339,7 +339,7 @@
       nixpkgsResults = await window.electronAPI.discoverSearchNixpkgs(q);
       nixpkgsSearched = true;
       showNixpkgsTab = true;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Nixpkgs search failed:', e);
       nixpkgsResults = [];
     } finally {
@@ -347,7 +347,7 @@
     }
   }
 
-  async function openModal(pkg) {
+  async function openModal(pkg: any) {
     selectedPackage = pkg;
     currentView = 'details';
     loadingDetails = true;
@@ -362,7 +362,7 @@
         loadIcon(pkg.icon.name);
       }
       packageDetails = await window.electronAPI.discoverGetDetails(pkg.pkgname);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load details:', e);
     } finally {
       loadingDetails = false;
@@ -376,7 +376,7 @@
     packageDetails = null;
   }
 
-  function getIconUrl(pkg) {
+  function getIconUrl(pkg: any) {
     if (!pkg.icon?.name) return null;
     return iconCache[pkg.icon.name] || null;
   }
@@ -391,16 +391,16 @@
     }
   });
 
-  function openUrl(url) {
+  function openUrl(url: any) {
     if (url) {
       window.open(url, '_blank');
     }
   }
 
   let showKillConfirm = $state(false);
-  let pendingTryPackage = $state(null);
+  let pendingTryPackage = $state<any>(null);
 
-  async function tryPackage(pkgname) {
+  async function tryPackage(pkgname: any) {
     // Check if a process is already running
     const status = await window.electronAPI.discoverIsTrying();
     if (status.running) {
@@ -412,13 +412,13 @@
     await doTryPackage(pkgname);
   }
 
-  async function doTryPackage(pkgname) {
+  async function doTryPackage(pkgname: any) {
     trying = true;
     try {
       await window.electronAPI.discoverTryPackage(pkgname);
       // Close modal after launching
       closeModal();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to try package:', e);
     } finally {
       trying = false;
@@ -446,13 +446,13 @@
       const result = await window.electronAPI.discoverGetConfigFiles();
       if (result.success) {
         configFiles = result.files;
-        const allUsers = [...new Set(result.files.flatMap(f => f.users))];
+        const allUsers = [...new Set(result.files.flatMap((f: any) => f.users))];
         availableUsers = allUsers;
         installUser = availableUsers[0] || '';
         autoSelectFile();
         configFilesLoaded = true;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load config files:', e);
     }
   }
@@ -462,7 +462,7 @@
     installFile = f ? f.path : '';
   }
 
-  async function selectType(type) {
+  async function selectType(type: any) {
     installType = type;
     autoSelectFile();
 
@@ -504,14 +504,14 @@
       } else {
         showToast(result.error || 'Failed to add package', 'error');
       }
-    } catch (e) {
+    } catch (e: any) {
       showToast(e.message || 'Failed to add package', 'error');
     } finally {
       adding = false;
     }
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: any) {
     if (e.key === 'Escape' && selectedPackage) {
       closeModal();
     }

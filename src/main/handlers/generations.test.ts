@@ -93,9 +93,9 @@ describe('generations handler', () => {
 
       const gens = await handlers.getGenerations();
 
-      expect(gens.map(g => g.number)).toEqual([10, 5, 3]);
-      expect(gens.find(g => g.number === 5).current).toBe(true);
-      expect(gens.find(g => g.number === 3).current).toBe(false);
+      expect(gens.map((g: any) => g.number)).toEqual([10, 5, 3]);
+      expect(gens.find((g: any) => g.number === 5).current).toBe(true);
+      expect(gens.find((g: any) => g.number === 3).current).toBe(false);
       expect(gens[0].date).toBe('2026-01-01T00:00:00.000Z');
       expect(fakeFs.readlinkSync).toHaveBeenCalledWith('/run/current-system');
     });

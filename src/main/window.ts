@@ -114,7 +114,7 @@ function registerWindowHandlers() {
     }, 50);
   });
 
-  ipcMain.handle('settings-set-theme', (_event, theme) => {
+  ipcMain.handle('settings-set-theme', (_event: any, theme: any) => {
     const value = WINDOW_BG[theme] ? theme : 'mocha';
     try {
       fs.writeFileSync(themeFilePath(), JSON.stringify({ theme: value }), 'utf8');

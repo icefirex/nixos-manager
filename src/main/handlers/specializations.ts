@@ -13,7 +13,7 @@ const VALID_SPEC_NAME = /^[a-zA-Z0-9_-]+$/;
  * Build the switch-to-configuration path for a specialization.
  * Pure: no fs access.
  */
-function buildSpecSwitchPath(name, profilePath) {
+function buildSpecSwitchPath(name: any, profilePath: any) {
   if (name === 'base') {
     return `${profilePath}/bin/switch-to-configuration`;
   }
@@ -24,7 +24,7 @@ function buildSpecSwitchPath(name, profilePath) {
  * Determine the active specialization name from resolved system paths.
  * Pure (realpath is injected). Returns 'base', the entry name, or null.
  */
-function determineActiveSpec(currentPath, basePath, specEntries, realpath) {
+function determineActiveSpec(currentPath: any, basePath: any, specEntries: any, realpath: any) {
   if (!currentPath || !basePath) return null;
   if (currentPath === basePath) return 'base';
   for (const entry of specEntries) {
@@ -39,7 +39,7 @@ function determineActiveSpec(currentPath, basePath, specEntries, realpath) {
  * Build the specialization list: "base" first, then directory entries.
  * Pure (isDirectory is injected).
  */
-function buildSpecializationList(activeSpec, specEntries, isDirectory) {
+function buildSpecializationList(activeSpec: any, specEntries: any, isDirectory: any) {
   const specializations = [{ name: 'base', active: activeSpec === 'base' }];
   for (const entry of specEntries) {
     if (isDirectory(entry)) {
@@ -69,7 +69,7 @@ function createSpecializationsHandlers(deps: SpecializationsDeps = {}) {
   const specDir = `${profilePath}/specialisation`;
 
   return {
-    switchSpecialization: async (name) => {
+    switchSpecialization: async (name: any) => {
       // SEC-05: validate name before constructing any path
       if (!name || !VALID_SPEC_NAME.test(name)) {
         throw new Error(`Invalid specialization name: "${name}"`);
@@ -116,10 +116,10 @@ function createSpecializationsHandlers(deps: SpecializationsDeps = {}) {
         currentPath,
         basePath,
         specEntries,
-        (entry) => depsFs.realpathSync(path.join(specDir, entry))
+        (entry: any) => depsFs.realpathSync(path.join(specDir, entry))
       );
 
-      return buildSpecializationList(activeSpec, specEntries, (entry) => {
+      return buildSpecializationList(activeSpec, specEntries, (entry: any) => {
         try {
           return depsFs.statSync(path.join(specDir, entry)).isDirectory();
         } catch (e: any) {
@@ -138,7 +138,7 @@ function register(deps: SpecializationsDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createSpecializationsHandlers(deps);
 
-  depsIpcMain.handle('switch-specialization', async (_event, name) => {
+  depsIpcMain.handle('switch-specialization', async (_event: any, name: any) => {
     return handlers.switchSpecialization(name);
   });
 

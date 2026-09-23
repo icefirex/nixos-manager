@@ -1,6 +1,6 @@
 <script lang="ts">
   let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
-  let info = $state(null);
+  let info = $state<any>(null);
   let loading = $state(true);
 
   $effect(() => {
@@ -13,14 +13,14 @@
     loading = true;
     try {
       info = await window.electronAPI.getDetailedSystemInfo();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load system info:', e);
     } finally {
       loading = false;
     }
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: any) {
     if (e.key === 'Escape') onClose();
   }
 </script>
