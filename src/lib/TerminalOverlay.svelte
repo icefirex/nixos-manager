@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Terminal from "./Terminal.svelte";
 
   let showTerminal = $state(false);
@@ -99,14 +99,14 @@
     terminalExpanded = !terminalExpanded;
   }
 
-  function handleDragStart(e) {
+  function handleDragStart(e: MouseEvent) {
     isDragging = true;
     e.preventDefault();
 
     const startY = e.clientY;
     const startHeight = terminalHeight;
 
-    function onMouseMove(e) {
+    function onMouseMove(e: MouseEvent) {
       const delta = startY - e.clientY;
       const newHeight = Math.min(Math.max(startHeight + delta, 150), window.innerHeight - 200);
       terminalHeight = newHeight;

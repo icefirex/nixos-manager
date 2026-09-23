@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Sidebar from "./lib/Sidebar.svelte";
   import HeaderStrip from "./lib/HeaderStrip.svelte";
   import Dashboard from "./lib/Dashboard.svelte";

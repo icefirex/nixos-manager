@@ -1,8 +1,8 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
 
-  let { pendingPackage = null, onPendingConsumed = () => {} } = $props();
+  let { pendingPackage = null, onPendingConsumed = () => {} }: { pendingPackage?: any; onPendingConsumed?: () => void } = $props();
 
   let packages = $state({
     system: [],

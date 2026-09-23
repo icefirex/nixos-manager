@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
   let data = $state(null);
@@ -7,12 +7,12 @@
   let expandedOption = $state(null);
   let revertingOptionKey = $state(null);
 
-  function formatTime(ts) {
+  function formatTime(ts: number): string {
     if (!ts) return '';
     return new Date(ts).toLocaleString();
   }
 
-  function openPackage(pkg, source) {
+  function openPackage(pkg: string, source?: string) {
     if (source === 'live') {
       window.dispatchEvent(new CustomEvent('select-package', { detail: { pkg, source } }));
     } else {
@@ -20,7 +20,7 @@
     }
   }
 
-  function formatRelative(ts) {
+  function formatRelative(ts: number): string {
     if (!ts) return '';
     const diff = Date.now() - new Date(ts).getTime();
     if (diff < 0) return 'just now';
@@ -31,7 +31,7 @@
     return new Date(ts).toLocaleDateString();
   }
 
-  function summarizeOptionChange(change) {
+  function summarizeOptionChange(change: any) {
     if (!change) return '';
     if (change.action === 'added') return 'added';
     if (change.action === 'removed') return 'removed';
@@ -40,7 +40,7 @@
     return 'updated';
   }
 
-  function optionChangeKey(change, idx) {
+  function optionChangeKey(change: any, idx: number) {
     return `${change.optionPath}:${change.file}:${idx}`;
   }
 
@@ -76,7 +76,7 @@
     }
   }
 
-  function previewValue(value) {
+  function previewValue(value: string): string {
     if (value == null) return 'not set';
     const text = String(value).trim();
     if (!text) return 'empty';
@@ -84,11 +84,11 @@
     return oneLine.length > 80 ? `${oneLine.slice(0, 77)}...` : oneLine;
   }
 
-  function isMultilineValue(value) {
+  function isMultilineValue(value: string): boolean {
     return typeof value === 'string' && value.includes('\n');
   }
 
-  function getChangedLinePairs(oldValue, newValue, max = 12) {
+  function getChangedLinePairs(oldValue: string, newValue: string, max = 12) {
     const oldLines = String(oldValue || '').split('\n');
     const newLines = String(newValue || '').split('\n');
     const pairs = [];

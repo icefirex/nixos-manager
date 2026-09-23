@@ -355,7 +355,7 @@ describe('discover handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers all expected IPC channels and forwards deps', async () => {
-      const {  ipcMain  } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron.ts');
       ipcMain.__resetHandlers();
       const mod = require('./discover.ts');
 

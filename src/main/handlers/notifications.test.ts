@@ -184,7 +184,7 @@ describe('notifications handler', () => {
 
   describe('register(deps) wiring', () => {
     it('registers the get-notifications channel and forwards deps', async () => {
-      const {  ipcMain  } = require('../../../tests/mocks/electron');
+      const {  ipcMain  } = require('../../../tests/mocks/electron.ts');
       ipcMain.__resetHandlers();
       const mod = require('./notifications.ts');
 

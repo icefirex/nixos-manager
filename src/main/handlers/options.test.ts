@@ -16,7 +16,7 @@ describe('options handler', () => {
   });
 
   it('registers all expected IPC channels via register(deps)', () => {
-    const {  ipcMain  } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron.ts');
     ipcMain.__resetHandlers();
     const mod = require('./options.ts');
 
@@ -36,7 +36,7 @@ describe('options handler', () => {
   });
 
   it('register(deps) forwards injected deps so channels use the factory', async () => {
-    const {  ipcMain  } = require('../../../tests/mocks/electron');
+    const {  ipcMain  } = require('../../../tests/mocks/electron.ts');
     ipcMain.__resetHandlers();
     const mod = require('./options.ts');
 

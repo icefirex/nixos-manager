@@ -1,5 +1,5 @@
-<script>
-  let { show = false, onClose } = $props();
+<script lang="ts">
+  let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
   let info = $state(null);
   let loading = $state(true);
 

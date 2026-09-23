@@ -1,8 +1,8 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte';
   import Icon from "./Icon.svelte";
 
-  let { show = false, onClose } = $props();
+  let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
 
   let gitInfo = $state(null);
   let loading = $state(true);

@@ -1,7 +1,31 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { systemInfo, onSystemInfoClick, onNotificationsClick, onGitClick, onFlakeInfoClick, notificationCount = 0 } = $props();
+  interface SystemInfo {
+    profile: string;
+    hostname: string;
+    nixosVersion: string;
+    kernelVersion: string;
+    generation: number;
+    lastBuild: string;
+    healthy: boolean;
+  }
+
+  let {
+    systemInfo,
+    onSystemInfoClick,
+    onNotificationsClick,
+    onGitClick,
+    onFlakeInfoClick,
+    notificationCount = 0,
+  }: {
+    systemInfo: SystemInfo;
+    onSystemInfoClick: () => void;
+    onNotificationsClick: () => void;
+    onGitClick: () => void;
+    onFlakeInfoClick: () => void;
+    notificationCount?: number;
+  } = $props();
 </script>
 
 <div class="header-strip">

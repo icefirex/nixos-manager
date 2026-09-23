@@ -1,7 +1,21 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { type, icon, title, description, onclick, disabled = false } = $props();
+  let {
+    type,
+    icon,
+    title,
+    description,
+    onclick,
+    disabled = false,
+  }: {
+    type: string;
+    icon: string;
+    title: string;
+    description: string;
+    onclick: () => void;
+    disabled?: boolean;
+  } = $props();
 </script>
 
 <button class="action-card {type}" class:disabled {onclick} {disabled}>

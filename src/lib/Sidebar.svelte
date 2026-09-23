@@ -1,13 +1,13 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { currentPage = $bindable("dashboard") } = $props();
+  let { currentPage = $bindable("dashboard") }: { currentPage?: string } = $props();
 
   let hasDrift = $state(false);
 
   $effect(() => {
-    function onPendingChanges(e) {
-      hasDrift = e.detail.hasDrift;
+    function onPendingChanges(e: Event) {
+      hasDrift = (e as CustomEvent).detail.hasDrift;
     }
     window.addEventListener('pending-changes', onPendingChanges);
     return () => window.removeEventListener('pending-changes', onPendingChanges);
@@ -30,7 +30,7 @@
     { id: "history", icon: "ScrollText", tooltip: "History" },
   ];
 
-  function navigate(pageId) {
+  function navigate(pageId: string) {
     currentPage = pageId;
   }
 </script>

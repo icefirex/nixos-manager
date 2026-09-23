@@ -1,9 +1,23 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { title, subtitle, percentage, eta, currentStep, steps } = $props();
+  let {
+    title,
+    subtitle,
+    percentage,
+    eta,
+    currentStep,
+    steps,
+  }: {
+    title: string;
+    subtitle: string;
+    percentage: number;
+    eta: string;
+    currentStep: number;
+    steps: string[];
+  } = $props();
 
-  function getStepStatus(index) {
+  function getStepStatus(index: number): string {
     if (index < currentStep) return "completed";
     if (index === currentStep) return "active";
     return "";

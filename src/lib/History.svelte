@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
   let entries = $state([]);
@@ -9,7 +9,7 @@
   let typeFilter = $state('all');
   let lastSearchQuery = $state('');
 
-  function formatTime(ts) {
+  function formatTime(ts: number): string {
     const diff = Date.now() - ts;
     if (diff < 60000) return 'just now';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
@@ -18,19 +18,19 @@
     return new Date(ts).toLocaleDateString();
   }
 
-  function formatFullDate(ts) {
+  function formatFullDate(ts: number): string {
     return new Date(ts).toLocaleString();
   }
 
-  function formatFile(file) {
+  function formatFile(file: string) {
     return file.replace(/^.*[/]/, '…/');
   }
 
-  function selectEntry(id) {
+  function selectEntry(id: unknown) {
     selectedId = selectedId === id ? null : id;
   }
 
-  function previewValue(value) {
+  function previewValue(value: string): string {
     if (value == null) return 'not set';
     const text = String(value).trim();
     if (!text) return 'empty';
@@ -38,11 +38,11 @@
     return oneLine.length > 80 ? `${oneLine.slice(0, 77)}...` : oneLine;
   }
 
-  function isMultilineValue(value) {
+  function isMultilineValue(value: string): boolean {
     return typeof value === 'string' && value.includes('\n');
   }
 
-  function getChangedLinePairs(oldValue, newValue, max = 12) {
+  function getChangedLinePairs(oldValue: string, newValue: string, max = 12) {
     const oldLines = String(oldValue || '').split('\n');
     const newLines = String(newValue || '').split('\n');
     const pairs = [];
@@ -58,7 +58,7 @@
     return { pairs, hidden: Math.max(0, total - pairs.length) };
   }
 
-  function isSubsequence(text, query) {
+  function isSubsequence(text: string, query: string): boolean {
     if (!text || !query) return false;
     let pos = 0;
     for (const ch of query) {

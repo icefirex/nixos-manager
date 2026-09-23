@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
   import hljs from 'highlight.js/lib/core';

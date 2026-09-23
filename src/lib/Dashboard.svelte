@@ -1,10 +1,10 @@
-<script>
+<script lang="ts">
   import ActionCard from "./ActionCard.svelte";
   import ProgressCard from "./ProgressCard.svelte";
   import SidePanel from "./SidePanel.svelte";
   import Icon from "./Icon.svelte";
 
-  let { systemInfo = {} } = $props();
+  let { systemInfo = {} }: { systemInfo?: any } = $props();
 
   let updateInputs = $state(false);
   let isBuilding = $state(false);
@@ -60,7 +60,7 @@
 
   // Listen for flake update events from SidePanel
   $effect(() => {
-    function handleFlakeUpdateStart(e) {
+    function handleFlakeUpdateStart(e: Event) {
       const { inputName } = e.detail;
       isBuilding = true;
 
@@ -74,7 +74,7 @@
       };
     }
 
-    function handleFlakeUpdateComplete(e) {
+    function handleFlakeUpdateComplete(e: Event) {
       const { inputName, success, error } = e.detail;
       isBuilding = false;
 
@@ -128,7 +128,7 @@
     }
   }
 
-  function getActionTitle(action) {
+  function getActionTitle(action: string): string {
     const titles = {
       'switch': 'Switching System Configuration',
       'boot': 'Building for Next Boot',
@@ -138,7 +138,7 @@
     return titles[action] || 'Building';
   }
 
-  async function handleAction(action) {
+  async function handleAction(action: string) {
     isBuilding = true;
     currentAction = action;
     buildError = null;

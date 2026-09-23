@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import {
     Home, Compass, Package, SlidersHorizontal, History, Hammer,
     ArrowDownToLine, Users, Trash2, ScrollText, Settings,
@@ -11,7 +11,7 @@
     Snowflake
   } from 'lucide-svelte';
 
-  const icons = {
+  const icons: Record<string, any> = {
     Home, Compass, Package, SlidersHorizontal, History, Hammer,
     ArrowDownToLine, Users, Trash2, ScrollText, Settings,
     Zap, Rocket, FlaskConical, CheckCircle,
@@ -23,7 +23,7 @@
     Snowflake
   };
 
-  let { name, size = 20, ...rest } = $props();
+  let { name, size = 20, ...rest }: { name: string; size?: number; [key: string]: unknown } = $props();
 </script>
 
 {#if icons[name]}

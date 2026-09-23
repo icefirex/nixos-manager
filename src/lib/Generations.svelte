@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
 
   let generations = $state([]);
@@ -127,7 +127,7 @@
     }
   }
 
-  async function computeGroups(gens) {
+  async function computeGroups(gens: any) {
     if (gens.length === 0) return [];
 
     const groups = [];
@@ -194,7 +194,7 @@
     return groups;
   }
 
-  async function startBackgroundIndexing(token) {
+  async function startBackgroundIndexing(token: number) {
     if (generations.length < 2) {
       indexingProgress = { current: 0, total: 0, complete: true };
       return;
@@ -252,7 +252,7 @@
   }
 
 
-  function getSearchMatchInfo(genNumber) {
+  function getSearchMatchInfo(genNumber: number) {
     if (!masterSearch.trim()) return null;
 
     const entry = searchIndexArray.find(e => e.genNumber === genNumber);
@@ -274,7 +274,7 @@
     loadGenerations();
   });
 
-  function toggleGroup(groupIndex) {
+  function toggleGroup(groupIndex: number) {
     const newSet = new Set(expandedGroups);
     if (newSet.has(groupIndex)) {
       newSet.delete(groupIndex);
@@ -284,7 +284,7 @@
     expandedGroups = newSet;
   }
 
-  async function selectGeneration(gen) {
+  async function selectGeneration(gen: any) {
     if (selectedGeneration?.number === gen.number) {
       selectedGeneration = null;
       generationInfo = null;
@@ -333,13 +333,13 @@
     }
   }
 
-  function getFilteredDiffItems(items) {
+  function getFilteredDiffItems(items: any[]) {
     if (!diffFilter.trim()) return items;
     const q = diffFilter.toLowerCase();
     return items.filter(pkg => pkg.name.toLowerCase().includes(q));
   }
 
-  function compareVersions(a, b) {
+  function compareVersions(a: string, b: string): number {
     const pa = a.split(/[.\-+]/).map(Number);
     const pb = b.split(/[.\-+]/).map(Number);
     for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -351,7 +351,7 @@
     return 0;
   }
 
-  function getPaginatedItems(items) {
+  function getPaginatedItems(items: any[]) {
     const filtered = getFilteredDiffItems(items);
     const start = diffPage * ITEMS_PER_PAGE;
     return {

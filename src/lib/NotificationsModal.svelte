@@ -1,5 +1,5 @@
-<script>
-  let { show = false, onClose, onCountChange } = $props();
+<script lang="ts">
+  let { show = false, onClose, onCountChange }: { show?: boolean; onClose: () => void; onCountChange: (n: number) => void } = $props();
   let notifications = $state([]);
   let loading = $state(true);
 
