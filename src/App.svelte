@@ -13,8 +13,10 @@
   import GitModal from "./lib/GitModal.svelte";
   import TerminalOverlay from "./lib/TerminalOverlay.svelte";
   import FlakeInfoModal from "./lib/FlakeInfoModal.svelte";
+  import Settings from "./lib/Settings.svelte";
+  import { initTheme, watchSystemTheme } from "./lib/themes.ts";
 
-  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes']);
+  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes', 'settings']);
   // UX-09: restore last active tab; fall back to dashboard for unknown values
   const _savedPage = localStorage.getItem('nixos-manager:active-tab');
   let currentPage = $state(VALID_PAGES.has(_savedPage) ? _savedPage : 'dashboard');
@@ -84,6 +86,9 @@
   }
 
   $effect(() => {
+    // Theme: apply persisted choice ASAP and follow OS preference for 'system'
+    initTheme();
+    const unwatchTheme = watchSystemTheme();
     loadSystemInfo();
     loadNotificationCount();
 
@@ -92,7 +97,10 @@
     const cleanupFlake = window.electronAPI.onFlakeUpdateCheckComplete(() => {
       loadNotificationCount();
     });
-    return cleanupFlake;
+    return () => {
+      unwatchTheme();
+      cleanupFlake();
+    };
   });
 
   let isMaximized = $state(false);
@@ -171,6 +179,9 @@
         </div>
         <div class="page" class:hidden={currentPage !== "changes"}>
           <Changes />
+        </div>
+        <div class="page" class:hidden={currentPage !== "settings"}>
+          <Settings />
         </div>
       </div>
     </div>

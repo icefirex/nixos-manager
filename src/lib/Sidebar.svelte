@@ -67,11 +67,12 @@
 
   <div class="sidebar-footer">
     <button
-      class="nav-btn coming-soon"
-      onclick={undefined}
+      class="nav-btn"
+      class:active={currentPage === 'settings'}
+      onclick={() => navigate('settings')}
     >
       <Icon name="Settings" size={20} />
-      <span class="tooltip">Settings (coming soon)</span>
+      <span class="tooltip">Settings</span>
     </button>
   </div>
 </div>

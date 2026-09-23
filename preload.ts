@@ -10,6 +10,7 @@ const electronAPI = {
   maximize: () => ipcRenderer.invoke('window-maximize'),
   close: () => ipcRenderer.invoke('window-close'),
   getVersion: () => ipcRenderer.invoke('get-app-version'),
+  setTheme: (theme: string) => ipcRenderer.invoke('settings-set-theme', theme),
 
   // NixOS operations
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),

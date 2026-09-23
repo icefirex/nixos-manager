@@ -3,6 +3,7 @@
   import { FitAddon } from '@xterm/addon-fit';
   import '@xterm/xterm/css/xterm.css';
   import { onMount } from 'svelte';
+  import { TERMINAL_THEMES, initTheme, onThemeChange } from './themes.ts';
 
   let terminalElement = $state(null);
   let terminal = $state(null);
@@ -66,30 +67,7 @@
 
   onMount(() => {
     terminal = new Terminal({
-      theme: {
-        background: '#11111b',
-        foreground: '#cdd6f4',
-        cursor: '#f5e0dc',
-        cursorAccent: '#11111b',
-        selectionBackground: 'rgba(137, 180, 250, 0.3)',
-        selectionForeground: '#cdd6f4',
-        black: '#45475a',
-        red: '#f38ba8',
-        green: '#a6e3a1',
-        yellow: '#f9e2af',
-        blue: '#89b4fa',
-        magenta: '#cba6f7',
-        cyan: '#94e2d5',
-        white: '#bac2de',
-        brightBlack: '#585b70',
-        brightRed: '#f38ba8',
-        brightGreen: '#a6e3a1',
-        brightYellow: '#f9e2af',
-        brightBlue: '#89b4fa',
-        brightMagenta: '#cba6f7',
-        brightCyan: '#94e2d5',
-        brightWhite: '#a6adc8',
-      },
+      theme: TERMINAL_THEMES[initTheme()],
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 11,
       lineHeight: 1.3,
@@ -104,6 +82,13 @@
     fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(terminalElement);
+
+    // Live theme changes: re-apply the xterm palette
+    const unwatchTheme = onThemeChange((resolved) => {
+      if (terminal) {
+        terminal.options.theme = TERMINAL_THEMES[resolved];
+      }
+    });
 
     // Fit after a small delay to ensure container is sized
     setTimeout(() => fitAddon.fit(), 50);
@@ -174,6 +159,7 @@
     return () => {
       document.removeEventListener('click', handleDocumentClick);
       resizeObserver.disconnect();
+      unwatchTheme();
       terminal?.dispose();
     };
   });

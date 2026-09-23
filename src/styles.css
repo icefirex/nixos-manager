@@ -823,3 +823,58 @@ html, body {
   text-transform: capitalize;
   margin-bottom: 8px;
 }
+
+/* ============================================================
+ * Theme: Catppuccin Latte (light) — opt-in via
+ * document.documentElement.dataset.theme = 'latte'
+ * ============================================================ */
+:root[data-theme='latte'] {
+  --crust: #dce0e8;
+  --crust-rgb: 220, 224, 232;
+  --mantle: #e6e9ef;
+  --mantle-rgb: 230, 233, 239;
+  --base: #eff1f5;
+  --base-rgb: 239, 241, 245;
+  --surface0: #ccd0da;
+  --surface0-rgb: 204, 208, 218;
+  --surface1: #bcc0cc;
+  --surface1-rgb: 188, 192, 204;
+  --surface2: #acb0be;
+  --surface2-rgb: 172, 176, 190;
+  --overlay0: #9ca0b0;
+  --overlay0-rgb: 156, 160, 176;
+  --subtext0: #6c6f85;
+  --subtext0-rgb: 108, 111, 133;
+  --subtext1: #5c5f77;
+  --subtext1-rgb: 92, 95, 119;
+  --text: #4c4f69;
+  --text-rgb: 76, 79, 105;
+  --blue: #1e66f5;
+  --blue-rgb: 30, 102, 245;
+  --mauve: #8839ef;
+  --mauve-rgb: 136, 57, 239;
+  --green: #40a02b;
+  --green-rgb: 64, 160, 43;
+  --teal: #179299;
+  --teal-rgb: 23, 146, 153;
+  --red: #d20f39;
+  --red-rgb: 210, 15, 57;
+  --yellow: #df8e1d;
+  --yellow-rgb: 223, 142, 29;
+  --peach: #fe640b;
+  --peach-rgb: 254, 100, 11;
+  --pink: #ea76cb;
+  --pink-rgb: 234, 118, 203;
+  --lavender: #7287fd;
+  --lavender-rgb: 114, 135, 253;
+  --rosewater: #dc8a78;
+  --rosewater-rgb: 220, 138, 120;
+  --sky-bright: #04a5e5;
+  --sky-bright-rgb: 4, 165, 229;
+  --green-bright: #40a02b;
+  --green-bright-rgb: 64, 160, 43;
+  --black: #000000;
+  --black-rgb: 0, 0, 0;
+  --white: #ffffff;
+  --white-rgb: 255, 255, 255;
+}

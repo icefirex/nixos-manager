@@ -7,6 +7,25 @@ import fs from 'fs';
 let mainWindow: import('electron').BrowserWindow | null = null;
 let cachedVersion: string | null = null; // CQ-08: read once, not on every IPC call
 
+// Native window background per stored theme (avoids dark flash on light themes)
+const WINDOW_BG: Record<string, string> = {
+  mocha: '#1e1e2e',
+  latte: '#eff1f5',
+};
+
+function themeFilePath() {
+  return path.join(app.getPath('userData'), 'window-theme.json');
+}
+
+function readStoredTheme(): string {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(themeFilePath(), 'utf8'));
+    return parsed?.theme === 'latte' ? 'latte' : 'mocha';
+  } catch {
+    return 'mocha';
+  }
+}
+
 /**
  * Check if we're in development mode
  */
@@ -26,7 +45,7 @@ function createWindow() {
     minHeight: 800,
     frame: false,
     transparent: false,
-    backgroundColor: '#1e1e2e',
+    backgroundColor: WINDOW_BG[readStoredTheme()] || WINDOW_BG.mocha,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -91,6 +110,17 @@ function registerWindowHandlers() {
     setTimeout(() => {
       mainWindow?.destroy();
     }, 50);
+  });
+
+  ipcMain.handle('settings-set-theme', (_event, theme) => {
+    const value = theme === 'latte' ? 'latte' : 'mocha';
+    try {
+      fs.writeFileSync(themeFilePath(), JSON.stringify({ theme: value }), 'utf8');
+      return { success: true };
+    } catch (e: any) {
+      console.error('Failed to persist theme:', e.message);
+      return { success: false, error: e.message };
+    }
   });
 
   ipcMain.handle('get-app-version', () => {
