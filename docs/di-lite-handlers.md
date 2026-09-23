@@ -41,10 +41,20 @@ module.exports = { register, createExampleHandlers };
 
 ## Current Usage
 
+Full DI-lite factories (`createXHandlers`):
+
 - `src/main/handlers/options.js` exports `createOptionsHandlers`.
 - `src/main/handlers/packages.js` exports `createPackagesHandlers`.
 - `src/main/handlers/history.js` exports `createHistoryHandlers`.
 - `src/main/handlers/rebuild.js` exports `createRebuildHandlers`.
+- `src/main/handlers/git.js` exports `createGitHandlers` (+ pure parsers).
+- `src/main/handlers/generations.js` exports `createGenerationsHandlers` (+ pure parsers).
+- `src/main/handlers/notifications.js` exports `createNotificationsHandlers` (+ pure builders).
+- `src/main/handlers/system.js` exports `createSystemHandlers` (+ pure helpers).
+
+Pure-parser-only extraction (factory can be added later):
+
+- `src/main/handlers/flake.js` exports `parseFlakeInputs`, `parseFlakeLockInfo`.
 
 ## Testing Guidance
 
