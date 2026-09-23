@@ -10,20 +10,24 @@
     <div id="app"></div>
     <script>
       // Boot theme — runs before the bundle so the first paint already has
-      // the persisted theme (prevents a dark flash when using Latte).
+      // the persisted theme (prevents a wrong-flash when using a light theme).
       (function () {
+        var BG = {
+          mocha: '#1e1e2e',
+          macchiato: '#24273a',
+          latte: '#eff1f5',
+          nord: '#2e3440'
+        };
         try {
           var raw = localStorage.getItem('nixos-manager:theme');
-          var id = raw === 'latte' || raw === 'mocha' ? raw : 'mocha';
+          var id = raw && BG[raw] ? raw : 'mocha';
           if (id === 'system') {
             id = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
               ? 'latte'
               : 'mocha';
           }
           document.documentElement.dataset.theme = id;
-          if (id === 'latte') {
-            document.body.style.background = '#eff1f5';
-          }
+          document.body.style.background = BG[id];
         } catch (e) {}
       })();
     </script>

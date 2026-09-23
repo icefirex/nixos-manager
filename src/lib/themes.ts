@@ -2,14 +2,20 @@
 // Tokens live in CSS (:root / :root[data-theme='latte']); this module only
 // manages WHICH theme is active and notifies JS consumers (xterm).
 
-export type ResolvedTheme = 'mocha' | 'latte';
+export type ResolvedTheme = 'mocha' | 'macchiato' | 'latte' | 'nord';
 export type ThemeId = ResolvedTheme | 'system';
 
 const STORAGE_KEY = 'nixos-manager:theme';
-export const THEME_IDS: ThemeId[] = ['mocha', 'latte', 'system'];
+export const THEME_IDS: ThemeId[] = ['mocha', 'macchiato', 'nord', 'latte', 'system'];
 
 export function isThemeId(value: unknown): value is ThemeId {
-  return value === 'mocha' || value === 'latte' || value === 'system';
+  return (
+    value === 'mocha' ||
+    value === 'macchiato' ||
+    value === 'latte' ||
+    value === 'nord' ||
+    value === 'system'
+  );
 }
 
 /** Resolve 'system' against the OS preference; pass-through otherwise. */
@@ -30,6 +36,14 @@ export function getTheme(): ThemeId {
     return 'mocha';
   }
 }
+
+/** Native window background per resolved theme (kept in sync with window.ts). */
+export const THEME_WINDOW_BG: Record<ResolvedTheme, string> = {
+  mocha: '#1e1e2e',
+  macchiato: '#24273a',
+  latte: '#eff1f5',
+  nord: '#2e3440',
+};
 
 /** Apply a theme: set data-theme, persist, notify listeners + main process. */
 export function applyTheme(id: ThemeId): ResolvedTheme {
@@ -128,6 +142,30 @@ export const TERMINAL_THEMES: Record<ResolvedTheme, TerminalPalette> = {
     brightCyan: '#94e2d5',
     brightWhite: '#a6adc8',
   },
+  macchiato: {
+    background: '#1e2030',
+    foreground: '#cad3f5',
+    cursor: '#f4dbd6',
+    cursorAccent: '#1e2030',
+    selectionBackground: 'rgba(138, 173, 244, 0.3)',
+    selectionForeground: '#cad3f5',
+    black: '#494d64',
+    red: '#ed8796',
+    green: '#a6da95',
+    yellow: '#eed49f',
+    blue: '#8aadf4',
+    magenta: '#f5bde6',
+    cyan: '#8bd5ca',
+    white: '#b8c0e0',
+    brightBlack: '#5b6078',
+    brightRed: '#ed8796',
+    brightGreen: '#a6da95',
+    brightYellow: '#eed49f',
+    brightBlue: '#8aadf4',
+    brightMagenta: '#f5bde6',
+    brightCyan: '#8bd5ca',
+    brightWhite: '#a5adcb',
+  },
   latte: {
     background: '#eff1f5',
     foreground: '#4c4f69',
@@ -152,10 +190,36 @@ export const TERMINAL_THEMES: Record<ResolvedTheme, TerminalPalette> = {
     brightCyan: '#179299',
     brightWhite: '#4c4f69',
   },
+  nord: {
+    background: '#2e3440',
+    foreground: '#d8dee9',
+    cursor: '#d8dee9',
+    cursorAccent: '#2e3440',
+    selectionBackground: 'rgba(136, 192, 208, 0.3)',
+    selectionForeground: '#eceff4',
+    black: '#3b4252',
+    red: '#bf616a',
+    green: '#a3be8c',
+    yellow: '#ebcb8b',
+    blue: '#81a1c1',
+    magenta: '#b48ead',
+    cyan: '#8fbcbb',
+    white: '#e5e9f0',
+    brightBlack: '#4c566a',
+    brightRed: '#bf616a',
+    brightGreen: '#a3be8c',
+    brightYellow: '#ebcb8b',
+    brightBlue: '#81a1c1',
+    brightMagenta: '#b48ead',
+    brightCyan: '#8fbcbb',
+    brightWhite: '#eceff4',
+  },
 };
 
 export const THEME_LABELS: Record<ThemeId, string> = {
   mocha: 'Catppuccin Mocha (dark)',
+  macchiato: 'Catppuccin Macchiato (dark)',
   latte: 'Catppuccin Latte (light)',
+  nord: 'Nord (dark)',
   system: 'Match system',
 };

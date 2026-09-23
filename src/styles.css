@@ -878,3 +878,111 @@ html, body {
   --white: #ffffff;
   --white-rgb: 255, 255, 255;
 }
+
+/* ============================================================
+ * Theme: Catppuccin Macchiato (medium dark)
+ * ============================================================ */
+:root[data-theme='macchiato'] {
+  --crust: #181926;
+  --crust-rgb: 24, 25, 38;
+  --mantle: #1e2030;
+  --mantle-rgb: 30, 32, 48;
+  --base: #24273a;
+  --base-rgb: 36, 39, 58;
+  --surface0: #363a4f;
+  --surface0-rgb: 54, 58, 79;
+  --surface1: #494d64;
+  --surface1-rgb: 73, 77, 100;
+  --surface2: #5b6078;
+  --surface2-rgb: 91, 96, 120;
+  --overlay0: #6e738d;
+  --overlay0-rgb: 110, 115, 141;
+  --subtext0: #a5adcb;
+  --subtext0-rgb: 165, 173, 203;
+  --subtext1: #b8c0e0;
+  --subtext1-rgb: 184, 192, 224;
+  --text: #cad3f5;
+  --text-rgb: 202, 211, 245;
+  --blue: #8aadf4;
+  --blue-rgb: 138, 173, 244;
+  --mauve: #c6a0f6;
+  --mauve-rgb: 198, 160, 246;
+  --green: #a6da95;
+  --green-rgb: 166, 218, 149;
+  --teal: #8bd5ca;
+  --teal-rgb: 139, 213, 202;
+  --red: #ed8796;
+  --red-rgb: 237, 135, 150;
+  --yellow: #eed49f;
+  --yellow-rgb: 238, 212, 159;
+  --peach: #f5a97f;
+  --peach-rgb: 245, 169, 127;
+  --pink: #f5bde6;
+  --pink-rgb: 245, 189, 230;
+  --lavender: #b7bdf8;
+  --lavender-rgb: 183, 189, 248;
+  --rosewater: #f4dbd6;
+  --rosewater-rgb: 244, 219, 214;
+  --sky-bright: #91d7e3;
+  --sky-bright-rgb: 145, 215, 227;
+  --green-bright: #a6da95;
+  --green-bright-rgb: 166, 218, 149;
+  --black: #000000;
+  --black-rgb: 0, 0, 0;
+  --white: #ffffff;
+  --white-rgb: 255, 255, 255;
+}
+
+/* ============================================================
+ * Theme: Nord (cool dark blue)
+ * ============================================================ */
+:root[data-theme='nord'] {
+  --crust: #242933;
+  --crust-rgb: 36, 41, 51;
+  --mantle: #2e3440;
+  --mantle-rgb: 46, 52, 64;
+  --base: #3b4252;
+  --base-rgb: 59, 66, 82;
+  --surface0: #434c5e;
+  --surface0-rgb: 67, 76, 94;
+  --surface1: #4c566a;
+  --surface1-rgb: 76, 86, 106;
+  --surface2: #616e88;
+  --surface2-rgb: 97, 110, 136;
+  --overlay0: #7b88a1;
+  --overlay0-rgb: 123, 136, 161;
+  --subtext0: #d8dee9;
+  --subtext0-rgb: 216, 222, 233;
+  --subtext1: #e5e9f0;
+  --subtext1-rgb: 229, 233, 240;
+  --text: #eceff4;
+  --text-rgb: 236, 239, 244;
+  --blue: #81a1c1;
+  --blue-rgb: 129, 161, 193;
+  --mauve: #b48ead;
+  --mauve-rgb: 180, 142, 173;
+  --green: #a3be8c;
+  --green-rgb: 163, 190, 140;
+  --teal: #8fbcbb;
+  --teal-rgb: 143, 188, 187;
+  --red: #bf616a;
+  --red-rgb: 191, 97, 106;
+  --yellow: #ebcb8b;
+  --yellow-rgb: 235, 203, 139;
+  --peach: #d08770;
+  --peach-rgb: 208, 135, 112;
+  --pink: #c695ad;
+  --pink-rgb: 198, 149, 173;
+  --lavender: #88c0d0;
+  --lavender-rgb: 136, 192, 208;
+  --rosewater: #eceff4;
+  --rosewater-rgb: 236, 239, 244;
+  --sky-bright: #88c0d0;
+  --sky-bright-rgb: 136, 192, 208;
+  --green-bright: #a3be8c;
+  --green-bright-rgb: 163, 190, 140;
+  --black: #000000;
+  --black-rgb: 0, 0, 0;
+  --white: #ffffff;
+  --white-rgb: 255, 255, 255;
+}

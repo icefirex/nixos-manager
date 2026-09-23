@@ -10,7 +10,9 @@ let cachedVersion: string | null = null; // CQ-08: read once, not on every IPC c
 // Native window background per stored theme (avoids dark flash on light themes)
 const WINDOW_BG: Record<string, string> = {
   mocha: '#1e1e2e',
+  macchiato: '#24273a',
   latte: '#eff1f5',
+  nord: '#2e3440',
 };
 
 function themeFilePath() {
@@ -20,7 +22,7 @@ function themeFilePath() {
 function readStoredTheme(): string {
   try {
     const parsed = JSON.parse(fs.readFileSync(themeFilePath(), 'utf8'));
-    return parsed?.theme === 'latte' ? 'latte' : 'mocha';
+    return WINDOW_BG[parsed?.theme] ? parsed.theme : 'mocha';
   } catch {
     return 'mocha';
   }
@@ -113,7 +115,7 @@ function registerWindowHandlers() {
   });
 
   ipcMain.handle('settings-set-theme', (_event, theme) => {
-    const value = theme === 'latte' ? 'latte' : 'mocha';
+    const value = WINDOW_BG[theme] ? theme : 'mocha';
     try {
       fs.writeFileSync(themeFilePath(), JSON.stringify({ theme: value }), 'utf8');
       return { success: true };

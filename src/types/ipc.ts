@@ -139,7 +139,7 @@ export interface ElectronAPI {
   maximize: () => Promise<boolean>;
   close: () => Promise<void>;
   getVersion: () => Promise<string>;
-  setTheme: (theme: 'mocha' | 'latte') => Promise<{ success: boolean; error?: string }>;
+  setTheme: (theme: string) => Promise<{ success: boolean; error?: string }>;
 
   nixosRebuild: (options: NixosRebuildRequest) => Promise<unknown>;
   cancelRebuild: () => Promise<boolean>;
