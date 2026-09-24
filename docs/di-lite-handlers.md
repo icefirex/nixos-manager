@@ -13,21 +13,26 @@ The goal is better testability with minimal runtime changes.
 
 ## Template
 
-```js
-const { ipcMain } = require('electron');
-const { realDep } = require('../utils');
+```ts
+import { ipcMain } from 'electron';
+import { realDep } from '../utils.ts';
 
-function createExampleHandlers(deps = {}) {
+type ExampleDeps = {
+  ipcMain?: import('electron').IpcMain;
+  realDep?: (input: string) => Promise<string>;
+};
+
+function createExampleHandlers(deps: ExampleDeps = {}) {
   const depsRealDep = deps.realDep || realDep;
 
   return {
-    doThing: async (input) => {
+    doThing: async (input: string) => {
       return depsRealDep(input);
     }
   };
 }
 
-function register(deps = {}) {
+function register(deps: ExampleDeps = {}) {
   const depsIpcMain = deps.ipcMain || ipcMain;
   const handlers = createExampleHandlers(deps);
 
@@ -36,25 +41,24 @@ function register(deps = {}) {
   });
 }
 
-module.exports = { register, createExampleHandlers };
+export { register, createExampleHandlers };
 ```
 
 ## Current Usage
 
-Full DI-lite factories (`createXHandlers`):
+All 11 handler modules follow the pattern:
 
-- `src/main/handlers/options.js` exports `createOptionsHandlers`.
-- `src/main/handlers/packages.js` exports `createPackagesHandlers`.
-- `src/main/handlers/history.js` exports `createHistoryHandlers`.
-- `src/main/handlers/rebuild.js` exports `createRebuildHandlers`.
-- `src/main/handlers/git.js` exports `createGitHandlers` (+ pure parsers).
-- `src/main/handlers/generations.js` exports `createGenerationsHandlers` (+ pure parsers).
-- `src/main/handlers/notifications.js` exports `createNotificationsHandlers` (+ pure builders).
-- `src/main/handlers/system.js` exports `createSystemHandlers` (+ pure helpers).
-
-Pure-parser-only extraction (factory can be added later):
-
-- `src/main/handlers/flake.js` exports `parseFlakeInputs`, `parseFlakeLockInfo`.
+- `src/main/handlers/options.ts` exports `createOptionsHandlers`.
+- `src/main/handlers/packages.ts` exports `createPackagesHandlers`.
+- `src/main/handlers/history.ts` exports `createHistoryHandlers`.
+- `src/main/handlers/rebuild.ts` exports `createRebuildHandlers`.
+- `src/main/handlers/git.ts` exports `createGitHandlers` (+ pure parsers).
+- `src/main/handlers/generations.ts` exports `createGenerationsHandlers` (+ pure parsers).
+- `src/main/handlers/notifications.ts` exports `createNotificationsHandlers` (+ pure builders).
+- `src/main/handlers/system.ts` exports `createSystemHandlers` (+ pure helpers).
+- `src/main/handlers/specializations.ts` exports `createSpecializationsHandlers`.
+- `src/main/handlers/discover.ts` exports `createDiscoverHandlers` (+ pure helpers).
+- `src/main/handlers/flake.ts` exports `createFlakeHandlers` (+ `parseFlakeInputs`, `parseFlakeLockInfo`).
 
 ## Testing Guidance
 

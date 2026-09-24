@@ -1,14 +1,15 @@
 <div align="center">
   <img src="assets/icon.svg" width="80" height="80"/>
   <h1>NixOS Manager</h1>
-  <p>A beautiful desktop app for managing NixOS flake configurations.<br/>Built with Electron and Svelte 5, themed with Catppuccin Mocha.</p>
+  <p>A beautiful desktop app for managing NixOS flake configurations.<br/>Built with Electron and Svelte 5, fully TypeScript, themed with Catppuccin & Nord.</p>
 
   [![Release](https://img.shields.io/github/v/release/icefirex/nixos-manager?style=flat-square&color=89b4fa)](https://github.com/icefirex/nixos-manager/releases)
   [![License](https://img.shields.io/github/license/icefirex/nixos-manager?style=flat-square&color=a6e3a1)](LICENSE)
   [![NixOS](https://img.shields.io/badge/NixOS-flakes-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://nixos.org)
   [![Electron](https://img.shields.io/badge/Electron-desktop-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org)
   [![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-  [![Catppuccin](https://img.shields.io/badge/theme-Catppuccin%20Mocha-CBA6F7?style=flat-square)](https://catppuccin.com)
+  [![Catppuccin](https://img.shields.io/badge/themes-Catppuccin_·_Nord-CBA6F7?style=flat-square)](https://catppuccin.com)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 </div>
 
 ---
@@ -90,6 +91,18 @@
 - System health indicator in the header
 - Notification center with actionable alerts (git sync status, stale flake inputs, disk space, generation count)
 - Detailed system info: CPU, memory, disk, uptime, specialization
+
+### Config Editing
+- Edit option values inline — toggles for booleans, syntax-highlighted multi-line editor for complex values
+- Add packages to your configuration from Discover (system, user, or home-manager targets)
+- Remove packages from any config file with automatic diff feedback
+- Revert individual option changes from git
+
+### Theming
+- 4 built-in themes: Catppuccin Mocha, Macchiato, Nord, Latte — plus Match-system
+- Applies to the whole app, including the embedded terminal (live re-theming)
+- Persisted across restarts, no boot flash (native window background follows the theme)
+- All colors tokenized as CSS custom properties — new themes are one token block
 
 ### Flake Management
 - View all flake inputs with age indicators
@@ -200,69 +213,73 @@ nix.settings.trusted-public-keys = [ "nixos-manager-icefire.cachix.org-1:eUCn5EO
 ```bash
 git clone https://github.com/icefirex/nixos-manager.git
 cd nixos-manager
+nix-shell                # dev shell — Node 24 + Electron
 npm install
 npm run dev
 ```
 
-This starts both the Vite dev server and Electron with hot reload.
+`npm run dev` builds the main process (`build:main`), starts the Vite dev server, and launches Electron with the renderer on hot reload.
+
+**After changing main-process code** (`src/main/**`, `preload.ts`), re-run `npm run build:main` and restart Electron — the renderer hot-reloads, but Electron runs the compiled output.
+
+### Checks
+
+```bash
+npm test                 # 314 vitest tests
+npm run typecheck        # strict tsc (sources, types, tests)
+npm run check            # svelte-check — expected: 0 errors, 0 warnings
+```
+
+CI runs all three on every PR and is a required check on `main` (squash/rebase merges only).
 
 ## Testing
 
-Tests use [Vitest](https://vitest.dev) and are co-located with source files:
+Tests use [Vitest](https://vitest.dev) and live next to the code they cover — **314 tests** across the main process and the renderer.
 
 ```
-src/main/
-├── constants.test.js          # 3 tests — all exports and thresholds
-├── parse.test.js              # 36 tests — nix code parser
-├── nix-packages.test.js       # 65 tests — shared module (string stripping,
-│                              #   list extraction, scanning, duplicates)
-├── utils.test.js              # 10 tests — flake dir detection, runCmd,
-│                              #   build status, spawn env, error messages
-└── handlers/
-    ├── discover.test.js       # Export smoke tests for all 11 IPC handler
-    ├── flake.test.js          #   modules. The handlers themselves are
-    ├── generations.test.js    #   Electron IPC wiring exercised only when
-    ├── git.test.js            #   running inside the full Electron app.
-    ├── notifications.test.js
-    ├── options.test.js
-    ├── packages.test.js
-    ├── rebuild.test.js
-    ├── specializations.test.js
-    ├── system.test.js
-    └── history.test.js
+src/
+├── lib/                          # Renderer tests (jsdom + Testing Library)
+│   ├── themes.test.ts            # 14 tests — theme store, persistence, palettes
+│   ├── Settings.test.ts          # 4 tests — theme picker applies + persists
+│   ├── Sidebar.test.ts           # 5 tests — navigation
+│   ├── Icon.test.ts              # 3 tests
+│   └── ActionCard.test.ts        # 3 tests
+├── main/
+│   ├── constants.test.ts         # 3 tests — all exports and thresholds
+│   ├── parse.test.ts             # 36 tests — nix code parser
+│   ├── nix-packages.test.ts      # 65 tests — package scanner
+│   ├── utils.test.ts             # 10 tests — flake dir detection, runCmd, spawn env
+│   └── handlers/
+│       ├── discover.test.ts      # 33 tests
+│       ├── options.test.ts       # 20 tests
+│       ├── specializations.test.ts  # 18 tests
+│       ├── flake.test.ts         # 16 tests
+│       ├── git.test.ts           # 15 tests
+│       ├── generations.test.ts   # 15 tests
+│       ├── packages.test.ts      # 13 tests
+│       ├── notifications.test.ts # 13 tests
+│       ├── system.test.ts        # 12 tests
+│       ├── rebuild.test.ts       # 8 tests
+│       └── history.test.ts       # 8 tests
+tests/
 └── mocks/
-    └── electron.js            # Vitest mock (avoids electron binary dependency in tests)
+    └── electron.ts               # IPC mock — no Electron binary needed
 ```
 
 ### Running
 
 ```bash
-# Enter the dev shell (provides Node.js + Electron)
-nix-shell
+nix-shell                # dev shell — Node 24 (>= 23.6 required for .ts sources)
 
-# Run all tests
-node ./node_modules/.bin/vitest run
-
-# Run with coverage
-node ./node_modules/.bin/vitest run --coverage
-
-# Watch mode
-node ./node_modules/.bin/vitest
-
-# Single test file
-node ./node_modules/.bin/vitest run src/main/parse.test.js
+npm test                 # all 314 tests
+npm run typecheck        # strict tsc over sources, types, and tests
+npm run check            # svelte-check (expected: 0 errors, 0 warnings)
+npm run test -- --coverage
 ```
 
-### Coverage (testable layer)
+### Coverage
 
-| Module           | Stmts  | Branch | Funcs  | Lines  |
-|------------------|--------|--------|--------|--------|
-| `constants`      |  100%  |  100%  |  100%  |  100%  |
-| `parse`          |  100%  | 95.5%  |  100%  |  100%  |
-| `utils`          |  100%  | 60%    |  100%  |  100%  |
-| `nix-packages`   |  90.5% | 78.8%  |  84%   |  93.3% |
-
-The core parsing and utility modules are well-covered. Handler coverage is low (~5%) because they are Electron IPC stubs that depend on `ipcMain` at load time — they are exercised only within the running Electron app. An `electron` mock allows the handler stubs to run without a real electron binary.
+Overall **70.5%** statements. Core modules (constants, parse, utils, nix-packages) sit at 70–100%, handlers between 59–96%, and the theme store at 97.6%. Every IPC handler is a DI-lite factory (see [`docs/di-lite-handlers.md`](docs/di-lite-handlers.md)), so side-effecting dependencies (`runCmd`, `spawn`, `fs`, `getDb`) are injected and stubbed per test — no Electron binary required. CI runs the full suite (typecheck + svelte-check + tests) on every PR and is a required check on `main`.
 
 ## Configuration
 
@@ -289,81 +306,51 @@ The bundled fallback script (`nixos-manager-rebuild`) is always present as a las
 ## Tech Stack
 
 - **Electron** — Desktop runtime
-- **Svelte 5** — Reactive UI framework (runes mode)
-- **Vite** — Build tool
-- **Vitest** — Test runner with v8 coverage
+- **TypeScript** — 100% of the codebase, strict mode (`noImplicitAny`)
+- **Svelte 5** — Reactive UI framework (runes mode, `lang="ts"` components)
+- **Vite** — Build tool (renderer + config bundling)
+- **svelte-check + tsc** — Type checking, enforced in CI
+- **Vitest** — Test runner with v8 coverage (+ jsdom & Testing Library for the renderer)
 - **Lucide** — SVG icon library
 - **xterm.js** — Terminal emulator for build output
 - **highlight.js** — Nix syntax highlighting
-- **Catppuccin Mocha** — Color theme
+- **Catppuccin & Nord** — Built-in themes (token-based CSS custom properties)
 
 ## Architecture
 
 ```
+main.ts / preload.ts            # Electron entry + secure IPC bridge (compiled to dist-electron/)
 src/
-├── App.svelte                 # Root component, routing
-├── lib/                       # UI components
-│   ├── Dashboard.svelte       # Rebuild actions + progress + drift banner
-│   ├── Discover.svelte        # Package search (AppStream + nixpkgs)
-│   ├── Packages.svelte        # Installed package viewer
-│   ├── Changes.svelte         # Pending config changes
-│   ├── History.svelte         # Package change log
-│   ├── Options.svelte         # NixOS options viewer
-│   ├── Generations.svelte     # Generation management
-│   ├── GitModal.svelte        # Git operations
-│   ├── Sidebar.svelte         # Navigation
-│   ├── HeaderStrip.svelte     # System status bar
-│   └── ...                    # Supporting components
-├── main/
-│   ├── constants.js           # Centralised constants
-│   ├── constants.test.js      #
-│   ├── parse.js               # Nix code parsers
-│   ├── parse.test.js          #
-│   ├── nix-packages.js        # Shared Nix package scanner
-│   ├── nix-packages.test.js   #
-│   ├── utils.js               # Shared utilities
-│   ├── utils.test.js          #
-│   ├── window.js              # Electron window setup
-│   └── handlers/              # IPC handler modules
-│       ├── system.js           #
-│       ├── system.test.js      #
-│       ├── rebuild.js          #
-│       ├── rebuild.test.js     #
-│       ├── generations.js      #
-│       ├── generations.test.js #
-│       ├── packages.js         #
-│       ├── packages.test.js    #
-│       ├── options.js          #
-│       ├── options.test.js     #
-│       ├── discover.js         #
-│       ├── discover.test.js    #
-│       ├── git.js              #
-│       ├── git.test.js         #
-│       ├── flake.js            #
-│       ├── flake.test.js       #
-│       ├── specializations.js  #
-│       ├── specializations.test.js #
-│       ├── notifications.js    #
-│       ├── notifications.test.js #
-│       ├── history.js          # Change log handler
-│       └── history.test.js     #
-│   └── mocks/
-│       └── electron.js        # Vitest mock for handler tests
+├── App.svelte                  # Root component, tab routing
+├── main.ts                     # Renderer entry (Vite)
+├── styles.css                  # Theme tokens (:root) + base styles
+├── lib/                        # Svelte 5 components — all lang="ts"
+│   ├── Dashboard  Discover  Packages  Options  Generations
+│   ├── History  Changes  Settings  Sidebar  HeaderStrip
+│   ├── Terminal  TerminalOverlay  GitModal  SystemInfoModal
+│   ├── NotificationsModal  FlakeInfoModal  ActionCard  ProgressCard  Icon
+│   ├── themes.ts               # Theme store: persistence, events, xterm palettes
+│   └── a11y.ts                 # Keyboard-activation helper
+├── main/                       # Main process (compiled via tsconfig.build.json)
+│   ├── constants.ts  parse.ts  utils.ts  nix-packages.ts  window.ts
+│   └── handlers/               # 11 IPC modules — DI-lite factories
+│       ├── system.ts      notifications.ts   rebuild.ts    specializations.ts
+│       ├── flake.ts       packages.ts        options.ts    generations.ts
+│       ├── git.ts         discover.ts        history.ts
+tests/mocks/electron.ts         # IPC mock for tests
 scripts/
-│   ├── nixos-manager-rebuild  # Bundled generic rebuild fallback
-│   └── nixos-manager-eval     # Bundled generic eval fallback
+├── nixos-manager-rebuild       # Bundled rebuild fallback (uses nh when available)
+└── nixos-manager-eval          # Bundled eval fallback
 ```
 
-All renderer-to-main communication goes through a secure IPC bridge (`preload.js`) with context isolation enabled.
+All renderer-to-main communication goes through a secure IPC bridge (`preload.ts`, compiled to `dist-electron/preload.js`) with context isolation enabled.
 
 ## Building
 
 ```bash
-# Build the Svelte frontend only
-npm run build:svelte
-
-# Build with Nix (produces a wrapped Electron binary)
-nix build .
+npm run build:main       # compile main process + preload -> dist-electron/
+npm run build:svelte     # build the Svelte frontend -> dist/
+nix build .              # full Nix package (wrapped system Electron binary)
 ```
 
 ## Contributing

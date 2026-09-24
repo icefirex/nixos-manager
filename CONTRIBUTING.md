@@ -32,10 +32,19 @@ npm run dev
 ## Making Changes
 
 ### Frontend (Svelte)
-Edit files under `src/`. Hot reload is active in dev mode.
+Edit files under `src/lib/` and `src/App.svelte` (all `lang="ts"`). Hot reload is active in dev mode.
 
-### IPC Handlers (Node.js)
-Edit files under `src/main/handlers/`. Restart Electron (`Ctrl+R` in dev mode) to pick up changes.
+### Main Process (TypeScript)
+Edit `src/main/**`, `main.ts`, or `preload.ts`. These compile to `dist-electron/`, so after changes run:
+
+```bash
+npm run build:main
+```
+
+and restart Electron to pick them up (renderer changes hot-reload; main-process changes do not).
+
+### IPC Handlers
+Handlers follow the DI-lite factory pattern — `createXHandlers(deps)` + `register(deps)`. See [`docs/di-lite-handlers.md`](docs/di-lite-handlers.md). Add tests next to the handler and inject stubs for side-effecting dependencies (`runCmd`, `spawn`, `fs`, ...).
 
 ### Bundled Scripts
 Edit `scripts/nixos-manager-rebuild` or `scripts/nixos-manager-eval`. These are plain bash scripts — test them directly before submitting.
@@ -47,18 +56,30 @@ If you change `package.json` or `package-lock.json`, update `npmDepsHash` in `pa
 nix build . 2>&1 | grep 'got:' | awk '{print $2}'
 ```
 
+## Checks
+
+CI runs on every PR and is a **required check on `main`** — a PR cannot merge unless all three pass:
+
+```bash
+npm test                 # vitest — 314 tests
+npm run typecheck        # strict tsc
+npm run check            # svelte-check (0 errors, 0 warnings expected)
+```
+
 ## Code Style
 
-- Svelte components use runes mode (`$state`, `$props`, `$effect`)
-- IPC handler files follow the `{ register }` export pattern
+- Svelte components use runes mode (`$state`, `$props`, `$effect`) with `lang="ts"`
+- IPC handlers follow the DI-lite factory pattern (`createXHandlers` + typed `XDeps`)
+- Themes: use CSS custom-property tokens (`var(--blue)`, `rgba(var(--blue-rgb), 0.3)`) — never hardcode colors
 - Shell scripts use `set -euo pipefail` and explicit variable quoting
 
 ## Pull Requests
 
 1. Fork the repository and create a feature branch
 2. Keep commits focused; one logical change per commit
-3. Test your changes on a NixOS system with a flake configuration
+3. The CI check must pass (typecheck + svelte-check + tests)
 4. Open a PR against `main` with a clear description
+5. Merges are squash or rebase only — `main` keeps a linear history
 
 ## Reporting Issues
 
