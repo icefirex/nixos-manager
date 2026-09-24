@@ -24,7 +24,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Cache Nix store
-        uses: cachix/cachix-action@v13
+        uses: cachix/cachix-action@v17
         with:
           name: nixos-manager-icefire
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
@@ -42,7 +42,7 @@ jobs:
           tar -czf "nixos-manager-${VERSION}-linux-x86_64.tar.gz" dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
