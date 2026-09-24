@@ -22,7 +22,20 @@
   <img src="assets/screenshots/4.png" width="49%"/>
 </p>
 <p align="center">
-  <img src="assets/screenshots/5.png" width="98%"/>
+  <img src="assets/screenshots/5.png" width="49%"/>
+  <img src="assets/screenshots/6.png" width="49%"/>
+</p>
+<p align="center">
+  <img src="assets/screenshots/7.png" width="49%"/>
+  <img src="assets/screenshots/8.png" width="49%"/>
+</p>
+<p align="center">
+  <img src="assets/screenshots/9.png" width="49%"/>
+  <img src="assets/screenshots/10.png" width="49%"/>
+</p>
+<p align="center">
+  <img src="assets/screenshots/11.png" width="49%"/>
+  <img src="assets/screenshots/12.png" width="49%"/>
 </p>
 
 ---
