@@ -10,7 +10,7 @@
 
 let
   pname = "nixos-manager";
-  version = "1.9.0";
+  version = "1.9.1";
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -28,7 +28,7 @@ in buildNpmPackage {
 
   src = ./.;
 
-  npmDepsHash = "sha256-AVVblSOEKaDpZqoK9yxEq0ckDQGjKUalUOmikB4kZ3I=";
+  npmDepsHash = "sha256-BIy6txKpaC0HuN7PVlgz5Sbia8HPrzG7P21ceAgIKek=";
 
   nativeBuildInputs = [
     makeWrapper
