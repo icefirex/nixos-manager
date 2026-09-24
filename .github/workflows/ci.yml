@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Stub Electron binary marker (tests import electron but never launch it)
+        run: echo "electron" > node_modules/electron/path.txt
+
       - name: Typecheck (tsc, strict)
         run: npm run typecheck
 
