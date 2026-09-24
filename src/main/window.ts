@@ -19,6 +19,27 @@ function themeFilePath() {
   return path.join(app.getPath('userData'), 'window-theme.json');
 }
 
+/**
+ * Resolve the application root (the directory containing package.json).
+ *
+ * When Electron is launched with a *file path* (e.g. the Nix wrapper runs
+ * `<root>/dist-electron/main.js`), app.getAppPath() returns that file's
+ * directory instead of the package.json root. Walk up until package.json
+ * is found so packaged and dev layouts both resolve correctly.
+ */
+function resolveAppRoot(): string {
+  let dir = app.getAppPath();
+  for (let i = 0; i < 4; i++) {
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return app.getAppPath();
+}
+
 function readStoredTheme(): string {
   try {
     const parsed = JSON.parse(fs.readFileSync(themeFilePath(), 'utf8'));
@@ -64,7 +85,7 @@ function createWindow() {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'));
+    win.loadFile(path.join(resolveAppRoot(), 'dist', 'index.html'));
   }
 
   // DevTools keyboard shortcut — dev builds only (BUG-03)
@@ -128,7 +149,7 @@ function registerWindowHandlers() {
   ipcMain.handle('get-app-version', () => {
     if (cachedVersion) return cachedVersion; // CQ-08: serve from cache
     try {
-      const packagePath = path.join(app.getAppPath(), 'package.json');
+      const packagePath = path.join(resolveAppRoot(), 'package.json');
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       cachedVersion = packageJson.version;
       return cachedVersion;
