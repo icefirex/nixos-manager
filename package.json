@@ -21,7 +21,8 @@
     "build:svelte": "vite build",
     "start": "npm run build:main && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
