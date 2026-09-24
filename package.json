@@ -1,6 +1,6 @@
 {
   "name": "nixos-manager",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "A beautiful GUI for managing NixOS configurations",
   "author": "icefirex",
   "repository": {
@@ -11,22 +11,31 @@
   "bugs": {
     "url": "https://github.com/icefirex/nixos-manager/issues"
   },
-  "main": "main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:svelte\" \"npm run dev:electron\"",
     "dev:svelte": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && ELECTRON_ENABLE_LOGGING=true electron .",
-    "build": "vite build && electron-builder",
+    "dev:electron": "npm run build:main && wait-on http://localhost:5173 && ELECTRON_ENABLE_LOGGING=true electron .",
+    "build:main": "tsc -p tsconfig.build.json",
+    "build": "npm run build:main && vite build && electron-builder",
     "build:svelte": "vite build",
-    "start": "electron ."
+    "start": "npm run build:main && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@testing-library/svelte": "^5.4.2",
+    "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^4.1.9",
     "concurrently": "^9.0.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
+    "jsdom": "^30.1.1",
     "svelte": "^5.0.0",
+    "svelte-check": "^4.7.6",
+    "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vitest": "^4.1.9",
     "wait-on": "^8.0.0"
@@ -49,10 +58,8 @@
     },
     "files": [
       "dist/**/*",
-      "main.js",
-      "preload.js",
-      "package.json",
-      "src/main/**/*"
+      "dist-electron/**/*",
+      "package.json"
     ]
   },
   "dependencies": {

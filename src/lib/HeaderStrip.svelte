@@ -1,7 +1,31 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { systemInfo, onSystemInfoClick, onNotificationsClick, onGitClick, onFlakeInfoClick, notificationCount = 0 } = $props();
+  interface SystemInfo {
+    profile: string;
+    hostname: string;
+    nixosVersion: string;
+    kernelVersion: string;
+    generation: number;
+    lastBuild: string;
+    healthy: boolean;
+  }
+
+  let {
+    systemInfo,
+    onSystemInfoClick,
+    onNotificationsClick,
+    onGitClick,
+    onFlakeInfoClick,
+    notificationCount = 0,
+  }: {
+    systemInfo: SystemInfo;
+    onSystemInfoClick: () => void;
+    onNotificationsClick: () => void;
+    onGitClick: () => void;
+    onFlakeInfoClick: () => void;
+    notificationCount?: number;
+  } = $props();
 </script>
 
 <div class="header-strip">
@@ -42,12 +66,12 @@
 
 <style>
   .header-strip {
-    background: rgba(24, 24, 37, 0.9);
+    background: rgba(var(--mantle-rgb), 0.9);
     padding: 16px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
     flex-shrink: 0;
   }
 
@@ -60,24 +84,24 @@
   .profile-avatar {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #a6e3a1 0%, #94e2d5 100%);
+    background: linear-gradient(135deg, var(--green) 0%, var(--teal) 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #1e1e2e;
-    box-shadow: 0 4px 12px rgba(166, 227, 161, 0.3);
+    color: var(--base);
+    box-shadow: 0 4px 12px rgba(var(--green-rgb), 0.3);
   }
 
   .profile-info h3 {
     font-size: 14px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .profile-info span {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .header-status {
@@ -86,7 +110,7 @@
     gap: 12px;
     margin-left: 24px;
     padding-left: 24px;
-    border-left: 1px solid rgba(49, 50, 68, 0.5);
+    border-left: 1px solid rgba(var(--surface0-rgb), 0.5);
   }
 
   .status-badge {
@@ -105,36 +129,36 @@
   }
 
   .status-badge.healthy {
-    background: rgba(166, 227, 161, 0.12);
-    border: 1px solid rgba(166, 227, 161, 0.25);
-    color: #a6e3a1;
-    box-shadow: 0 2px 8px rgba(166, 227, 161, 0.15);
+    background: rgba(var(--green-rgb), 0.12);
+    border: 1px solid rgba(var(--green-rgb), 0.25);
+    color: var(--green);
+    box-shadow: 0 2px 8px rgba(var(--green-rgb), 0.15);
   }
 
   .status-badge.healthy .status-icon {
     width: 8px;
     height: 8px;
-    background: #a6e3a1;
+    background: var(--green);
     border-radius: 50%;
-    box-shadow: 0 0 10px rgba(166, 227, 161, 0.6);
+    box-shadow: 0 0 10px rgba(var(--green-rgb), 0.6);
     animation: glow 2s ease-in-out infinite;
   }
 
   @keyframes glow {
     0%,
     100% {
-      box-shadow: 0 0 8px rgba(166, 227, 161, 0.4);
+      box-shadow: 0 0 8px rgba(var(--green-rgb), 0.4);
     }
     50% {
-      box-shadow: 0 0 16px rgba(166, 227, 161, 0.8);
+      box-shadow: 0 0 16px rgba(var(--green-rgb), 0.8);
     }
   }
 
   .status-badge.generation {
-    background: rgba(137, 180, 250, 0.12);
-    border: 1px solid rgba(137, 180, 250, 0.25);
-    color: #89b4fa;
-    box-shadow: 0 2px 8px rgba(137, 180, 250, 0.15);
+    background: rgba(var(--blue-rgb), 0.12);
+    border: 1px solid rgba(var(--blue-rgb), 0.25);
+    color: var(--blue);
+    box-shadow: 0 2px 8px rgba(var(--blue-rgb), 0.15);
   }
 
   .generation-number {
@@ -148,11 +172,11 @@
   }
 
   .header-btn {
-    background: rgba(49, 50, 68, 0.8);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 8px;
     padding: 8px 16px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 12px;
     cursor: pointer;
     display: flex;
@@ -162,21 +186,21 @@
   }
 
   .header-btn:hover {
-    background: rgba(69, 71, 90, 0.6);
-    border-color: rgba(137, 180, 250, 0.5);
+    background: rgba(var(--surface1-rgb), 0.6);
+    border-color: rgba(var(--blue-rgb), 0.5);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(var(--black-rgb), 0.2);
   }
 
   .git-btn {
-    background: rgba(250, 179, 135, 0.1);
-    border-color: rgba(250, 179, 135, 0.2);
-    color: #fab387;
+    background: rgba(var(--peach-rgb), 0.1);
+    border-color: rgba(var(--peach-rgb), 0.2);
+    color: var(--peach);
   }
 
   .git-btn:hover {
-    background: rgba(250, 179, 135, 0.2);
-    border-color: rgba(250, 179, 135, 0.4);
+    background: rgba(var(--peach-rgb), 0.2);
+    border-color: rgba(var(--peach-rgb), 0.4);
   }
 
   .git-btn :global(svg) {
@@ -194,15 +218,15 @@
     min-width: 18px;
     height: 18px;
     padding: 0 5px;
-    background: #f38ba8;
+    background: var(--red);
     border-radius: 9px;
     font-size: 10px;
     font-weight: 700;
-    color: #1e1e2e;
+    color: var(--base);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(243, 139, 168, 0.4);
+    box-shadow: 0 2px 8px rgba(var(--red-rgb), 0.4);
     animation: badge-pop 0.3s ease;
   }
 

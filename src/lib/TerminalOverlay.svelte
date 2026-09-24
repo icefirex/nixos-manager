@@ -1,18 +1,19 @@
-<script>
+<script lang="ts">
+  import { onKeyActivate } from "./a11y.ts";
   import Terminal from "./Terminal.svelte";
 
   let showTerminal = $state(false);
   let terminalExpanded = $state(true);
   let terminalHeight = $state(320);
   let isDragging = $state(false);
-  let terminalComponent = $state(null);
+  let terminalComponent = $state<any>(null);
   let terminalTitle = $state('Terminal');
   let isRunning = $state(false);
   let hasError = $state(false);
   let isTryProcess = $state(false);
   let showKillConfirm = $state(false);
-  let pendingAction = $state(null); // 'close' or 'new-try'
-  let pendingTryCallback = $state(null); // stored callback for 'new-try' action
+  let pendingAction = $state<any>(null); // 'close' or 'new-try'
+  let pendingTryCallback = $state<any>(null); // stored callback for 'new-try' action
 
   // Clamp terminal height when window resizes
   $effect(() => {
@@ -99,14 +100,14 @@
     terminalExpanded = !terminalExpanded;
   }
 
-  function handleDragStart(e) {
+  function handleDragStart(e: MouseEvent) {
     isDragging = true;
     e.preventDefault();
 
     const startY = e.clientY;
     const startHeight = terminalHeight;
 
-    function onMouseMove(e) {
+    function onMouseMove(e: MouseEvent) {
       const delta = startY - e.clientY;
       const newHeight = Math.min(Math.max(startHeight + delta, 150), window.innerHeight - 200);
       terminalHeight = newHeight;
@@ -158,7 +159,7 @@
   }
 
   // Export method to request killing before new try
-  export function requestKillForNewTry(callback) {
+  export function requestKillForNewTry(callback: any) {
     if (isTryProcess && isRunning) {
       pendingAction = 'new-try';
       showKillConfirm = true;
@@ -178,7 +179,11 @@
     <!-- Drag handle -->
     <div
       class="terminal-drag-handle"
+      role="button"
+      tabindex="0"
+      aria-label="Toggle terminal size"
       onmousedown={handleDragStart}
+      onkeydown={(e) => onKeyActivate(e, () => { terminalExpanded = !terminalExpanded; })}
       class:dragging={isDragging}
     >
       <div class="drag-indicator"></div>
@@ -220,8 +225,8 @@
 
 <!-- Kill confirmation dialog -->
 {#if showKillConfirm}
-  <div class="confirm-overlay" onclick={cancelKill}>
-    <div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="confirm-overlay" role="presentation" onclick={cancelKill} onkeydown={(e) => { if (e.key === "Escape") cancelKill(); }}>
+    <div class="confirm-dialog" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="confirm-header">
         <span class="confirm-icon">⚠️</span>
         <h3>Application Running</h3>
@@ -250,10 +255,10 @@
     left: 73px;
     right: 1px;
     height: var(--terminal-height);
-    background: rgba(17, 17, 27, 0.98);
-    border-top: 1px solid rgba(137, 180, 250, 0.3);
-    border-left: 1px solid rgba(49, 50, 68, 0.5);
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    background: rgba(var(--crust-rgb), 0.98);
+    border-top: 1px solid rgba(var(--blue-rgb), 0.3);
+    border-left: 1px solid rgba(var(--surface0-rgb), 0.5);
+    box-shadow: 0 -8px 32px rgba(var(--black-rgb), 0.5);
     display: flex;
     flex-direction: column;
     z-index: 100;
@@ -271,27 +276,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(24, 24, 37, 0.9);
-    border-bottom: 1px solid rgba(49, 50, 68, 0.3);
+    background: rgba(var(--mantle-rgb), 0.9);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.3);
     transition: background 0.15s;
   }
 
   .terminal-drag-handle:hover,
   .terminal-drag-handle.dragging {
-    background: rgba(137, 180, 250, 0.1);
+    background: rgba(var(--blue-rgb), 0.1);
   }
 
   .drag-indicator {
     width: 48px;
     height: 4px;
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 2px;
     transition: background 0.15s;
   }
 
   .terminal-drag-handle:hover .drag-indicator,
   .terminal-drag-handle.dragging .drag-indicator {
-    background: rgba(137, 180, 250, 0.5);
+    background: rgba(var(--blue-rgb), 0.5);
   }
 
   .terminal-header {
@@ -299,8 +304,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 16px;
-    background: rgba(24, 24, 37, 0.95);
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+    background: rgba(var(--mantle-rgb), 0.95);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
     flex-shrink: 0;
   }
 
@@ -310,14 +315,14 @@
     gap: 10px;
     font-size: 13px;
     font-weight: 500;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .spinner-inline {
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -335,13 +340,13 @@
   }
 
   .status-dot.success {
-    background: #a6e3a1;
-    box-shadow: 0 0 8px rgba(166, 227, 161, 0.5);
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(var(--green-rgb), 0.5);
   }
 
   .status-dot.error {
-    background: #f38ba8;
-    box-shadow: 0 0 8px rgba(243, 139, 168, 0.5);
+    background: var(--red);
+    box-shadow: 0 0 8px rgba(var(--red-rgb), 0.5);
   }
 
   .terminal-controls {
@@ -354,8 +359,8 @@
     height: 28px;
     border: none;
     border-radius: 6px;
-    background: rgba(49, 50, 68, 0.8);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--subtext0);
     font-size: 16px;
     cursor: pointer;
     display: flex;
@@ -365,24 +370,24 @@
   }
 
   .terminal-btn:hover {
-    background: rgba(69, 71, 90, 0.9);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.9);
+    color: var(--text);
   }
 
   .terminal-btn.close:hover {
-    background: rgba(243, 139, 168, 0.3);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.3);
+    color: var(--red);
   }
 
   .terminal-btn.cancel-build:hover {
-    background: rgba(250, 179, 135, 0.3);
-    color: #fab387;
+    background: rgba(var(--peach-rgb), 0.3);
+    color: var(--peach);
   }
 
   .terminal-content {
     flex: 1;
     overflow: hidden;
-    background: #11111b;
+    background: var(--crust);
   }
 
   .terminal-content.hidden {
@@ -393,7 +398,7 @@
   .confirm-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(var(--black-rgb), 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -407,8 +412,8 @@
   }
 
   .confirm-dialog {
-    background: #1e1e2e;
-    border: 1px solid rgba(69, 71, 90, 0.6);
+    background: var(--base);
+    border: 1px solid rgba(var(--surface1-rgb), 0.6);
     border-radius: 12px;
     padding: 20px;
     max-width: 360px;
@@ -441,13 +446,13 @@
   .confirm-header h3 {
     font-size: 16px;
     font-weight: 600;
-    color: #f9e2af;
+    color: var(--yellow);
     margin: 0;
   }
 
   .confirm-message {
     font-size: 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     margin: 0 0 20px 0;
     line-height: 1.5;
   }
@@ -468,23 +473,23 @@
   }
 
   .confirm-btn.cancel {
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.5);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
+    color: var(--subtext0);
   }
 
   .confirm-btn.cancel:hover {
-    background: rgba(69, 71, 90, 0.5);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.5);
+    color: var(--text);
   }
 
   .confirm-btn.kill {
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.4);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.4);
+    color: var(--red);
   }
 
   .confirm-btn.kill:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 </style>

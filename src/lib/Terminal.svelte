@@ -1,17 +1,18 @@
-<script>
+<script lang="ts">
   import { Terminal } from '@xterm/xterm';
   import { FitAddon } from '@xterm/addon-fit';
   import '@xterm/xterm/css/xterm.css';
   import { onMount } from 'svelte';
+  import { TERMINAL_THEMES, initTheme, onThemeChange } from './themes.ts';
 
-  let terminalElement = $state(null);
-  let terminal = $state(null);
-  let fitAddon = $state(null);
+  let terminalElement = $state<any>(null);
+  let terminal = $state<any>(null);
+  let fitAddon = $state<any>(null);
 
   // Context menu state
   let showContextMenu = $state(false);
   let contextMenuPos = $state({ x: 0, y: 0 });
-  let contextMenuEl = $state(null);
+  let contextMenuEl = $state<any>(null);
 
   // Create/update portal for context menu
   $effect(() => {
@@ -32,7 +33,7 @@
         contextMenuEl.style.display = 'block';
 
         // Handle clicks on menu items
-        const handleMenuClick = (e) => {
+        const handleMenuClick = (e: any) => {
           const action = e.target.dataset.action;
           if (action === 'copy') {
             const selection = terminal?.getSelection();
@@ -66,30 +67,7 @@
 
   onMount(() => {
     terminal = new Terminal({
-      theme: {
-        background: '#11111b',
-        foreground: '#cdd6f4',
-        cursor: '#f5e0dc',
-        cursorAccent: '#11111b',
-        selectionBackground: 'rgba(137, 180, 250, 0.3)',
-        selectionForeground: '#cdd6f4',
-        black: '#45475a',
-        red: '#f38ba8',
-        green: '#a6e3a1',
-        yellow: '#f9e2af',
-        blue: '#89b4fa',
-        magenta: '#cba6f7',
-        cyan: '#94e2d5',
-        white: '#bac2de',
-        brightBlack: '#585b70',
-        brightRed: '#f38ba8',
-        brightGreen: '#a6e3a1',
-        brightYellow: '#f9e2af',
-        brightBlue: '#89b4fa',
-        brightMagenta: '#cba6f7',
-        brightCyan: '#94e2d5',
-        brightWhite: '#a6adc8',
-      },
+      theme: TERMINAL_THEMES[initTheme()],
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 11,
       lineHeight: 1.3,
@@ -105,11 +83,18 @@
     terminal.loadAddon(fitAddon);
     terminal.open(terminalElement);
 
+    // Live theme changes: re-apply the xterm palette
+    const unwatchTheme = onThemeChange((resolved) => {
+      if (terminal) {
+        terminal.options.theme = TERMINAL_THEMES[resolved];
+      }
+    });
+
     // Fit after a small delay to ensure container is sized
     setTimeout(() => fitAddon.fit(), 50);
 
     // Handle keyboard shortcuts for copy
-    terminal.attachCustomKeyEventHandler((event) => {
+    terminal.attachCustomKeyEventHandler((event: any) => {
       // Ctrl+Shift+C to copy
       if (event.ctrlKey && event.shiftKey && event.key === 'C') {
         const selection = terminal.getSelection();
@@ -130,7 +115,7 @@
     });
 
     // Right-click context menu
-    terminalElement.addEventListener('contextmenu', (e) => {
+    terminalElement.addEventListener('contextmenu', (e: any) => {
       e.preventDefault();
 
       // Calculate position and clamp to viewport bounds
@@ -174,6 +159,7 @@
     return () => {
       document.removeEventListener('click', handleDocumentClick);
       resizeObserver.disconnect();
+      unwatchTheme();
       terminal?.dispose();
     };
   });
@@ -185,7 +171,7 @@
     }
   }
 
-  export function write(data) {
+  export function write(data: any) {
     terminal?.write(data);
   }
 </script>
@@ -206,7 +192,7 @@
   .terminal-container {
     width: 100%;
     height: 100%;
-    background: #11111b;
+    background: var(--crust);
     overflow: hidden;
   }
 
@@ -221,11 +207,11 @@
 
   :global(.terminal-context-menu-portal .context-menu) {
     position: fixed;
-    background: rgba(30, 30, 46, 0.98);
-    border: 1px solid rgba(69, 71, 90, 0.8);
+    background: rgba(var(--base-rgb), 0.98);
+    border: 1px solid rgba(var(--surface1-rgb), 0.8);
     border-radius: 8px;
     padding: 4px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 16px rgba(var(--black-rgb), 0.4);
     backdrop-filter: blur(8px);
     min-width: 100px;
     pointer-events: auto;
@@ -237,7 +223,7 @@
     padding: 8px 12px;
     background: transparent;
     border: none;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 12px;
     text-align: left;
     cursor: pointer;
@@ -246,7 +232,7 @@
   }
 
   :global(.terminal-context-menu-portal .context-item:hover) {
-    background: rgba(137, 180, 250, 0.2);
+    background: rgba(var(--blue-rgb), 0.2);
   }
 
   .terminal-container :global(.xterm) {
@@ -260,7 +246,7 @@
 
   .terminal-container :global(.xterm-viewport) {
     overflow-y: auto !important;
-    background: #11111b !important;
+    background: var(--crust) !important;
   }
 
   /* Custom scrollbar - thin and subtle */
@@ -270,20 +256,20 @@
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-track) {
-    background: rgba(17, 17, 27, 0.5);
+    background: rgba(var(--crust-rgb), 0.5);
     border-radius: 4px;
     margin: 4px 0;
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb) {
-    background: linear-gradient(180deg, rgba(137, 180, 250, 0.4), rgba(137, 180, 250, 0.2));
+    background: linear-gradient(180deg, rgba(var(--blue-rgb), 0.4), rgba(var(--blue-rgb), 0.2));
     border-radius: 4px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
-    background: linear-gradient(180deg, rgba(137, 180, 250, 0.6), rgba(137, 180, 250, 0.4));
+    background: linear-gradient(180deg, rgba(var(--blue-rgb), 0.6), rgba(var(--blue-rgb), 0.4));
     background-clip: padding-box;
   }
 

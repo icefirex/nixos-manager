@@ -1,13 +1,14 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
+  import { onKeyActivate } from "./a11y.ts";
 
-  let specializations = $state([]);
-  let flakeInputs = $state([]);
+  let specializations = $state<any[]>([]);
+  let flakeInputs = $state<any[]>([]);
   let showConfirmDialog = $state(false);
-  let pendingSwitch = $state(null);
+  let pendingSwitch = $state<any>(null);
   let isSwitching = $state(false);
-  let switchError = $state(null);
-  let selectedInput = $state(null);
+  let switchError = $state<any>(null);
+  let selectedInput = $state<any>(null);
   let isUpdatingInput = $state(false);
 
   // Load real data on mount
@@ -24,7 +25,7 @@
   async function loadSpecializations() {
     try {
       specializations = await window.electronAPI.getSpecializations();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load specializations:", e);
     }
   }
@@ -32,12 +33,12 @@
   async function loadFlakeInputs() {
     try {
       flakeInputs = await window.electronAPI.getFlakeInputs();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load flake inputs:", e);
     }
   }
 
-  function requestSwitch(name) {
+  function requestSwitch(name: any) {
     // Don't switch if already active
     const current = specializations.find(s => s.active);
     if (current?.name === name) return;
@@ -60,7 +61,7 @@
         ...s,
         active: s.name === pendingSwitch,
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to switch:", e);
       switchError = e.message || "Failed to switch specialization";
     } finally {
@@ -74,12 +75,12 @@
     pendingSwitch = null;
   }
 
-  function selectInput(name) {
+  function selectInput(name: any) {
     if (isUpdatingInput) return;
     selectedInput = selectedInput === name ? null : name;
   }
 
-  async function updateSingleInput(name) {
+  async function updateSingleInput(name: any) {
     if (isUpdatingInput) return;
 
     isUpdatingInput = true;
@@ -98,7 +99,7 @@
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: name, success: true }
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to update:", e);
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: name, success: false, error: e.message }
@@ -127,7 +128,7 @@
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: 'all', success: true }
       }));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to update:", e);
       window.dispatchEvent(new CustomEvent('flake-update-complete', {
         detail: { inputName: 'all', success: false, error: e.message }
@@ -173,12 +174,15 @@
     </div>
     <div class="input-list">
       {#each flakeInputs as input}
-        <button
+        <div
           class="input-item"
           class:selected={selectedInput === input.name}
           class:updating={isUpdatingInput && selectedInput === input.name}
-          onclick={() => selectInput(input.name)}
-          disabled={isUpdatingInput}
+          role="button"
+          tabindex={isUpdatingInput ? -1 : 0}
+          aria-disabled={isUpdatingInput}
+          onclick={() => { if (!isUpdatingInput) selectInput(input.name); }}
+          onkeydown={(e) => { if (!isUpdatingInput) onKeyActivate(e, () => selectInput(input.name)); }}
         >
           <span class="input-left">
             <span class="input-name">{input.name}</span>
@@ -199,7 +203,7 @@
           {#if isUpdatingInput && selectedInput === input.name}
             <span class="input-spinner"></span>
           {/if}
-        </button>
+        </div>
       {/each}
     </div>
     <button class="update-btn" onclick={updateAllInputs} disabled={isUpdatingInput}>
@@ -214,8 +218,8 @@
 </div>
 
 {#if showConfirmDialog}
-  <div class="modal-overlay" onclick={cancelSwitch}>
-    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" role="presentation" onclick={cancelSwitch} onkeydown={(e) => { if (e.key === 'Escape') cancelSwitch(); }}>
+    <div class="modal-content" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="modal-header">Switch Specialization</div>
       <div class="modal-body">
         <p>Switch from <strong>{getCurrentSpecName()}</strong> to <strong>{pendingSwitch}</strong>?</p>
@@ -256,16 +260,16 @@
   }
 
   .panel-card {
-    background: rgba(24, 24, 37, 0.9);
-    border: 1px solid rgba(49, 50, 68, 0.5);
+    background: rgba(var(--mantle-rgb), 0.9);
+    border: 1px solid rgba(var(--surface0-rgb), 0.5);
     border-radius: 16px;
     padding: 20px;
     transition: all 0.3s;
   }
 
   .panel-card:hover {
-    border-color: rgba(69, 71, 90, 0.8);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    border-color: rgba(var(--surface1-rgb), 0.8);
+    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.2);
   }
 
   .panel-header {
@@ -278,7 +282,7 @@
   .panel-title {
     font-size: 13px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .panel-badge {
@@ -289,9 +293,9 @@
   }
 
   .badge-active {
-    background: rgba(166, 227, 161, 0.15);
-    color: #a6e3a1;
-    border: 1px solid rgba(166, 227, 161, 0.25);
+    background: rgba(var(--green-rgb), 0.15);
+    color: var(--green);
+    border: 1px solid rgba(var(--green-rgb), 0.25);
   }
 
   .spec-list {
@@ -305,7 +309,7 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    background: rgba(30, 30, 46, 0.8);
+    background: rgba(var(--base-rgb), 0.8);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -316,38 +320,38 @@
   }
 
   .spec-item:hover {
-    background: rgba(49, 50, 68, 0.6);
+    background: rgba(var(--surface0-rgb), 0.6);
     transform: translateX(4px);
   }
 
   .spec-item.active {
-    border-color: rgba(137, 180, 250, 0.5);
-    background: rgba(137, 180, 250, 0.1);
-    box-shadow: 0 0 16px rgba(137, 180, 250, 0.1);
+    border-color: rgba(var(--blue-rgb), 0.5);
+    background: rgba(var(--blue-rgb), 0.1);
+    box-shadow: 0 0 16px rgba(var(--blue-rgb), 0.1);
   }
 
   .spec-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #45475a;
+    background: var(--surface1);
     transition: all 0.3s;
   }
 
   .spec-item.active .spec-dot {
-    background: #a6e3a1;
-    box-shadow: 0 0 10px rgba(166, 227, 161, 0.6);
+    background: var(--green);
+    box-shadow: 0 0 10px rgba(var(--green-rgb), 0.6);
   }
 
   .spec-name {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .spec-tag {
     margin-left: auto;
     font-size: 9px;
-    color: #a6e3a1;
+    color: var(--green);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -359,11 +363,13 @@
   }
 
   .input-item {
+    cursor: pointer;
+    user-select: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 10px 12px;
-    background: rgba(30, 30, 46, 0.8);
+    background: rgba(var(--base-rgb), 0.8);
     border-radius: 8px;
     transition: all 0.2s;
     border: 1px solid transparent;
@@ -373,27 +379,27 @@
     color: inherit;
   }
 
-  .input-item:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.5);
+  .input-item:hover:not(.updating) {
+    background: rgba(var(--surface0-rgb), 0.5);
   }
 
   .input-item.selected {
-    border-color: rgba(137, 180, 250, 0.5);
-    background: rgba(137, 180, 250, 0.1);
+    border-color: rgba(var(--blue-rgb), 0.5);
+    background: rgba(var(--blue-rgb), 0.1);
   }
 
   .input-item.updating {
     opacity: 0.7;
   }
 
-  .input-item:disabled {
+  .input-item[aria-disabled="true"] {
     cursor: not-allowed;
     opacity: 0.6;
   }
 
   .input-name {
     font-size: 12px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .input-left {
@@ -408,9 +414,9 @@
   .update-pill {
     font-size: 9px;
     font-weight: 600;
-    color: #89b4fa;
-    background: rgba(137, 180, 250, 0.15);
-    border: 1px solid rgba(137, 180, 250, 0.35);
+    color: var(--blue);
+    background: rgba(var(--blue-rgb), 0.15);
+    border: 1px solid rgba(var(--blue-rgb), 0.35);
     border-radius: 4px;
     padding: 1px 5px;
     white-space: nowrap;
@@ -426,11 +432,11 @@
   }
 
   .input-status.fresh {
-    color: #a6e3a1;
+    color: var(--green);
   }
 
   .input-status.stale {
-    color: #f9e2af;
+    color: var(--yellow);
   }
 
   .input-update-btn {
@@ -438,8 +444,8 @@
     height: 24px;
     border-radius: 6px;
     border: none;
-    background: rgba(137, 180, 250, 0.2);
-    color: #89b4fa;
+    background: rgba(var(--blue-rgb), 0.2);
+    color: var(--blue);
     font-size: 14px;
     cursor: pointer;
     display: flex;
@@ -450,15 +456,15 @@
   }
 
   .input-update-btn:hover {
-    background: rgba(137, 180, 250, 0.4);
+    background: rgba(var(--blue-rgb), 0.4);
     transform: rotate(180deg);
   }
 
   .input-spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-left: 8px;
@@ -468,8 +474,8 @@
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(30, 30, 46, 0.3);
-    border-top-color: #1e1e2e;
+    border: 2px solid rgba(var(--base-rgb), 0.3);
+    border-top-color: var(--base);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-right: 8px;
@@ -478,13 +484,13 @@
   .update-btn {
     background: linear-gradient(
       135deg,
-      #89b4fa 0%,
-      #b4befe 100%
+      var(--blue) 0%,
+      var(--lavender) 100%
     );
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-radius: 10px;
     padding: 12px;
-    color: #1e1e2e;
+    color: var(--base);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -513,7 +519,7 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.2) 50%,
+      rgba(var(--white-rgb), 0.2) 50%,
       transparent 100%
     );
     transition: left 0.5s;
@@ -525,8 +531,8 @@
 
   .update-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(137, 180, 250, 0.4),
-      0 0 40px rgba(137, 180, 250, 0.2);
+    box-shadow: 0 8px 24px rgba(var(--blue-rgb), 0.4),
+      0 0 40px rgba(var(--blue-rgb), 0.2);
   }
 
   /* Modal styles */
@@ -536,7 +542,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(var(--black-rgb), 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -545,36 +551,36 @@
   }
 
   .modal-content {
-    background: #1e1e2e;
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    background: var(--base);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-radius: 16px;
     padding: 24px;
     min-width: 320px;
     max-width: 400px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 16px 48px rgba(var(--black-rgb), 0.4);
   }
 
   .modal-header {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin-bottom: 16px;
   }
 
   .modal-body {
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 14px;
     line-height: 1.5;
   }
 
   .modal-body strong {
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .modal-note {
     margin-top: 12px;
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .modal-actions {
@@ -595,22 +601,22 @@
   }
 
   .modal-btn.cancel {
-    background: rgba(49, 50, 68, 0.8);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--text);
   }
 
   .modal-btn.cancel:hover {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
   }
 
   .modal-btn.confirm {
-    background: linear-gradient(135deg, #89b4fa 0%, #b4befe 100%);
-    color: #1e1e2e;
+    background: linear-gradient(135deg, var(--blue) 0%, var(--lavender) 100%);
+    color: var(--base);
   }
 
   .modal-btn.confirm:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(137, 180, 250, 0.4);
+    box-shadow: 0 4px 16px rgba(var(--blue-rgb), 0.4);
   }
 
   /* Loading overlay */
@@ -620,7 +626,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(var(--black-rgb), 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -633,14 +639,14 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 3px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -657,22 +663,22 @@
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(243, 139, 168, 0.15);
-    border: 1px solid rgba(243, 139, 168, 0.4);
+    background: rgba(var(--red-rgb), 0.15);
+    border: 1px solid rgba(var(--red-rgb), 0.4);
     border-radius: 10px;
     padding: 12px 16px;
     display: flex;
     align-items: center;
     gap: 12px;
     z-index: 1002;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px rgba(var(--black-rgb), 0.3);
   }
 
   .error-icon {
     width: 24px;
     height: 24px;
-    background: #f38ba8;
-    color: #1e1e2e;
+    background: var(--red);
+    color: var(--base);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -682,7 +688,7 @@
   }
 
   .error-message {
-    color: #f38ba8;
+    color: var(--red);
     font-size: 13px;
     max-width: 300px;
   }
@@ -690,7 +696,7 @@
   .error-dismiss {
     background: none;
     border: none;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 18px;
     cursor: pointer;
     padding: 4px;
@@ -698,6 +704,6 @@
   }
 
   .error-dismiss:hover {
-    color: #cdd6f4;
+    color: var(--text);
   }
 </style>

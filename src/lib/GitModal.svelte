@@ -1,17 +1,17 @@
-<script>
+<script lang="ts">
   import { tick } from 'svelte';
   import Icon from "./Icon.svelte";
 
-  let { show = false, onClose } = $props();
+  let { show = false, onClose }: { show?: boolean; onClose: () => void } = $props();
 
-  let gitInfo = $state(null);
+  let gitInfo = $state<any>(null);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let activeTab = $state('status');
-  let selectedCommit = $state(null);
-  let commitDetails = $state(null);
+  let selectedCommit = $state<any>(null);
+  let commitDetails = $state<any>(null);
   let loadingCommit = $state(false);
-  let actionMessage = $state(null);
+  let actionMessage = $state<any>(null);
   let actionLoading = $state(false);
 
   const tabs = [
@@ -32,14 +32,14 @@
     actionMessage = null;
     try {
       gitInfo = await window.electronAPI.getGitInfo();
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
     } finally {
       loading = false;
     }
   }
 
-  async function selectCommit(commit) {
+  async function selectCommit(commit: any) {
     if (selectedCommit?.hash === commit.hash) {
       selectedCommit = null;
       commitDetails = null;
@@ -49,14 +49,14 @@
     loadingCommit = true;
     try {
       commitDetails = await window.electronAPI.getCommitDetails(commit.hash);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load commit:', e);
     } finally {
       loadingCommit = false;
     }
   }
 
-  async function switchBranch(branchName) {
+  async function switchBranch(branchName: any) {
     actionLoading = true;
     actionMessage = null;
     try {
@@ -65,7 +65,7 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
@@ -81,7 +81,7 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
@@ -97,14 +97,14 @@
       if (result.success) {
         await loadGitInfo();
       }
-    } catch (e) {
+    } catch (e: any) {
       actionMessage = { type: 'error', text: e.message };
     } finally {
       actionLoading = false;
     }
   }
 
-  function getStatusIcon(status) {
+  function getStatusIcon(status: any) {
     switch (status) {
       case 'M': return '~';
       case 'A': return '+';
@@ -114,7 +114,7 @@
     }
   }
 
-  function getStatusColor(status) {
+  function getStatusColor(status: any) {
     switch (status) {
       case 'M': return '#f9e2af';
       case 'A': return '#a6e3a1';
@@ -131,8 +131,8 @@
 </script>
 
 {#if show}
-  <div class="modal-backdrop" onclick={onClose}>
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-backdrop" role="presentation" onclick={onClose} onkeydown={(e) => { if (e.key === "Escape") onClose(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <div class="header-left">
           <span class="modal-icon"><Icon name="GitBranch" size={24} /></span>
@@ -282,7 +282,7 @@
             {:else if activeTab === 'branches'}
               <div class="branches-section">
                 <div class="branch-list">
-                  {#each gitInfo.branches.filter(b => !b.isRemote) as branch}
+                  {#each gitInfo.branches.filter((b: any) => !b.isRemote) as branch}
                     <div class="branch-item" class:current={branch.isCurrent}>
                       <div class="branch-info">
                         <span class="branch-name">
@@ -308,10 +308,10 @@
                   {/each}
                 </div>
 
-                {#if gitInfo.branches.filter(b => b.isRemote).length > 0}
+                {#if gitInfo.branches.filter((b: any) => b.isRemote).length > 0}
                   <h4 class="remote-header">Remote Branches</h4>
                   <div class="branch-list remote">
-                    {#each gitInfo.branches.filter(b => b.isRemote) as branch}
+                    {#each gitInfo.branches.filter((b: any) => b.isRemote) as branch}
                       <div class="branch-item remote">
                         <span class="branch-name">{branch.name}</span>
                         <button
@@ -408,7 +408,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(var(--black-rgb), 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -417,15 +417,15 @@
   }
 
   .modal {
-    background: linear-gradient(180deg, #1e1e2e 0%, #181825 100%);
+    background: linear-gradient(180deg, var(--base) 0%, var(--mantle) 100%);
     border-radius: 16px;
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     width: 700px;
     max-width: 90vw;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 60px rgba(var(--black-rgb), 0.5);
     overflow: hidden;
   }
 
@@ -434,7 +434,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    border-bottom: 1px solid rgba(69, 71, 90, 0.3);
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .header-left {
@@ -444,7 +444,7 @@
   }
 
   .modal-icon {
-    color: #fab387;
+    color: var(--peach);
     display: flex;
     align-items: center;
   }
@@ -452,14 +452,14 @@
   .modal-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
   .close-btn {
-    background: rgba(243, 139, 168, 0.1);
+    background: rgba(var(--red-rgb), 0.1);
     border: none;
-    color: #f38ba8;
+    color: var(--red);
     width: 32px;
     height: 32px;
     border-radius: 8px;
@@ -472,7 +472,7 @@
   }
 
   .close-btn:hover {
-    background: rgba(243, 139, 168, 0.2);
+    background: rgba(var(--red-rgb), 0.2);
   }
 
   .modal-loading, .modal-error {
@@ -482,14 +482,14 @@
     align-items: center;
     justify-content: center;
     padding: 60px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(250, 179, 135, 0.2);
-    border-top-color: #fab387;
+    border: 3px solid rgba(var(--peach-rgb), 0.2);
+    border-top-color: var(--peach);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
@@ -500,7 +500,7 @@
   }
 
   .modal-error {
-    color: #f38ba8;
+    color: var(--red);
   }
 
   .error-icon {
@@ -510,9 +510,9 @@
 
   .modal-error button {
     margin-top: 16px;
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.3);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.3);
+    color: var(--red);
     padding: 8px 20px;
     border-radius: 8px;
     cursor: pointer;
@@ -527,8 +527,8 @@
 
   .repo-info {
     padding: 16px 24px;
-    background: rgba(49, 50, 68, 0.3);
-    border-bottom: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .repo-main {
@@ -551,7 +551,7 @@
   .repo-link {
     font-size: 16px;
     font-weight: 600;
-    color: #89b4fa;
+    color: var(--blue);
     text-decoration: none;
   }
 
@@ -563,11 +563,11 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(203, 166, 247, 0.15);
+    background: rgba(var(--mauve-rgb), 0.15);
     padding: 4px 12px;
     border-radius: 20px;
     font-size: 13px;
-    color: #cba6f7;
+    color: var(--mauve);
   }
 
   .branch-icon {
@@ -581,11 +581,11 @@
   }
 
   .ahead {
-    color: #a6e3a1;
+    color: var(--green);
   }
 
   .behind {
-    color: #f9e2af;
+    color: var(--yellow);
   }
 
   .repo-user {
@@ -593,7 +593,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .user-icon {
@@ -601,18 +601,18 @@
   }
 
   .user-name {
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .user-email {
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .action-bar {
     display: flex;
     gap: 8px;
     padding: 12px 24px;
-    border-bottom: 1px solid rgba(69, 71, 90, 0.3);
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .action-btn {
@@ -620,18 +620,18 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 8px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .action-btn:hover:not(:disabled) {
-    background: rgba(69, 71, 90, 0.5);
-    border-color: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--surface1-rgb), 0.5);
+    border-color: rgba(var(--blue-rgb), 0.3);
   }
 
   .action-btn:disabled {
@@ -645,20 +645,20 @@
   }
 
   .action-message.success {
-    background: rgba(166, 227, 161, 0.1);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.1);
+    color: var(--green);
   }
 
   .action-message.error {
-    background: rgba(243, 139, 168, 0.1);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.1);
+    color: var(--red);
   }
 
   .tabs {
     display: flex;
     gap: 4px;
     padding: 12px 24px;
-    border-bottom: 1px solid rgba(69, 71, 90, 0.3);
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .tab {
@@ -669,7 +669,7 @@
     background: transparent;
     border: none;
     border-radius: 8px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -677,18 +677,18 @@
   }
 
   .tab:hover {
-    background: rgba(49, 50, 68, 0.5);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.5);
+    color: var(--subtext0);
   }
 
   .tab.active {
-    background: rgba(250, 179, 135, 0.15);
-    color: #fab387;
+    background: rgba(var(--peach-rgb), 0.15);
+    color: var(--peach);
   }
 
   .tab-badge {
-    background: #f38ba8;
-    color: #1e1e2e;
+    background: var(--red);
+    color: var(--base);
     padding: 2px 6px;
     border-radius: 10px;
     font-size: 11px;
@@ -696,7 +696,7 @@
   }
 
   .tab-count {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(var(--black-rgb), 0.2);
     padding: 2px 6px;
     border-radius: 10px;
     font-size: 11px;
@@ -713,17 +713,17 @@
   }
 
   .tab-content::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
 
   .tab-content::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
 
   .tab-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(137, 180, 250, 0.5);
+    background: rgba(var(--blue-rgb), 0.5);
   }
 
   /* Status Tab */
@@ -733,7 +733,7 @@
     align-items: center;
     justify-content: center;
     padding: 40px;
-    color: #a6e3a1;
+    color: var(--green);
   }
 
   .clean-icon {
@@ -748,7 +748,7 @@
   .status-group h4 {
     font-size: 12px;
     font-weight: 600;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     margin: 0 0 8px 0;
   }
@@ -764,7 +764,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 6px;
     font-family: "JetBrains Mono", monospace;
     font-size: 12px;
@@ -777,7 +777,7 @@
   }
 
   .file-name {
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   /* Branches Tab */
@@ -792,14 +792,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 8px;
     transition: all 0.15s;
   }
 
   .branch-item.current {
-    background: rgba(203, 166, 247, 0.1);
-    border: 1px solid rgba(203, 166, 247, 0.2);
+    background: rgba(var(--mauve-rgb), 0.1);
+    border: 1px solid rgba(var(--mauve-rgb), 0.2);
   }
 
   .branch-item.remote {
@@ -815,34 +815,34 @@
   .branch-name {
     font-family: "JetBrains Mono", monospace;
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
     display: flex;
     align-items: center;
     gap: 8px;
   }
 
   .current-marker {
-    color: #a6e3a1;
+    color: var(--green);
   }
 
   .branch-track {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .switch-btn {
     padding: 6px 12px;
-    background: rgba(137, 180, 250, 0.1);
-    border: 1px solid rgba(137, 180, 250, 0.2);
+    background: rgba(var(--blue-rgb), 0.1);
+    border: 1px solid rgba(var(--blue-rgb), 0.2);
     border-radius: 6px;
-    color: #89b4fa;
+    color: var(--blue);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .switch-btn:hover:not(:disabled) {
-    background: rgba(137, 180, 250, 0.2);
+    background: rgba(var(--blue-rgb), 0.2);
   }
 
   .switch-btn:disabled {
@@ -853,7 +853,7 @@
   .remote-header {
     font-size: 12px;
     font-weight: 600;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     margin: 20px 0 8px 0;
   }
@@ -875,7 +875,7 @@
     flex-direction: column;
     gap: 4px;
     padding: 12px 14px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border: 1px solid transparent;
     border-radius: 8px;
     cursor: pointer;
@@ -886,12 +886,12 @@
   }
 
   .commit-item:hover {
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
   }
 
   .commit-item.selected {
-    background: rgba(250, 179, 135, 0.1);
-    border-color: rgba(250, 179, 135, 0.2);
+    background: rgba(var(--peach-rgb), 0.1);
+    border-color: rgba(var(--peach-rgb), 0.2);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
@@ -905,15 +905,15 @@
   .commit-hash {
     font-family: "JetBrains Mono", monospace;
     font-size: 12px;
-    color: #fab387;
-    background: rgba(250, 179, 135, 0.1);
+    color: var(--peach);
+    background: rgba(var(--peach-rgb), 0.1);
     padding: 2px 8px;
     border-radius: 4px;
   }
 
   .commit-subject {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -924,12 +924,12 @@
     display: flex;
     gap: 16px;
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .commit-details {
-    background: rgba(30, 30, 46, 0.8);
-    border: 1px solid rgba(250, 179, 135, 0.2);
+    background: rgba(var(--base-rgb), 0.8);
+    border: 1px solid rgba(var(--peach-rgb), 0.2);
     border-top: none;
     border-radius: 0 0 8px 8px;
     padding: 16px;
@@ -948,7 +948,7 @@
   }
 
   .loading-details {
-    color: #6c7086;
+    color: var(--overlay0);
     font-style: italic;
   }
 
@@ -959,11 +959,11 @@
   .commit-message pre {
     margin: 0;
     padding: 12px;
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
     border-radius: 6px;
     font-family: "JetBrains Mono", monospace;
     font-size: 12px;
-    color: #cdd6f4;
+    color: var(--text);
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -976,7 +976,7 @@
   }
 
   .info-label {
-    color: #6c7086;
+    color: var(--overlay0);
     min-width: 60px;
   }
 
@@ -987,7 +987,7 @@
   .commit-files h5, .commit-diff h5 {
     font-size: 11px;
     font-weight: 600;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     margin: 0 0 8px 0;
   }
@@ -1004,7 +1004,7 @@
     gap: 8px;
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .commit-diff {
@@ -1014,11 +1014,11 @@
   .commit-diff pre {
     margin: 0;
     padding: 10px;
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
     border-radius: 6px;
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
-    color: #a6adc8;
+    color: var(--subtext0);
     overflow-x: auto;
   }
 </style>

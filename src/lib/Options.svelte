@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
   import hljs from 'highlight.js/lib/core';
@@ -6,7 +6,7 @@
 
   hljs.registerLanguage('nix', nix);
 
-  let options = $state({
+  let options = $state<any>({
     services: [],
     programs: [],
     hardware: [],
@@ -16,21 +16,21 @@
     other: []
   });
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let searchQuery = $state("");
   let activeTab = $state("services");
   let sourceMode = $state("config"); // "config" or "live"
   let savingOption = $state(false);
-  let editingOptionKey = $state(null);
+  let editingOptionKey = $state<any>(null);
   let editDraftValue = $state("");
   let catalogSearching = $state(false);
   let catalogSearched = $state("");
-  let catalogResults = $state([]);
-  let catalogError = $state(null);
+  let catalogResults = $state<any[]>([]);
+  let catalogError = $state<any>(null);
 
   // Option detail state
-  let selectedOption = $state(null);
-  let optionInfo = $state(null);
+  let selectedOption = $state<any>(null);
+  let optionInfo = $state<any>(null);
   let loadingInfo = $state(false);
 
   const tabs = [
@@ -45,14 +45,14 @@
 
   // Derived filtered options for each category - ensures reactivity
   let filteredByCategory = $derived.by(() => {
-    const result = {};
+    const result: Record<string, any> = {};
     const q = searchQuery.trim().toLowerCase();
     for (const tab of tabs) {
       const list = options[tab.id] || [];
       if (!q) {
         result[tab.id] = list;
       } else {
-        result[tab.id] = list.filter(opt =>
+        result[tab.id] = list.filter((opt: any) =>
           opt.path.toLowerCase().includes(q) ||
           (opt.value && opt.value.toLowerCase().includes(q))
         );
@@ -87,7 +87,7 @@
       } else {
         options = await window.electronAPI.getOptions();
       }
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
       console.error("Failed to load options:", e);
     } finally {
@@ -99,14 +99,14 @@
     loadOptions();
   });
 
-  function switchSource(mode) {
+  function switchSource(mode: any) {
     if (mode !== sourceMode) {
       sourceMode = mode;
       loadOptions();
     }
   }
 
-  async function selectOption(opt) {
+  async function selectOption(opt: any) {
     const optKey = `${opt.path}:${opt.file || opt.source}`;
     if (selectedOption === optKey) {
       selectedOption = null;
@@ -128,7 +128,7 @@
       if (selectedOption === optKey) {
         optionInfo = { ...info, currentValue: opt.value, currentFile: opt.file, currentLine: opt.line };
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load option info:", e);
       if (selectedOption === optKey) {
         optionInfo = { path: opt.path, error: e.message };
@@ -138,17 +138,17 @@
     }
   }
 
-  function openUrl(url) {
+  function openUrl(url: any) {
     if (url) {
       window.open(url, '_blank');
     }
   }
 
-  function getTabCount(tab) {
+  function getTabCount(tab: any) {
     return options[tab]?.length || 0;
   }
 
-  function getFilteredCount(tab) {
+  function getFilteredCount(tab: any) {
     return filteredByCategory[tab]?.length || 0;
   }
 
@@ -160,25 +160,25 @@
     return total;
   }
 
-  function formatValue(value) {
+  function formatValue(value: any) {
     if (!value) return '';
     if (value.length > 60) return value.substring(0, 57) + '...';
     return value;
   }
 
-  function stripHtml(value) {
+  function stripHtml(value: any) {
     if (!value) return '';
     return String(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  function parseBoolValue(value) {
+  function parseBoolValue(value: any) {
     const v = normalizeValue(value).toLowerCase();
     if (v === 'true') return true;
     if (v === 'false') return false;
     return null;
   }
 
-  function normalizeValue(value) {
+  function normalizeValue(value: any) {
     if (!value) return '';
     return String(value).trim().replace(/;$/, '').trim();
   }
@@ -207,7 +207,7 @@
     editDraftValue = '';
   }
 
-  async function saveOptionValue(optionPath, newValue, filePath = null) {
+  async function saveOptionValue(optionPath: any, newValue: any, filePath = null) {
     savingOption = true;
     try {
       const result = await window.electronAPI.setOptionValue({
@@ -225,7 +225,7 @@
       window.dispatchEvent(new CustomEvent('packages-changed'));
       await loadOptions();
       return true;
-    } catch (e) {
+    } catch (e: any) {
       alert(e.message || 'Failed to save option value');
       return false;
     } finally {
@@ -271,7 +271,7 @@
     }
   }
 
-  function getSuggestedValue(result) {
+  function getSuggestedValue(result: any) {
     const type = (result?.type || '').toLowerCase();
     if (type.includes('bool')) return 'true';
     if (result?.example) return normalizeValue(stripHtml(result.example));
@@ -293,14 +293,14 @@
         return;
       }
       catalogResults = result.results || [];
-    } catch (e) {
+    } catch (e: any) {
       catalogError = e.message || 'Search failed';
     } finally {
       catalogSearching = false;
     }
   }
 
-  async function addOptionFromCatalog(result) {
+  async function addOptionFromCatalog(result: any) {
     if (!result?.path) return;
     const value = getSuggestedValue(result);
     const ok = await saveOptionValue(result.path, value, null);
@@ -311,19 +311,19 @@
     }
   }
 
-  function isBlockValue(value) {
+  function isBlockValue(value: any) {
     if (!value) return false;
     // Any structured value (blocks, lists) or multi-line content
     if (value.startsWith('{') || value.startsWith('[') || value.includes('\n')) return true;
     return false;
   }
 
-  function getOptionKey(opt) {
+  function getOptionKey(opt: any) {
     return `${opt.path}:${opt.file || opt.source}`;
   }
 
   // Nix syntax highlighting using highlight.js
-  function highlightNix(code) {
+  function highlightNix(code: any) {
     if (!code) return '';
     try {
       return hljs.highlight(code, { language: 'nix' }).value;
@@ -544,7 +544,7 @@
             {#if sourceMode === 'config' && isBooleanOption()}
               {@const currentBool = parseBoolValue(optionInfo.currentValue)}
               <div class="bool-editor">
-                <button class="value-toggle" class:active={currentBool === true} onclick={toggleBooleanOption} disabled={savingOption}>
+                <button class="value-toggle" class:active={currentBool === true} onclick={toggleBooleanOption} disabled={savingOption} aria-label="Toggle boolean value">
                   <span class="toggle-knob"></span>
                 </button>
                 <span class="bool-label">{currentBool === true ? 'true' : 'false'}</span>
@@ -648,23 +648,23 @@
   .page-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0 0 4px 0;
   }
 
   .subtitle {
     font-size: 14px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin: 0;
   }
 
   .source-toggle {
     display: flex;
     gap: 4px;
-    background: rgba(30, 30, 46, 0.6);
+    background: rgba(var(--base-rgb), 0.6);
     padding: 4px;
     border-radius: 12px;
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .source-btn {
@@ -675,7 +675,7 @@
     border: none;
     border-radius: 8px;
     background: transparent;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -683,14 +683,14 @@
   }
 
   .source-btn:hover {
-    color: #a6adc8;
-    background: rgba(49, 50, 68, 0.4);
+    color: var(--subtext0);
+    background: rgba(var(--surface0-rgb), 0.4);
   }
 
   .source-btn.active {
-    background: linear-gradient(135deg, rgba(203, 166, 247, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
-    color: #cba6f7;
-    box-shadow: 0 2px 8px rgba(203, 166, 247, 0.15);
+    background: linear-gradient(135deg, rgba(var(--mauve-rgb), 0.2) 0%, rgba(var(--lavender-rgb), 0.2) 100%);
+    color: var(--mauve);
+    box-shadow: 0 2px 8px rgba(var(--mauve-rgb), 0.15);
   }
 
   .source-icon {
@@ -700,8 +700,8 @@
   .search-bar {
     display: flex;
     align-items: center;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 12px;
     padding: 0 16px;
     margin-bottom: 16px;
@@ -709,8 +709,8 @@
   }
 
   .search-bar:focus-within {
-    border-color: rgba(203, 166, 247, 0.5);
-    box-shadow: 0 0 0 2px rgba(203, 166, 247, 0.1);
+    border-color: rgba(var(--mauve-rgb), 0.5);
+    box-shadow: 0 0 0 2px rgba(var(--mauve-rgb), 0.1);
   }
 
   .search-icon {
@@ -725,19 +725,19 @@
     background: transparent;
     border: none;
     outline: none;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 14px;
     padding: 12px 0;
   }
 
   .search-bar input::placeholder {
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .clear-btn {
-    background: rgba(243, 139, 168, 0.2);
+    background: rgba(var(--red-rgb), 0.2);
     border: none;
-    color: #f38ba8;
+    color: var(--red);
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -750,7 +750,7 @@
   }
 
   .clear-btn:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .tabs {
@@ -762,11 +762,11 @@
   }
 
   .tab {
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 10px;
     padding: 10px 16px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -777,18 +777,18 @@
   }
 
   .tab:hover {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .tab.active {
-    background: linear-gradient(135deg, rgba(203, 166, 247, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
-    border-color: rgba(203, 166, 247, 0.4);
-    color: #cba6f7;
+    background: linear-gradient(135deg, rgba(var(--mauve-rgb), 0.2) 0%, rgba(var(--lavender-rgb), 0.2) 100%);
+    border-color: rgba(var(--mauve-rgb), 0.4);
+    color: var(--mauve);
   }
 
   .count {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(var(--black-rgb), 0.2);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 11px;
@@ -796,7 +796,7 @@
   }
 
   .tab.active .count {
-    background: rgba(203, 166, 247, 0.2);
+    background: rgba(var(--mauve-rgb), 0.2);
   }
 
   .tab.dimmed {
@@ -804,29 +804,29 @@
   }
 
   .count.filtered {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
   }
 
   .tab.active .count.filtered {
-    background: rgba(166, 227, 161, 0.3);
+    background: rgba(var(--green-rgb), 0.3);
   }
 
   .refresh-btn {
     margin-left: auto;
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 10px;
     padding: 10px 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 14px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .refresh-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .refresh-btn:disabled {
@@ -840,14 +840,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(203, 166, 247, 0.2);
-    border-top-color: #cba6f7;
+    border: 3px solid rgba(var(--mauve-rgb), 0.2);
+    border-top-color: var(--mauve);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
@@ -863,7 +863,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #f38ba8;
+    color: var(--red);
     text-align: center;
   }
 
@@ -874,9 +874,9 @@
 
   .error button {
     margin-top: 16px;
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.3);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.3);
+    color: var(--red);
     padding: 8px 20px;
     border-radius: 8px;
     cursor: pointer;
@@ -884,7 +884,7 @@
   }
 
   .error button:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .options-content {
@@ -905,15 +905,15 @@
   .section-header h2 {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
   .section-header .info {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-family: monospace;
-    background: rgba(49, 50, 68, 0.4);
+    background: rgba(var(--surface0-rgb), 0.4);
     padding: 2px 8px;
     border-radius: 4px;
   }
@@ -932,17 +932,17 @@
   }
 
   .option-list::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
 
   .option-list::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
 
   .option-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(88, 91, 112, 0.8);
+    background: rgba(var(--surface2-rgb), 0.8);
   }
 
   .option-item-wrapper {
@@ -955,7 +955,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border: 1px solid transparent;
     border-radius: 8px;
     transition: all 0.15s;
@@ -966,12 +966,12 @@
   }
 
   .option-item:hover {
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
   }
 
   .option-item.selected {
-    background: rgba(203, 166, 247, 0.15);
-    border-color: rgba(203, 166, 247, 0.3);
+    background: rgba(var(--mauve-rgb), 0.15);
+    border-color: rgba(var(--mauve-rgb), 0.3);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
@@ -987,13 +987,13 @@
   .option-path {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .option-value {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
-    color: #a6e3a1;
+    color: var(--green);
     opacity: 0.8;
   }
 
@@ -1005,23 +1005,23 @@
 
   .option-file, .option-source {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-family: monospace;
   }
 
   .expand-icon {
     font-size: 10px;
-    color: #6c7086;
+    color: var(--overlay0);
     transition: transform 0.2s;
   }
 
   .option-item.selected .expand-icon {
-    color: #cba6f7;
+    color: var(--mauve);
   }
 
   .option-detail {
-    background: rgba(30, 30, 46, 0.8);
-    border: 1px solid rgba(203, 166, 247, 0.3);
+    background: rgba(var(--base-rgb), 0.8);
+    border: 1px solid rgba(var(--mauve-rgb), 0.3);
     border-top: none;
     border-radius: 0 0 8px 8px;
     overflow: hidden;
@@ -1044,7 +1044,7 @@
   }
 
   .detail-error {
-    color: #f38ba8;
+    color: var(--red);
     font-size: 13px;
   }
 
@@ -1063,7 +1063,7 @@
   .skeleton-title {
     width: 200px;
     height: 20px;
-    background: linear-gradient(90deg, rgba(69, 71, 90, 0.4) 25%, rgba(88, 91, 112, 0.6) 50%, rgba(69, 71, 90, 0.4) 75%);
+    background: linear-gradient(90deg, rgba(var(--surface1-rgb), 0.4) 25%, rgba(var(--surface2-rgb), 0.6) 50%, rgba(var(--surface1-rgb), 0.4) 75%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s infinite;
     border-radius: 4px;
@@ -1072,7 +1072,7 @@
   .skeleton-description {
     width: 100%;
     height: 14px;
-    background: linear-gradient(90deg, rgba(69, 71, 90, 0.4) 25%, rgba(88, 91, 112, 0.6) 50%, rgba(69, 71, 90, 0.4) 75%);
+    background: linear-gradient(90deg, rgba(var(--surface1-rgb), 0.4) 25%, rgba(var(--surface2-rgb), 0.6) 50%, rgba(var(--surface1-rgb), 0.4) 75%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s infinite;
     border-radius: 4px;
@@ -1086,7 +1086,7 @@
 
   .skeleton-field {
     height: 40px;
-    background: linear-gradient(90deg, rgba(69, 71, 90, 0.3) 25%, rgba(88, 91, 112, 0.5) 50%, rgba(69, 71, 90, 0.3) 75%);
+    background: linear-gradient(90deg, rgba(var(--surface1-rgb), 0.3) 25%, rgba(var(--surface2-rgb), 0.5) 50%, rgba(var(--surface1-rgb), 0.3) 75%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s infinite;
     border-radius: 6px;
@@ -1115,13 +1115,13 @@
   .detail-title h3 {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
   .type-badge {
-    background: rgba(203, 166, 247, 0.2);
-    color: #cba6f7;
+    background: rgba(var(--mauve-rgb), 0.2);
+    color: var(--mauve);
     padding: 2px 8px;
     border-radius: 6px;
     font-size: 12px;
@@ -1130,7 +1130,7 @@
 
   .detail-description {
     font-size: 13px;
-    color: #a6adc8;
+    color: var(--subtext0);
     margin: 0;
     line-height: 1.5;
   }
@@ -1154,14 +1154,14 @@
 
   .field-label {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   .field-value {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .field-value.mono {
@@ -1171,11 +1171,11 @@
   .block-value {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
-    color: #cdd6f4;
-    background: rgba(30, 30, 46, 0.6);
+    color: var(--text);
+    background: rgba(var(--base-rgb), 0.6);
     padding: 10px 12px;
     border-radius: 6px;
-    border: 1px solid rgba(69, 71, 90, 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.4);
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
@@ -1185,39 +1185,39 @@
 
   /* highlight.js Catppuccin-style theme for Nix */
   .block-value :global(.hljs-comment) {
-    color: #6c7086;
+    color: var(--overlay0);
     font-style: italic;
   }
 
   .block-value :global(.hljs-string) {
-    color: #a6e3a1;
+    color: var(--green);
   }
 
   .block-value :global(.hljs-literal),
   .block-value :global(.hljs-keyword) {
-    color: #fab387;
+    color: var(--peach);
   }
 
   .block-value :global(.hljs-number) {
-    color: #fab387;
+    color: var(--peach);
   }
 
   .block-value :global(.hljs-built_in),
   .block-value :global(.hljs-builtin-name) {
-    color: #f38ba8;
+    color: var(--red);
   }
 
   .block-value :global(.hljs-variable),
   .block-value :global(.hljs-attr) {
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .block-value :global(.hljs-punctuation) {
-    color: #cba6f7;
+    color: var(--mauve);
   }
 
   .block-value :global(.hljs-subst) {
-    color: #f5c2e7;
+    color: var(--pink);
   }
 
   .config-locations {
@@ -1229,8 +1229,8 @@
   .config-location {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
-    color: #f9e2af;
-    background: rgba(249, 226, 175, 0.1);
+    color: var(--yellow);
+    background: rgba(var(--yellow-rgb), 0.1);
     padding: 4px 8px;
     border-radius: 4px;
   }
@@ -1240,7 +1240,7 @@
     gap: 8px;
     flex-wrap: wrap;
     padding-top: 12px;
-    border-top: 1px solid rgba(69, 71, 90, 0.3);
+    border-top: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .action-btn {
@@ -1248,18 +1248,18 @@
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .action-btn:hover {
-    background: rgba(49, 50, 68, 0.8);
-    border-color: rgba(203, 166, 247, 0.3);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border-color: rgba(var(--mauve-rgb), 0.3);
   }
 
   .empty {
@@ -1267,22 +1267,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
     font-style: italic;
   }
 
   .search-results-info {
     margin-top: 12px;
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     text-align: center;
   }
 
   .catalog-search-box {
     margin-top: 10px;
     padding: 12px;
-    background: rgba(49, 50, 68, 0.2);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.2);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
@@ -1295,7 +1295,7 @@
     justify-content: space-between;
     gap: 10px;
     font-size: 12px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .catalog-search-btn,
@@ -1306,9 +1306,9 @@
     align-items: center;
     gap: 6px;
     border-radius: 6px;
-    border: 1px solid rgba(69, 71, 90, 0.35);
-    background: rgba(49, 50, 68, 0.5);
-    color: #cdd6f4;
+    border: 1px solid rgba(var(--surface1-rgb), 0.35);
+    background: rgba(var(--surface0-rgb), 0.5);
+    color: var(--text);
     font-size: 12px;
     padding: 6px 10px;
     cursor: pointer;
@@ -1318,7 +1318,7 @@
   .catalog-add-btn:hover,
   .save-btn:hover,
   .discard-btn:hover {
-    background: rgba(49, 50, 68, 0.75);
+    background: rgba(var(--surface0-rgb), 0.75);
   }
 
   .catalog-results {
@@ -1333,8 +1333,8 @@
     justify-content: space-between;
     gap: 8px;
     padding: 8px;
-    background: rgba(30, 30, 46, 0.55);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--base-rgb), 0.55);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
   }
 
@@ -1348,24 +1348,24 @@
   .catalog-path {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .catalog-type {
     font-size: 11px;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .catalog-desc {
     font-size: 11px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .catalog-error,
   .catalog-empty {
     margin: 0;
     font-size: 12px;
-    color: #f38ba8;
+    color: var(--red);
   }
 
   .inline-value-btn {
@@ -1384,17 +1384,17 @@
 
   .inline-value-btn.editable {
     cursor: pointer;
-    border-color: rgba(69, 71, 90, 0.3);
-    background: rgba(30, 30, 46, 0.35);
+    border-color: rgba(var(--surface1-rgb), 0.3);
+    background: rgba(var(--base-rgb), 0.35);
   }
 
   .inline-value-btn.editable:hover {
-    border-color: rgba(137, 180, 250, 0.35);
+    border-color: rgba(var(--blue-rgb), 0.35);
   }
 
   .edit-hint {
     font-size: 11px;
-    color: #89b4fa;
+    color: var(--blue);
     margin-left: 8px;
     white-space: nowrap;
   }
@@ -1407,9 +1407,9 @@
 
   .edit-input {
     border-radius: 6px;
-    border: 1px solid rgba(69, 71, 90, 0.4);
-    background: rgba(30, 30, 46, 0.7);
-    color: #cdd6f4;
+    border: 1px solid rgba(var(--surface1-rgb), 0.4);
+    background: rgba(var(--base-rgb), 0.7);
+    color: var(--text);
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
     padding: 8px 10px;
@@ -1438,16 +1438,16 @@
     width: 52px;
     height: 28px;
     border-radius: 20px;
-    border: 1px solid rgba(69, 71, 90, 0.5);
-    background: rgba(49, 50, 68, 0.6);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
+    background: rgba(var(--surface0-rgb), 0.6);
     cursor: pointer;
     transition: all 0.2s;
     padding: 0;
   }
 
   .value-toggle.active {
-    background: rgba(166, 227, 161, 0.2);
-    border-color: rgba(166, 227, 161, 0.5);
+    background: rgba(var(--green-rgb), 0.2);
+    border-color: rgba(var(--green-rgb), 0.5);
   }
 
   .value-toggle .toggle-knob {
@@ -1457,19 +1457,19 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #6c7086;
+    background: var(--overlay0);
     transition: left 0.2s, background 0.2s;
   }
 
   .value-toggle.active .toggle-knob {
     left: 27px;
-    background: #a6e3a1;
+    background: var(--green);
   }
 
   .bool-label {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 12px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .block-edit-btn {

@@ -1,13 +1,13 @@
-<script>
+<script lang="ts">
   import Icon from "./Icon.svelte";
 
-  let { currentPage = $bindable("dashboard") } = $props();
+  let { currentPage = $bindable("dashboard") }: { currentPage?: string } = $props();
 
   let hasDrift = $state(false);
 
   $effect(() => {
-    function onPendingChanges(e) {
-      hasDrift = e.detail.hasDrift;
+    function onPendingChanges(e: Event) {
+      hasDrift = (e as CustomEvent).detail.hasDrift;
     }
     window.addEventListener('pending-changes', onPendingChanges);
     return () => window.removeEventListener('pending-changes', onPendingChanges);
@@ -30,7 +30,7 @@
     { id: "history", icon: "ScrollText", tooltip: "History" },
   ];
 
-  function navigate(pageId) {
+  function navigate(pageId: string) {
     currentPage = pageId;
   }
 </script>
@@ -67,11 +67,12 @@
 
   <div class="sidebar-footer">
     <button
-      class="nav-btn coming-soon"
-      onclick={undefined}
+      class="nav-btn"
+      class:active={currentPage === 'settings'}
+      onclick={() => navigate('settings')}
     >
       <Icon name="Settings" size={20} />
-      <span class="tooltip">Settings (coming soon)</span>
+      <span class="tooltip">Settings</span>
     </button>
   </div>
 </div>
@@ -79,13 +80,13 @@
 <style>
   .sidebar {
     width: 72px;
-    background: rgba(24, 24, 37, 0.95);
+    background: rgba(var(--mantle-rgb), 0.95);
     padding: 16px 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    border-right: 1px solid rgba(49, 50, 68, 0.5);
+    border-right: 1px solid rgba(var(--surface0-rgb), 0.5);
     flex-shrink: 0;
     position: relative;
     z-index: 1000;
@@ -114,22 +115,22 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #f9e2af;
-    box-shadow: 0 0 6px rgba(249, 226, 175, 0.5);
+    background: var(--yellow);
+    box-shadow: 0 0 6px rgba(var(--yellow-rgb), 0.5);
   }
 
   .nav-btn:hover {
-    background: rgba(49, 50, 68, 0.6);
+    background: rgba(var(--surface0-rgb), 0.6);
     transform: scale(1.05);
   }
 
   .nav-btn.active {
     background: linear-gradient(
       135deg,
-      rgba(137, 180, 250, 0.8) 0%,
-      rgba(180, 190, 254, 0.8) 100%
+      rgba(var(--blue-rgb), 0.8) 0%,
+      rgba(var(--lavender-rgb), 0.8) 100%
     );
-    box-shadow: 0 4px 16px rgba(137, 180, 250, 0.3);
+    box-shadow: 0 4px 16px rgba(var(--blue-rgb), 0.3);
   }
 
   .nav-btn.active::after {
@@ -138,15 +139,15 @@
     left: -8px;
     width: 4px;
     height: 24px;
-    background: #89b4fa;
+    background: var(--blue);
     border-radius: 0 4px 4px 0;
-    box-shadow: 0 0 12px rgba(137, 180, 250, 0.6);
+    box-shadow: 0 0 12px rgba(var(--blue-rgb), 0.6);
   }
 
   .nav-btn .tooltip {
     position: absolute;
     left: 60px;
-    background: rgba(49, 50, 68, 0.98);
+    background: rgba(var(--surface0-rgb), 0.98);
     padding: 6px 12px;
     border-radius: 8px;
     font-size: 12px;
@@ -155,8 +156,8 @@
     pointer-events: none;
     transition: opacity 0.2s;
     z-index: 100;
-    border: 1px solid rgba(69, 71, 90, 0.5);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
+    box-shadow: 0 4px 12px rgba(var(--black-rgb), 0.3);
   }
 
   .nav-btn:hover .tooltip {
@@ -180,7 +181,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(49, 50, 68, 0.8),
+      rgba(var(--surface0-rgb), 0.8),
       transparent
     );
     margin: 8px 0;

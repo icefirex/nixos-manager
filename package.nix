@@ -10,7 +10,7 @@
 
 let
   pname = "nixos-manager";
-  version = "1.8.0";
+  version = "1.9.0";
 
   desktopItem = makeDesktopItem {
     name = pname;
@@ -28,7 +28,7 @@ in buildNpmPackage {
 
   src = ./.;
 
-  npmDepsHash = "sha256-kiXHinjbwIjmmDCBpOd3ZckE5g5tdSjdyE6PWzbEnFU=";
+  npmDepsHash = "sha256-AVVblSOEKaDpZqoK9yxEq0ckDQGjKUalUOmikB4kZ3I=";
 
   nativeBuildInputs = [
     makeWrapper
@@ -41,13 +41,14 @@ in buildNpmPackage {
   npmFlags = [ "--ignore-scripts" ];
   dontNpmBuild = false;
 
-  # Build only the Svelte frontend (not electron-builder)
+  # Build the main process (TypeScript -> dist-electron) and the Svelte frontend
   buildPhase = ''
     runHook preBuild
 
     # Run unit tests (exclude handler stubs that require electron binary)
     node ./node_modules/.bin/vitest run --exclude 'src/main/handlers/**'
 
+    npm run build:main
     npm run build:svelte
     runHook postBuild
   '';
@@ -68,10 +69,7 @@ in buildNpmPackage {
 
     # Copy built files
     cp -r dist $out/lib/${pname}/
-    mkdir -p $out/lib/${pname}/src
-    cp -r src/main $out/lib/${pname}/src/
-    cp main.js $out/lib/${pname}/
-    cp preload.js $out/lib/${pname}/
+    cp -r dist-electron $out/lib/${pname}/
     cp package.json $out/lib/${pname}/
 
     # Install bundled fallback scripts (used when nixos-rebuild-wrapper / nix-eval-flake
@@ -88,7 +86,7 @@ in buildNpmPackage {
     # Create wrapper script that uses system Electron
     # GPU flags help reduce compositor stutter on launch/close
     makeWrapper ${electron}/bin/electron $out/bin/${pname} \
-      --add-flags "$out/lib/${pname}/main.js" \
+      --add-flags "$out/lib/${pname}/dist-electron/main.js" \
       --add-flags "--disable-gpu-compositing" \
       --set ELECTRON_IS_DEV 0
 

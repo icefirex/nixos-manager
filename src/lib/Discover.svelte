@@ -1,28 +1,28 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
   import Icon from "./Icon.svelte";
 
   let searchQuery = $state('');
-  let selectedCategory = $state(null);
-  let categories = $state([]);
-  let allPackages = $state([]);
-  let featuredPackages = $state([]);
+  let selectedCategory = $state<any>(null);
+  let categories = $state<any[]>([]);
+  let allPackages = $state<any[]>([]);
+  let featuredPackages = $state<any[]>([]);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
   let stats = $state({ totalApps: 0, categories: 0 });
-  let selectedPackage = $state(null);
-  let packageDetails = $state(null);
+  let selectedPackage = $state<any>(null);
+  let packageDetails = $state<any>(null);
   let loadingDetails = $state(false);
   let trying = $state(false);
-  let iconCache = $state({});
+  let iconCache = $state<Record<string, string | null>>({});
 
   // Add to configuration
-  let configFiles = $state([]);
+  let configFiles = $state<any[]>([]);
   let configFilesLoaded = $state(false);
   let installFile = $state('');
   let installType = $state('system');
   let installUser = $state('');
-  let availableUsers = $state([]);
+  let availableUsers = $state<any[]>([]);
   let adding = $state(false);
   let installSuccess = $state(false);
   let installDiff = $state('');
@@ -31,13 +31,13 @@
   let currentView = $state('details');
   let configuredPackages = $state(new Set());
   let removing = $state(false);
-  let packageLocations = $state([]);
-  let auditLog = $state([]);
-  let toasts = $state([]);
-  let diffOverlay = $state(null);
+  let packageLocations = $state<any[]>([]);
+  let auditLog = $state<any[]>([]);
+  let toasts = $state<any[]>([]);
+  let diffOverlay = $state<any>(null);
   let installFilter = $state('all'); // all | installed
 
-  function showToast(message, type, diff) {
+  function showToast(message: string, type?: string, diff?: string) {
     const id = Date.now() + Math.random();
     toasts = [...toasts, { id, message, type, diff }];
     if (type !== 'error') {
@@ -53,7 +53,7 @@
 
   let isConfigured = $derived(selectedPackage ? configuredPackages.has(selectedPackage.pkgname) : false);
 
-  function matchesInstallFilter(pkg) {
+  function matchesInstallFilter(pkg: any) {
     const installed = configuredPackages.has(pkg.pkgname);
     if (installFilter === 'installed') return installed;
     return true;
@@ -73,7 +73,7 @@
     packageLocations.some(p => p.path === installFile)
   );
 
-  function formatTime(ts) {
+  function formatTime(ts: any) {
     const diff = Date.now() - ts;
     if (diff < 60000) return 'just now';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
@@ -82,12 +82,12 @@
   }
 
   // Nixpkgs extended search
-  let nixpkgsResults = $state([]);
+  let nixpkgsResults = $state<any[]>([]);
   let searchingNixpkgs = $state(false);
   let nixpkgsSearched = $state(false);
   let showNixpkgsTab = $state(false);
   // Category display names and icons
-  const categoryMeta = {
+  const categoryMeta: Record<string, any> = {
     'AudioVideo': { name: 'Media', icon: 'Film' },
     'Audio': { name: 'Audio', icon: 'Music' },
     'Video': { name: 'Video', icon: 'Video' },
@@ -155,7 +155,7 @@
 
   // Category counts
   let categoryCounts = $derived.by(() => {
-    const counts = {};
+    const counts: Record<string, number> = {};
     const q = searchQuery.trim().toLowerCase();
 
     for (const cat of categories) {
@@ -205,7 +205,7 @@
         window.electronAPI.discoverFeatured(24)
       ]);
 
-      categories = cats.filter(c => categoryMeta[c]);
+      categories = cats.filter((c: any) => categoryMeta[c]);
       allPackages = pkgs;
       featuredPackages = featured;
 
@@ -222,7 +222,7 @@
           loadIcon(pkg.icon.name);
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
     } finally {
       loading = false;
@@ -235,7 +235,7 @@
       if (result.success) {
         configuredPackages = new Set(result.packages);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load configured packages:', e);
     }
   }
@@ -255,13 +255,13 @@
             const secs = first.sections;
             if (secs.includes('system')) installType = 'system';
             else if (secs.includes('homeManager')) installType = 'homeManager';
-            else if (secs.some(s => s.type === 'user')) {
+            else if (secs.some((s: any) => s.type === 'user')) {
               installType = 'user';
-              installUser = secs.find(s => s.type === 'user').userName;
+              installUser = secs.find((s: any) => s.type === 'user').userName;
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to find package:', e);
       }
     }
@@ -292,14 +292,14 @@
       } else {
         showToast(result.error || 'Failed to remove package', 'error');
       }
-    } catch (e) {
+    } catch (e: any) {
       showToast(e.message || 'Failed to remove package', 'error');
     } finally {
       removing = false;
     }
   }
 
-  async function loadIcon(iconName) {
+  async function loadIcon(iconName: any) {
     if (iconCache[iconName]) return;
 
     try {
@@ -307,12 +307,12 @@
       if (dataUrl) {
         iconCache = { ...iconCache, [iconName]: dataUrl };
       }
-    } catch (e) {
+    } catch (e: any) {
       // Ignore icon load errors
     }
   }
 
-  function selectCategory(cat) {
+  function selectCategory(cat: any) {
     selectedCategory = cat === selectedCategory ? null : cat;
     showNixpkgsTab = false;
   }
@@ -339,7 +339,7 @@
       nixpkgsResults = await window.electronAPI.discoverSearchNixpkgs(q);
       nixpkgsSearched = true;
       showNixpkgsTab = true;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Nixpkgs search failed:', e);
       nixpkgsResults = [];
     } finally {
@@ -347,7 +347,7 @@
     }
   }
 
-  async function openModal(pkg) {
+  async function openModal(pkg: any) {
     selectedPackage = pkg;
     currentView = 'details';
     loadingDetails = true;
@@ -362,7 +362,7 @@
         loadIcon(pkg.icon.name);
       }
       packageDetails = await window.electronAPI.discoverGetDetails(pkg.pkgname);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load details:', e);
     } finally {
       loadingDetails = false;
@@ -376,7 +376,7 @@
     packageDetails = null;
   }
 
-  function getIconUrl(pkg) {
+  function getIconUrl(pkg: any) {
     if (!pkg.icon?.name) return null;
     return iconCache[pkg.icon.name] || null;
   }
@@ -391,16 +391,16 @@
     }
   });
 
-  function openUrl(url) {
+  function openUrl(url: any) {
     if (url) {
       window.open(url, '_blank');
     }
   }
 
   let showKillConfirm = $state(false);
-  let pendingTryPackage = $state(null);
+  let pendingTryPackage = $state<any>(null);
 
-  async function tryPackage(pkgname) {
+  async function tryPackage(pkgname: any) {
     // Check if a process is already running
     const status = await window.electronAPI.discoverIsTrying();
     if (status.running) {
@@ -412,13 +412,13 @@
     await doTryPackage(pkgname);
   }
 
-  async function doTryPackage(pkgname) {
+  async function doTryPackage(pkgname: any) {
     trying = true;
     try {
       await window.electronAPI.discoverTryPackage(pkgname);
       // Close modal after launching
       closeModal();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to try package:', e);
     } finally {
       trying = false;
@@ -446,13 +446,13 @@
       const result = await window.electronAPI.discoverGetConfigFiles();
       if (result.success) {
         configFiles = result.files;
-        const allUsers = [...new Set(result.files.flatMap(f => f.users))];
+        const allUsers = [...new Set(result.files.flatMap((f: any) => f.users))];
         availableUsers = allUsers;
         installUser = availableUsers[0] || '';
         autoSelectFile();
         configFilesLoaded = true;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load config files:', e);
     }
   }
@@ -462,7 +462,7 @@
     installFile = f ? f.path : '';
   }
 
-  async function selectType(type) {
+  async function selectType(type: any) {
     installType = type;
     autoSelectFile();
 
@@ -504,14 +504,14 @@
       } else {
         showToast(result.error || 'Failed to add package', 'error');
       }
-    } catch (e) {
+    } catch (e: any) {
       showToast(e.message || 'Failed to add package', 'error');
     } finally {
       adding = false;
     }
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: any) {
     if (e.key === 'Escape' && selectedPackage) {
       closeModal();
     }
@@ -710,8 +710,8 @@
 
 <!-- Modal -->
 {#if selectedPackage}
-  <div class="modal-overlay" onclick={closeModal} role="dialog" aria-modal="true">
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" onclick={closeModal} role="dialog" aria-modal="true" tabindex="-1" onkeydown={(e) => { if (e.key === "Escape") closeModal(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <button class="modal-close" onclick={closeModal}>×</button>
 
       <div class="modal-header">
@@ -902,8 +902,8 @@
 
 <!-- Kill confirmation dialog -->
 {#if showKillConfirm}
-  <div class="confirm-overlay" onclick={cancelKill}>
-    <div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="confirm-overlay" role="presentation" onclick={cancelKill} onkeydown={(e) => { if (e.key === 'Escape') cancelKill(); }}>
+    <div class="confirm-dialog" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <div class="confirm-header">
         <span class="confirm-icon"><Icon name="AlertTriangle" size={24} /></span>
         <h3>Application Running</h3>
@@ -936,8 +936,8 @@
 </div>
 
 {#if diffOverlay}
-  <div class="diff-overlay" onclick={closeDiffOverlay}>
-    <div class="diff-overlay-content" onclick={(e) => e.stopPropagation()}>
+  <div class="diff-overlay" role="presentation" onclick={closeDiffOverlay} onkeydown={(e) => { if (e.key === 'Escape') closeDiffOverlay(); }}>
+    <div class="diff-overlay-content" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <button class="diff-overlay-close" onclick={closeDiffOverlay}>✕</button>
       <pre>{diffOverlay}</pre>
     </div>
@@ -967,30 +967,30 @@
   .page-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0 0 4px 0;
   }
 
   .subtitle {
     font-size: 14px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin: 0;
   }
 
   .refresh-btn {
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 10px;
     padding: 10px 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 14px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .refresh-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .refresh-btn:disabled {
@@ -1002,8 +1002,8 @@
   .search-bar {
     display: flex;
     align-items: center;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 12px;
     padding: 0 16px;
     margin-bottom: 12px;
@@ -1011,8 +1011,8 @@
   }
 
   .search-bar:focus-within {
-    border-color: rgba(137, 180, 250, 0.5);
-    box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.1);
+    border-color: rgba(var(--blue-rgb), 0.5);
+    box-shadow: 0 0 0 2px rgba(var(--blue-rgb), 0.1);
   }
 
   .search-icon {
@@ -1027,19 +1027,19 @@
     background: transparent;
     border: none;
     outline: none;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 14px;
     padding: 12px 0;
   }
 
   .search-bar input::placeholder {
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .clear-btn {
-    background: rgba(243, 139, 168, 0.2);
+    background: rgba(var(--red-rgb), 0.2);
     border: none;
-    color: #f38ba8;
+    color: var(--red);
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -1056,10 +1056,10 @@
     gap: 6px;
     padding: 6px 12px;
     margin-left: 8px;
-    background: rgba(180, 190, 254, 0.15);
-    border: 1px solid rgba(180, 190, 254, 0.3);
+    background: rgba(var(--lavender-rgb), 0.15);
+    border: 1px solid rgba(var(--lavender-rgb), 0.3);
     border-radius: 8px;
-    color: #b4befe;
+    color: var(--lavender);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -1068,8 +1068,8 @@
   }
 
   .nixpkgs-search-btn:hover:not(:disabled) {
-    background: rgba(180, 190, 254, 0.25);
-    border-color: rgba(180, 190, 254, 0.5);
+    background: rgba(var(--lavender-rgb), 0.25);
+    border-color: rgba(var(--lavender-rgb), 0.5);
   }
 
   .nixpkgs-search-btn:disabled {
@@ -1086,11 +1086,11 @@
   }
 
   .tab {
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 10px;
     padding: 10px 16px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -1102,14 +1102,14 @@
   }
 
   .tab:hover {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .tab.active {
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
-    border-color: rgba(137, 180, 250, 0.4);
-    color: #89b4fa;
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.2) 0%, rgba(var(--lavender-rgb), 0.2) 100%);
+    border-color: rgba(var(--blue-rgb), 0.4);
+    color: var(--blue);
   }
 
   .cat-icon {
@@ -1117,7 +1117,7 @@
   }
 
   .count {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(var(--black-rgb), 0.2);
     padding: 1px 6px;
     border-radius: 8px;
     font-size: 10px;
@@ -1125,46 +1125,46 @@
   }
 
   .tab.active .count {
-    background: rgba(137, 180, 250, 0.2);
+    background: rgba(var(--blue-rgb), 0.2);
   }
 
   .tab.nixpkgs-tab {
-    border-color: rgba(180, 190, 254, 0.3);
-    color: #b4befe;
+    border-color: rgba(var(--lavender-rgb), 0.3);
+    color: var(--lavender);
   }
 
   .tab.installed-tab {
-    border-color: rgba(166, 227, 161, 0.3);
-    color: #a6e3a1;
+    border-color: rgba(var(--green-rgb), 0.3);
+    color: var(--green);
   }
 
   .tab.installed-tab:hover {
-    border-color: rgba(166, 227, 161, 0.5);
-    color: #b8efb4;
+    border-color: rgba(var(--green-rgb), 0.5);
+    color: var(--green-bright);
   }
 
   .tab.installed-tab.active {
-    background: linear-gradient(135deg, rgba(166, 227, 161, 0.2) 0%, rgba(137, 180, 250, 0.2) 100%);
-    border-color: rgba(166, 227, 161, 0.45);
-    color: #a6e3a1;
+    background: linear-gradient(135deg, rgba(var(--green-rgb), 0.2) 0%, rgba(var(--blue-rgb), 0.2) 100%);
+    border-color: rgba(var(--green-rgb), 0.45);
+    color: var(--green);
   }
 
   .tab.installed-tab .count {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
   }
 
   .tab.nixpkgs-tab:hover {
-    border-color: rgba(180, 190, 254, 0.5);
+    border-color: rgba(var(--lavender-rgb), 0.5);
   }
 
   .tab.nixpkgs-tab.active {
-    background: linear-gradient(135deg, rgba(180, 190, 254, 0.2) 0%, rgba(203, 166, 247, 0.2) 100%);
-    border-color: rgba(180, 190, 254, 0.5);
+    background: linear-gradient(135deg, rgba(var(--lavender-rgb), 0.2) 0%, rgba(var(--mauve-rgb), 0.2) 100%);
+    border-color: rgba(var(--lavender-rgb), 0.5);
   }
 
   .tab.nixpkgs-tab .count {
-    background: rgba(180, 190, 254, 0.2);
+    background: rgba(var(--lavender-rgb), 0.2);
   }
 
   /* Content Area */
@@ -1186,13 +1186,13 @@
   .section-header h2 {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
   .section-header .info {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   /* Card Grid */
@@ -1211,12 +1211,12 @@
   }
 
   .card-grid::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
 
   .card-grid::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
 
@@ -1226,8 +1226,8 @@
     flex-direction: column;
     align-items: center;
     padding: 16px 12px;
-    background: rgba(49, 50, 68, 0.3);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
@@ -1236,17 +1236,17 @@
   }
 
   .card:hover {
-    background: rgba(49, 50, 68, 0.5);
-    border-color: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border-color: rgba(var(--blue-rgb), 0.3);
     transform: translateY(-2px);
   }
 
   .card.configured {
-    border-color: rgba(166, 227, 161, 0.25);
+    border-color: rgba(var(--green-rgb), 0.25);
   }
 
   .card.configured:hover {
-    border-color: rgba(166, 227, 161, 0.4);
+    border-color: rgba(var(--green-rgb), 0.4);
   }
 
   .card-icon {
@@ -1255,7 +1255,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(30, 30, 46, 0.8);
+    background: rgba(var(--base-rgb), 0.8);
     border-radius: 12px;
     margin-bottom: 10px;
     overflow: hidden;
@@ -1284,7 +1284,7 @@
     width: 100%;
     font-size: 13px;
     font-weight: 500;
-    color: #cdd6f4;
+    color: var(--text);
     text-align: center;
   }
 
@@ -1298,9 +1298,10 @@
 
   .card-summary {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;
@@ -1311,7 +1312,7 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(var(--black-rgb), 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1327,8 +1328,8 @@
 
   .modal {
     position: relative;
-    background: #1e1e2e;
-    border: 1px solid rgba(69, 71, 90, 0.6);
+    background: var(--base);
+    border: 1px solid rgba(var(--surface1-rgb), 0.6);
     border-radius: 16px;
     max-width: 500px;
     width: 100%;
@@ -1354,9 +1355,9 @@
     position: absolute;
     top: 12px;
     right: 12px;
-    background: rgba(49, 50, 68, 0.8);
+    background: rgba(var(--surface0-rgb), 0.8);
     border: none;
-    color: #a6adc8;
+    color: var(--subtext0);
     width: 32px;
     height: 32px;
     border-radius: 8px;
@@ -1369,8 +1370,8 @@
   }
 
   .modal-close:hover {
-    background: rgba(69, 71, 90, 0.9);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.9);
+    color: var(--text);
   }
 
   .modal-header {
@@ -1378,8 +1379,8 @@
     align-items: center;
     gap: 16px;
     padding: 20px;
-    background: rgba(24, 24, 37, 0.8);
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+    background: rgba(var(--mantle-rgb), 0.8);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
   }
 
   .modal-icon {
@@ -1388,7 +1389,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(49, 50, 68, 0.6);
+    background: rgba(var(--surface0-rgb), 0.6);
     border-radius: 14px;
     flex-shrink: 0;
   }
@@ -1407,13 +1408,13 @@
   .modal-title h2 {
     font-size: 20px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0 0 4px 0;
   }
 
   .modal-pkgname {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-family: monospace;
   }
 
@@ -1423,22 +1424,22 @@
     justify-content: center;
     gap: 12px;
     padding: 40px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .spinner-sm {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
 
   .version-badge {
     display: inline-block;
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 12px;
@@ -1448,7 +1449,7 @@
 
   .modal-description {
     font-size: 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     line-height: 1.6;
     margin: 0 0 16px 0;
   }
@@ -1468,14 +1469,14 @@
 
   .meta-label {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   .meta-value {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .meta-badges {
@@ -1485,8 +1486,8 @@
   }
 
   .badge {
-    background: rgba(180, 190, 254, 0.15);
-    color: #b4befe;
+    background: rgba(var(--lavender-rgb), 0.15);
+    color: var(--lavender);
     padding: 3px 8px;
     border-radius: 4px;
     font-size: 12px;
@@ -1496,8 +1497,8 @@
     display: block;
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    color: #a6e3a1;
-    background: rgba(30, 30, 46, 0.8);
+    color: var(--green);
+    background: rgba(var(--base-rgb), 0.8);
     padding: 10px 12px;
     border-radius: 6px;
     overflow-x: auto;
@@ -1510,10 +1511,10 @@
 
   .install-select {
     width: 100%;
-    background: rgba(30, 30, 46, 0.8);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--base-rgb), 0.8);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 6px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 13px;
     padding: 8px 10px;
     outline: none;
@@ -1522,7 +1523,7 @@
   }
 
   .install-select:focus {
-    border-color: rgba(137, 180, 250, 0.5);
+    border-color: rgba(var(--blue-rgb), 0.5);
   }
 
   .type-selector {
@@ -1534,10 +1535,10 @@
   .type-btn {
     flex: 1;
     padding: 7px 10px;
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -1549,14 +1550,14 @@
   }
 
   .type-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .type-btn.active {
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.2) 0%, rgba(180, 190, 254, 0.2) 100%);
-    border-color: rgba(137, 180, 250, 0.4);
-    color: #89b4fa;
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.2) 0%, rgba(var(--lavender-rgb), 0.2) 100%);
+    border-color: rgba(var(--blue-rgb), 0.4);
+    color: var(--blue);
   }
 
   .type-btn:disabled {
@@ -1567,8 +1568,8 @@
   .type-spinner {
     width: 12px;
     height: 12px;
-    border: 2px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     display: inline-block;
@@ -1581,8 +1582,8 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: rgba(249, 226, 175, 0.2);
-    color: #f9e2af;
+    background: rgba(var(--yellow-rgb), 0.2);
+    color: var(--yellow);
     font-size: 10px;
     font-weight: 700;
   }
@@ -1594,20 +1595,20 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
     font-size: 10px;
     font-weight: 700;
   }
 
   .install-warning {
     font-size: 11px;
-    color: #f9e2af;
+    color: var(--yellow);
     margin: 0 0 10px 0;
     padding: 6px 10px;
-    background: rgba(249, 226, 175, 0.1);
+    background: rgba(var(--yellow-rgb), 0.1);
     border-radius: 6px;
-    border: 1px solid rgba(249, 226, 175, 0.2);
+    border: 1px solid rgba(var(--yellow-rgb), 0.2);
   }
 
   .install-action-btn {
@@ -1625,41 +1626,28 @@
   }
 
   .install-action-btn.add {
-    background: rgba(166, 227, 161, 0.2);
-    border: 1px solid rgba(166, 227, 161, 0.4);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    border: 1px solid rgba(var(--green-rgb), 0.4);
+    color: var(--green);
   }
 
   .install-action-btn.add:hover:not(:disabled) {
-    background: rgba(166, 227, 161, 0.3);
+    background: rgba(var(--green-rgb), 0.3);
   }
 
   .install-action-btn.remove {
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.4);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.4);
+    color: var(--red);
   }
 
   .install-action-btn.remove:hover:not(:disabled) {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .install-action-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-
-  .install-result {
-    font-size: 12px;
-    margin: 8px 0 0 0;
-    padding: 6px 10px;
-    border-radius: 6px;
-  }
-
-  .install-result.success {
-    color: #a6e3a1;
-    background: rgba(166, 227, 161, 0.1);
-    border: 1px solid rgba(166, 227, 161, 0.2);
   }
 
   .toast-container {
@@ -1678,12 +1666,12 @@
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: rgba(30, 30, 46, 0.97);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--base-rgb), 0.97);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 10px;
     font-size: 13px;
-    color: #cdd6f4;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    color: var(--text);
+    box-shadow: 0 6px 20px rgba(var(--black-rgb), 0.4);
     pointer-events: auto;
     animation: toastSlideIn 0.25s ease-out;
     max-width: 440px;
@@ -1691,11 +1679,11 @@
   }
 
   .toast-success {
-    border-color: rgba(166, 227, 161, 0.3);
+    border-color: rgba(var(--green-rgb), 0.3);
   }
 
   .toast-error {
-    border-color: rgba(243, 139, 168, 0.3);
+    border-color: rgba(var(--red-rgb), 0.3);
   }
 
   @keyframes toastSlideIn {
@@ -1722,10 +1710,10 @@
 
   .toast-action {
     padding: 3px 8px;
-    background: rgba(49, 50, 68, 0.6);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.6);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 5px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 11px;
     cursor: pointer;
     font-family: inherit;
@@ -1733,14 +1721,14 @@
   }
 
   .toast-action:hover {
-    background: rgba(49, 50, 68, 0.8);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--text);
   }
 
   .diff-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(var(--black-rgb), 0.65);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1750,26 +1738,26 @@
 
   .diff-overlay-content {
     position: relative;
-    background: #1e1e2e;
-    border: 1px solid rgba(69, 71, 90, 0.6);
+    background: var(--base);
+    border: 1px solid rgba(var(--surface1-rgb), 0.6);
     border-radius: 12px;
     padding: 20px;
     max-width: 600px;
     width: 90%;
     max-height: 70vh;
     overflow: auto;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 12px 40px rgba(var(--black-rgb), 0.5);
   }
 
   .diff-overlay-content::-webkit-scrollbar {
     width: 8px;
   }
   .diff-overlay-content::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
   .diff-overlay-content::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
 
@@ -1777,9 +1765,9 @@
     position: sticky;
     top: 0;
     float: right;
-    background: rgba(49, 50, 68, 0.8);
+    background: rgba(var(--surface0-rgb), 0.8);
     border: none;
-    color: #a6adc8;
+    color: var(--subtext0);
     width: 28px;
     height: 28px;
     border-radius: 6px;
@@ -1792,15 +1780,15 @@
   }
 
   .diff-overlay-close:hover {
-    background: rgba(69, 71, 90, 0.8);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.8);
+    color: var(--text);
   }
 
   .diff-overlay-content pre {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     line-height: 1.5;
-    color: #a6adc8;
+    color: var(--subtext0);
     white-space: pre;
     overflow-x: auto;
     clear: right;
@@ -1810,9 +1798,9 @@
     margin-bottom: 10px;
     max-height: 140px;
     overflow-y: auto;
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
-    background: rgba(30, 30, 46, 0.4);
+    background: rgba(var(--base-rgb), 0.4);
   }
 
   .file-list .section-label {
@@ -1820,8 +1808,8 @@
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #6c7086;
-    border-bottom: 1px solid rgba(69, 71, 90, 0.2);
+    color: var(--overlay0);
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.2);
   }
 
   .file-item {
@@ -1832,8 +1820,8 @@
     padding: 7px 10px;
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(69, 71, 90, 0.15);
-    color: #cdd6f4;
+    border-bottom: 1px solid rgba(var(--surface1-rgb), 0.15);
+    color: var(--text);
     font-size: 12px;
     cursor: pointer;
     text-align: left;
@@ -1846,12 +1834,12 @@
   }
 
   .file-item:hover {
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
   }
 
   .file-item.selected {
-    background: rgba(137, 180, 250, 0.12);
-    border-left: 2px solid #89b4fa;
+    background: rgba(var(--blue-rgb), 0.12);
+    border-left: 2px solid var(--blue);
   }
 
   .file-info {
@@ -1864,7 +1852,7 @@
   .file-path {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    color: #cdd6f4;
+    color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1880,9 +1868,9 @@
     display: inline-block;
     padding: 1px 5px;
     font-size: 9px;
-    background: rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface1-rgb), 0.3);
     border-radius: 3px;
-    color: #a6adc8;
+    color: var(--subtext0);
     text-transform: uppercase;
   }
 
@@ -1890,10 +1878,10 @@
     flex-shrink: 0;
     padding: 2px 6px;
     font-size: 9px;
-    background: rgba(166, 227, 161, 0.15);
-    border: 1px solid rgba(166, 227, 161, 0.3);
+    background: rgba(var(--green-rgb), 0.15);
+    border: 1px solid rgba(var(--green-rgb), 0.3);
     border-radius: 4px;
-    color: #a6e3a1;
+    color: var(--green);
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }
@@ -1901,17 +1889,11 @@
   .file-list-empty {
     padding: 12px;
     text-align: center;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 12px;
   }
 
 
-
-  .install-result:not(.success) {
-    color: #f38ba8;
-    background: rgba(243, 139, 168, 0.1);
-    border: 1px solid rgba(243, 139, 168, 0.2);
-  }
 
   .modal-actions {
     display: flex;
@@ -1924,38 +1906,38 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 8px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .action-btn:hover {
-    background: rgba(49, 50, 68, 0.8);
-    border-color: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border-color: rgba(var(--blue-rgb), 0.3);
   }
 
   .action-btn.primary {
-    background: rgba(137, 180, 250, 0.2);
-    border-color: rgba(137, 180, 250, 0.4);
-    color: #89b4fa;
+    background: rgba(var(--blue-rgb), 0.2);
+    border-color: rgba(var(--blue-rgb), 0.4);
+    color: var(--blue);
   }
 
   .action-btn.primary:hover {
-    background: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--blue-rgb), 0.3);
   }
 
   .action-btn.try {
-    background: rgba(166, 227, 161, 0.2);
-    border-color: rgba(166, 227, 161, 0.4);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    border-color: rgba(var(--green-rgb), 0.4);
+    color: var(--green);
   }
 
   .action-btn.try:hover {
-    background: rgba(166, 227, 161, 0.3);
+    background: rgba(var(--green-rgb), 0.3);
   }
 
   .action-btn.try:disabled {
@@ -1973,26 +1955,26 @@
     width: 8px;
   }
   .modal-page-container::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
   .modal-page-container::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
   .modal-page-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(88, 91, 112, 0.8);
+    background: rgba(var(--surface2-rgb), 0.8);
   }
 
   .file-list::-webkit-scrollbar {
     width: 6px;
   }
   .file-list::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.2);
+    background: rgba(var(--surface0-rgb), 0.2);
     border-radius: 3px;
   }
   .file-list::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.7);
+    background: rgba(var(--surface1-rgb), 0.7);
     border-radius: 3px;
   }
 
@@ -2002,8 +1984,8 @@
 
   .configured-badge {
     display: inline-block;
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 11px;
@@ -2018,10 +2000,10 @@
     gap: 8px;
     width: 100%;
     padding: 10px 14px;
-    background: rgba(137, 180, 250, 0.15);
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    background: rgba(var(--blue-rgb), 0.15);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-radius: 10px;
-    color: #89b4fa;
+    color: var(--blue);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -2030,19 +2012,19 @@
   }
 
   .config-nav-btn:hover {
-    background: rgba(137, 180, 250, 0.25);
-    border-color: rgba(137, 180, 250, 0.5);
+    background: rgba(var(--blue-rgb), 0.25);
+    border-color: rgba(var(--blue-rgb), 0.5);
   }
 
   .config-nav-btn.configured {
-    background: rgba(166, 227, 161, 0.15);
-    border-color: rgba(166, 227, 161, 0.3);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.15);
+    border-color: rgba(var(--green-rgb), 0.3);
+    color: var(--green);
   }
 
   .config-nav-btn.configured:hover {
-    background: rgba(166, 227, 161, 0.25);
-    border-color: rgba(166, 227, 161, 0.5);
+    background: rgba(var(--green-rgb), 0.25);
+    border-color: rgba(var(--green-rgb), 0.5);
   }
 
   .back-btn {
@@ -2051,18 +2033,18 @@
     gap: 4px;
     padding: 6px 12px;
     margin-bottom: 14px;
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .back-btn:hover {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .install-section {
@@ -2079,14 +2061,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 3px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
@@ -2103,9 +2085,9 @@
 
   .error-state button {
     margin-top: 16px;
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.3);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.3);
+    color: var(--red);
     padding: 8px 20px;
     border-radius: 8px;
     cursor: pointer;
@@ -2116,7 +2098,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
     font-style: italic;
     padding: 40px;
   }
@@ -2124,20 +2106,20 @@
   .browse-hint {
     margin-top: 16px;
     text-align: center;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 13px;
   }
 
   /* Nixpkgs search */
   .nixpkgs-card {
-    border-color: rgba(180, 190, 254, 0.3);
+    border-color: rgba(var(--lavender-rgb), 0.3);
   }
 
   .nixpkgs-badge {
     display: inline-flex;
     align-items: center;
-    background: rgba(180, 190, 254, 0.2);
-    color: #b4befe;
+    background: rgba(var(--lavender-rgb), 0.2);
+    color: var(--lavender);
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 9px;
@@ -2148,8 +2130,8 @@
   .installed-badge {
     display: inline-flex;
     align-items: center;
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 9px;
@@ -2170,13 +2152,13 @@
   .card-corner-badge.source {
     top: -1px;
     right: 10px;
-    border-color: rgba(180, 190, 254, 0.35);
+    border-color: rgba(var(--lavender-rgb), 0.35);
   }
 
   .card-corner-badge.installed {
     top: -1px;
     right: 10px;
-    border-color: rgba(166, 227, 161, 0.35);
+    border-color: rgba(var(--green-rgb), 0.35);
   }
 
   .card-corner-badge.source + .card-corner-badge.installed {
@@ -2189,7 +2171,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
     padding: 40px;
     gap: 16px;
   }
@@ -2198,75 +2180,20 @@
     font-style: italic;
   }
 
-  .search-nixpkgs-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    background: rgba(137, 180, 250, 0.15);
-    border: 1px solid rgba(137, 180, 250, 0.3);
-    border-radius: 10px;
-    color: #89b4fa;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .search-nixpkgs-btn:hover:not(:disabled) {
-    background: rgba(137, 180, 250, 0.25);
-    border-color: rgba(137, 180, 250, 0.5);
-  }
-
-  .search-nixpkgs-btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
-  }
-
-  .search-nixpkgs-btn.secondary {
-    padding: 8px 16px;
-    font-size: 13px;
-    background: rgba(49, 50, 68, 0.5);
-    border-color: rgba(69, 71, 90, 0.5);
-    color: #a6adc8;
-  }
-
-  .search-nixpkgs-btn.secondary:hover:not(:disabled) {
-    background: rgba(137, 180, 250, 0.15);
-    border-color: rgba(137, 180, 250, 0.3);
-    color: #89b4fa;
-  }
-
   .spinner-sm {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-  }
-
-  .search-more {
-    display: flex;
-    justify-content: center;
-    padding: 16px 0;
-  }
-
-  .nixpkgs-header {
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(69, 71, 90, 0.3);
-  }
-
-  .nixpkgs-header h2 {
-    color: #b4befe;
   }
 
   /* Kill Confirmation Dialog */
   .confirm-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(var(--black-rgb), 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2275,8 +2202,8 @@
   }
 
   .confirm-dialog {
-    background: #1e1e2e;
-    border: 1px solid rgba(69, 71, 90, 0.6);
+    background: var(--base);
+    border: 1px solid rgba(var(--surface1-rgb), 0.6);
     border-radius: 12px;
     padding: 20px;
     max-width: 360px;
@@ -2309,13 +2236,13 @@
   .confirm-header h3 {
     font-size: 16px;
     font-weight: 600;
-    color: #f9e2af;
+    color: var(--yellow);
     margin: 0;
   }
 
   .confirm-message {
     font-size: 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     margin: 0 0 20px 0;
     line-height: 1.5;
   }
@@ -2336,23 +2263,23 @@
   }
 
   .confirm-btn.cancel {
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.5);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
+    color: var(--subtext0);
   }
 
   .confirm-btn.cancel:hover {
-    background: rgba(69, 71, 90, 0.5);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.5);
+    color: var(--text);
   }
 
   .confirm-btn.kill {
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.4);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.4);
+    color: var(--red);
   }
 
   .confirm-btn.kill:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 </style>

@@ -8,6 +8,29 @@
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <script>
+      // Boot theme — runs before the bundle so the first paint already has
+      // the persisted theme (prevents a wrong-flash when using a light theme).
+      (function () {
+        var BG = {
+          mocha: '#1e1e2e',
+          macchiato: '#24273a',
+          latte: '#eff1f5',
+          nord: '#2e3440'
+        };
+        try {
+          var raw = localStorage.getItem('nixos-manager:theme');
+          var id = raw && BG[raw] ? raw : 'mocha';
+          if (id === 'system') {
+            id = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+              ? 'latte'
+              : 'mocha';
+          }
+          document.documentElement.dataset.theme = id;
+          document.body.style.background = BG[id];
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

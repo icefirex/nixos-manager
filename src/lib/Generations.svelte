@@ -1,14 +1,15 @@
-<script>
+<script lang="ts">
   import { tick } from "svelte";
+  import { onKeyActivate } from "./a11y.ts";
 
-  let generations = $state([]);
-  let groupedGenerations = $state([]);
+  let generations = $state<any[]>([]);
+  let groupedGenerations = $state<any[]>([]);
   let loading = $state(true);
-  let error = $state(null);
+  let error = $state<any>(null);
 
   // Search index state - using array for reliable Svelte 5 reactivity
   // Each entry: { genNumber, added, removed, changed, fromGen }
-  let searchIndexArray = $state([]);
+  let searchIndexArray = $state<any[]>([]);
   let indexingProgress = $state({ current: 0, total: 0, complete: false });
   let masterSearch = $state("");
   let isIndexing = $state(false);
@@ -18,9 +19,9 @@
   // the loadGenerations $effect to subscribe to it via `++indexingToken`, creating
   // an infinite re-run loop (effect_update_depth_exceeded).
   let indexingToken = 0;
-  let selectedGeneration = $state(null);
-  let generationInfo = $state(null);
-  let generationDiff = $state(null);
+  let selectedGeneration = $state<any>(null);
+  let generationInfo = $state<any>(null);
+  let generationDiff = $state<any>(null);
   let loadingInfo = $state(false);
 
   // Diff tab state
@@ -47,9 +48,9 @@
     // Find all generations that have matching packages
     for (const entry of searchIndexArray) {
       const allPackages = [
-        ...entry.added.map(p => p.name),
-        ...entry.removed.map(p => p.name),
-        ...entry.changed.map(p => p.name)
+        ...entry.added.map((p: any) => p.name),
+        ...entry.removed.map((p: any) => p.name),
+        ...entry.changed.map((p: any) => p.name)
       ];
       if (allPackages.some(name => name.toLowerCase().includes(query))) {
         matchingGenNumbers.add(entry.genNumber);
@@ -57,10 +58,10 @@
     }
 
     // Filter groups to only include matching generations
-    const filtered = [];
+    const filtered: any[] = [];
     for (const group of groupedGenerations) {
       const primaryMatches = matchingGenNumbers.has(group.primary.number);
-      const matchingIdentical = group.identical.filter(g => matchingGenNumbers.has(g.number));
+      const matchingIdentical = group.identical.filter((g: any) => matchingGenNumbers.has(g.number));
 
       if (primaryMatches || matchingIdentical.length > 0) {
         if (group.isGroup) {
@@ -95,11 +96,11 @@
 
   // Action state
   let showConfirmDialog = $state(false);
-  let confirmAction = $state(null);
-  let pendingGeneration = $state(null);
+  let confirmAction = $state<any>(null);
+  let pendingGeneration = $state<any>(null);
   let isActioning = $state(false);
-  let actionError = $state(null);
-  let actionSuccess = $state(null);
+  let actionError = $state<any>(null);
+  let actionSuccess = $state<any>(null);
 
   async function loadGenerations() {
     loading = true;
@@ -119,7 +120,7 @@
       groupedGenerations = await computeGroups(generations);
       // Start background indexing for search — pass token so it can self-cancel
       startBackgroundIndexing(myToken);
-    } catch (e) {
+    } catch (e: any) {
       error = e.message;
       console.error("Failed to load generations:", e);
     } finally {
@@ -127,12 +128,12 @@
     }
   }
 
-  async function computeGroups(gens) {
+  async function computeGroups(gens: any) {
     if (gens.length === 0) return [];
 
-    const groups = [];
-    const newSearchIndex = []; // Build array for proper reactivity
-    let currentGroup = null;
+    const groups: any[] = [];
+    const newSearchIndex: any[] = []; // Build array for proper reactivity
+    let currentGroup: any = null;
 
     for (let i = 0; i < gens.length; i++) {
       const gen = gens[i];
@@ -173,7 +174,7 @@
             currentGroup.isGroup = true;
             continue;
           }
-        } catch (e) {
+        } catch (e: any) {
           // If diff fails, treat as different
         }
       }
@@ -194,7 +195,7 @@
     return groups;
   }
 
-  async function startBackgroundIndexing(token) {
+  async function startBackgroundIndexing(token: number) {
     if (generations.length < 2) {
       indexingProgress = { current: 0, total: 0, complete: true };
       return;
@@ -232,7 +233,7 @@
             // Update searchIndexArray reactively after each new entry
             searchIndexArray = [...workingIndex];
           }
-        } catch (e) {
+        } catch (e: any) {
           // Skip failed diffs
         }
       }
@@ -252,7 +253,7 @@
   }
 
 
-  function getSearchMatchInfo(genNumber) {
+  function getSearchMatchInfo(genNumber: number) {
     if (!masterSearch.trim()) return null;
 
     const entry = searchIndexArray.find(e => e.genNumber === genNumber);
@@ -261,9 +262,9 @@
     const query = masterSearch.toLowerCase();
     const diff = entry;
     const matches = {
-      added: diff.added.filter(p => p.name.toLowerCase().includes(query)),
-      removed: diff.removed.filter(p => p.name.toLowerCase().includes(query)),
-      changed: diff.changed.filter(p => p.name.toLowerCase().includes(query))
+      added: diff.added.filter((p: any) => p.name.toLowerCase().includes(query)),
+      removed: diff.removed.filter((p: any) => p.name.toLowerCase().includes(query)),
+      changed: diff.changed.filter((p: any) => p.name.toLowerCase().includes(query))
     };
 
     const total = matches.added.length + matches.removed.length + matches.changed.length;
@@ -274,7 +275,7 @@
     loadGenerations();
   });
 
-  function toggleGroup(groupIndex) {
+  function toggleGroup(groupIndex: number) {
     const newSet = new Set(expandedGroups);
     if (newSet.has(groupIndex)) {
       newSet.delete(groupIndex);
@@ -284,7 +285,7 @@
     expandedGroups = newSet;
   }
 
-  async function selectGeneration(gen) {
+  async function selectGeneration(gen: any) {
     if (selectedGeneration?.number === gen.number) {
       selectedGeneration = null;
       generationInfo = null;
@@ -318,12 +319,12 @@
         if (prevGen) {
           try {
             generationDiff = await window.electronAPI.getGenerationDiff(prevGen.number, gen.number);
-          } catch (e) {
+          } catch (e: any) {
             console.error("Failed to load diff:", e);
           }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load generation info:", e);
       if (selectedGeneration?.number === gen.number) {
         generationInfo = { number: gen.number, error: e.message };
@@ -333,13 +334,13 @@
     }
   }
 
-  function getFilteredDiffItems(items) {
+  function getFilteredDiffItems(items: any[]) {
     if (!diffFilter.trim()) return items;
     const q = diffFilter.toLowerCase();
     return items.filter(pkg => pkg.name.toLowerCase().includes(q));
   }
 
-  function compareVersions(a, b) {
+  function compareVersions(a: string, b: string): number {
     const pa = a.split(/[.\-+]/).map(Number);
     const pb = b.split(/[.\-+]/).map(Number);
     for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -351,7 +352,7 @@
     return 0;
   }
 
-  function getPaginatedItems(items) {
+  function getPaginatedItems(items: any[]) {
     const filtered = getFilteredDiffItems(items);
     const start = diffPage * ITEMS_PER_PAGE;
     return {
@@ -372,7 +373,7 @@
     }
   }
 
-  function requestAction(action, gen) {
+  function requestAction(action: any, gen: any) {
     confirmAction = action;
     pendingGeneration = gen;
     showConfirmDialog = true;
@@ -411,17 +412,17 @@
 
       // Reload generations after action
       await loadGenerations();
-    } catch (e) {
+    } catch (e: any) {
       actionError = e.message;
     } finally {
       isActioning = false;
     }
   }
 
-  function formatDate(dateStr) {
+  function formatDate(dateStr: any) {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
+      const date: Date = new Date(dateStr);
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
@@ -434,12 +435,12 @@
     }
   }
 
-  function getRelativeTime(dateStr) {
+  function getRelativeTime(dateStr: any) {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now - date;
+      const date: Date = new Date(dateStr);
+      const now: Date = new Date();
+      const diffMs = now.getTime() - date.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) return 'Today';
@@ -547,9 +548,9 @@
       {#if matchingEntries.length > 0 && matchingEntries.length <= 10}
         <div class="search-match-summary">
           {#each matchingEntries as entry}
-            {@const addedMatches = entry.added.filter(p => p.name.toLowerCase().includes(query))}
-            {@const removedMatches = entry.removed.filter(p => p.name.toLowerCase().includes(query))}
-            {@const changedMatches = entry.changed.filter(p => p.name.toLowerCase().includes(query))}
+            {@const addedMatches = entry.added.filter((p: any) => p.name.toLowerCase().includes(query))}
+            {@const removedMatches = entry.removed.filter((p: any) => p.name.toLowerCase().includes(query))}
+            {@const changedMatches = entry.changed.filter((p: any) => p.name.toLowerCase().includes(query))}
             <div class="match-entry">
               <span class="match-gen">#{entry.genNumber}</span>
               {#each addedMatches as pkg}<span class="match-pkg added">+{pkg.name}</span>{/each}
@@ -639,8 +640,8 @@
 </div>
 
 {#if showConfirmDialog}
-  <div class="modal-overlay" onclick={cancelAction}>
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" role="presentation" onclick={cancelAction} onkeydown={(e) => { if (e.key === 'Escape') cancelAction(); }}>
+    <div class="modal" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <h3>{getActionTitle()}</h3>
       <p class="modal-description">{getActionDescription()}</p>
 
@@ -676,13 +677,13 @@
 {/if}
 
 {#if actionSuccess}
-  <div class="toast success" onclick={dismissSuccess}>
+  <div class="toast success" role="button" tabindex="0" onclick={dismissSuccess} onkeydown={(e) => onKeyActivate(e, dismissSuccess)}>
     <span class="toast-icon">OK</span>
     <span class="toast-message">{actionSuccess}</span>
   </div>
 {/if}
 
-{#snippet generationItem(gen, isInGroup)}
+{#snippet generationItem(gen: any, isInGroup: any)}
   {@const searchMatches = getSearchMatchInfo(gen.number)}
   <div class="generation-item-wrapper" class:in-group={isInGroup}>
     <button
@@ -731,7 +732,7 @@
   </div>
 {/snippet}
 
-{#snippet generationDetailPanel(gen)}
+{#snippet generationDetailPanel(gen: any)}
   <div class="detail-content">
     {#if !generationInfo}
       <div class="skeleton-loading">
@@ -877,12 +878,12 @@
                   {@const changeParts = pkg.change.split(',')}
                   {@const versionPart = changeParts[0].trim()}
                   {@const sizePart = changeParts[1]?.trim() || ''}
-                  {@const versions = versionPart.split('→').map(v => v.trim())}
+                  {@const versions = versionPart.split('→').map((v: any) => v.trim())}
                   {@const oldVer = versions[0] || ''}
                   {@const newVer = versions[1] || ''}
                   {@const isUpgrade = compareVersions(newVer, oldVer) > 0}
                   {@const isDowngrade = compareVersions(newVer, oldVer) < 0}
-                  <div class="diff-item changed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item changed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="version-change">
@@ -904,7 +905,7 @@
                   {@const addParts = pkg.change.split(',')}
                   {@const addVer = addParts[0].trim().replace('∅ → ', '')}
                   {@const addSize = addParts[1]?.trim() || ''}
-                  <div class="diff-item added clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item added clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="ver new">{addVer}</span>
@@ -914,7 +915,7 @@
                     </div>
                   </div>
                 {:else}
-                  <div class="diff-item removed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))}>
+                  <div class="diff-item removed clickable" onclick={() => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name }))} role="button" tabindex="0" onkeydown={(e) => onKeyActivate(e, () => window.dispatchEvent(new CustomEvent('select-package', { detail: pkg.name })))}>
                     <span class="diff-pkg">{pkg.name}</span>
                     <div class="diff-meta">
                       <span class="ver old">{pkg.change.replace('→ ∅', '').trim()}</span>
@@ -1001,22 +1002,22 @@
   .page-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0 0 4px 0;
   }
 
   .subtitle {
     font-size: 14px;
-    color: #6c7086;
+    color: var(--overlay0);
     margin: 0;
   }
 
   .refresh-btn {
-    background: rgba(49, 50, 68, 0.4);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 10px;
     padding: 10px 20px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -1024,8 +1025,8 @@
   }
 
   .refresh-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .refresh-btn:disabled {
@@ -1045,30 +1046,30 @@
   .search-input-wrapper {
     display: flex;
     align-items: center;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 10px;
     padding: 0 14px;
     transition: all 0.2s;
   }
 
   .search-input-wrapper:focus-within {
-    border-color: rgba(137, 180, 250, 0.5);
-    box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.1);
+    border-color: rgba(var(--blue-rgb), 0.5);
+    box-shadow: 0 0 0 2px rgba(var(--blue-rgb), 0.1);
   }
 
   .search-icon {
     font-size: 14px;
     margin-right: 10px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .indexing-spinner {
     display: inline-block;
     width: 12px;
     height: 12px;
-    border: 2px solid rgba(137, 180, 250, 0.3);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.3);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
@@ -1078,13 +1079,13 @@
     background: transparent;
     border: none;
     outline: none;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 14px;
     padding: 12px 0;
   }
 
   .search-input-wrapper input::placeholder {
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .search-input-wrapper input:disabled {
@@ -1095,8 +1096,8 @@
     width: 20px;
     height: 20px;
     border: none;
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
     border-radius: 50%;
     cursor: pointer;
     font-size: 12px;
@@ -1107,7 +1108,7 @@
   }
 
   .clear-search:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .indexing-status {
@@ -1120,21 +1121,21 @@
   .indexing-bar {
     flex: 1;
     height: 4px;
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
     border-radius: 2px;
     overflow: hidden;
   }
 
   .indexing-progress {
     height: 100%;
-    background: linear-gradient(90deg, #89b4fa, #b4befe);
+    background: linear-gradient(90deg, var(--blue), var(--lavender));
     border-radius: 2px;
     transition: width 0.1s ease-out;
   }
 
   .indexing-text {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     min-width: 50px;
     text-align: right;
   }
@@ -1143,7 +1144,7 @@
     display: block;
     margin-top: 8px;
     font-size: 12px;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .search-match-summary {
@@ -1163,7 +1164,7 @@
 
   .match-gen {
     font-family: "JetBrains Mono", "Fira Code", monospace;
-    color: #89b4fa;
+    color: var(--blue);
     min-width: 40px;
   }
 
@@ -1175,18 +1176,18 @@
   }
 
   .match-pkg.added {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
   }
 
   .match-pkg.removed {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   .match-pkg.changed {
-    background: rgba(249, 226, 175, 0.2);
-    color: #f9e2af;
+    background: rgba(var(--yellow-rgb), 0.2);
+    color: var(--yellow);
   }
 
   .loading {
@@ -1195,14 +1196,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(137, 180, 250, 0.2);
-    border-top-color: #89b4fa;
+    border: 3px solid rgba(var(--blue-rgb), 0.2);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
@@ -1218,7 +1219,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #f38ba8;
+    color: var(--red);
     text-align: center;
   }
 
@@ -1226,7 +1227,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(243, 139, 168, 0.2);
+    background: rgba(var(--red-rgb), 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1237,9 +1238,9 @@
 
   .error button {
     margin-top: 16px;
-    background: rgba(243, 139, 168, 0.2);
-    border: 1px solid rgba(243, 139, 168, 0.3);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border: 1px solid rgba(var(--red-rgb), 0.3);
+    color: var(--red);
     padding: 8px 20px;
     border-radius: 8px;
     cursor: pointer;
@@ -1247,7 +1248,7 @@
   }
 
   .error button:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .generations-content {
@@ -1268,21 +1269,21 @@
   .section-header h2 {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
   }
 
   .section-header .info {
     font-size: 12px;
-    color: #6c7086;
-    background: rgba(49, 50, 68, 0.4);
+    color: var(--overlay0);
+    background: rgba(var(--surface0-rgb), 0.4);
     padding: 2px 8px;
     border-radius: 4px;
   }
 
   .section-header .info.grouped {
-    background: rgba(137, 180, 250, 0.15);
-    color: #89b4fa;
+    background: rgba(var(--blue-rgb), 0.15);
+    color: var(--blue);
   }
 
   .generation-list {
@@ -1299,17 +1300,17 @@
   }
 
   .generation-list::-webkit-scrollbar-track {
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 4px;
   }
 
   .generation-list::-webkit-scrollbar-thumb {
-    background: rgba(69, 71, 90, 0.8);
+    background: rgba(var(--surface1-rgb), 0.8);
     border-radius: 4px;
   }
 
   .generation-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(88, 91, 112, 0.8);
+    background: rgba(var(--surface2-rgb), 0.8);
   }
 
   .show-more-btn {
@@ -1317,18 +1318,18 @@
     width: 100%;
     margin-top: 8px;
     padding: 8px 16px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(88, 91, 112, 0.4);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface2-rgb), 0.4);
     border-radius: 6px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 13px;
     cursor: pointer;
     text-align: center;
     transition: background 0.15s, color 0.15s;
   }
   .show-more-btn:hover {
-    background: rgba(69, 71, 90, 0.7);
-    color: #cdd6f4;
+    background: rgba(var(--surface1-rgb), 0.7);
+    color: var(--text);
   }
 
   /* Group styles */
@@ -1342,8 +1343,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 16px;
-    background: rgba(137, 180, 250, 0.08);
-    border: 1px dashed rgba(137, 180, 250, 0.3);
+    background: rgba(var(--blue-rgb), 0.08);
+    border: 1px dashed rgba(var(--blue-rgb), 0.3);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s;
@@ -1353,7 +1354,7 @@
   }
 
   .group-header:hover {
-    background: rgba(137, 180, 250, 0.12);
+    background: rgba(var(--blue-rgb), 0.12);
   }
 
   .group-header.expanded {
@@ -1369,35 +1370,35 @@
 
   .group-icon {
     font-size: 12px;
-    color: #89b4fa;
+    color: var(--blue);
     width: 16px;
   }
 
   .group-range {
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 13px;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .group-count {
     font-size: 11px;
-    color: #6c7086;
-    background: rgba(49, 50, 68, 0.4);
+    color: var(--overlay0);
+    background: rgba(var(--surface0-rgb), 0.4);
     padding: 2px 6px;
     border-radius: 4px;
   }
 
   .group-date {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .group-contents {
-    border: 1px dashed rgba(137, 180, 250, 0.3);
+    border: 1px dashed rgba(var(--blue-rgb), 0.3);
     border-top: none;
     border-radius: 0 0 8px 8px;
     padding: 8px;
-    background: rgba(137, 180, 250, 0.04);
+    background: rgba(var(--blue-rgb), 0.04);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1409,7 +1410,7 @@
   }
 
   .generation-item-wrapper.in-group .generation-item {
-    background: rgba(49, 50, 68, 0.2);
+    background: rgba(var(--surface0-rgb), 0.2);
   }
 
   .generation-item {
@@ -1417,7 +1418,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 14px 16px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border: 1px solid transparent;
     border-radius: 8px;
     transition: all 0.15s;
@@ -1428,27 +1429,27 @@
   }
 
   .generation-item:hover {
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
   }
 
   .generation-item.selected {
-    background: rgba(137, 180, 250, 0.15);
-    border-color: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--blue-rgb), 0.15);
+    border-color: rgba(var(--blue-rgb), 0.3);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
 
   .generation-item.current {
-    border-left: 3px solid #a6e3a1;
+    border-left: 3px solid var(--green);
   }
 
   .generation-item.current.selected {
-    border-left-color: #a6e3a1;
+    border-left-color: var(--green);
   }
 
   .generation-item.has-match {
-    background: rgba(137, 180, 250, 0.1);
-    border-color: rgba(137, 180, 250, 0.2);
+    background: rgba(var(--blue-rgb), 0.1);
+    border-color: rgba(var(--blue-rgb), 0.2);
   }
 
   .gen-main {
@@ -1467,8 +1468,8 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #a6e3a1;
-    box-shadow: 0 0 8px rgba(166, 227, 161, 0.6);
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(var(--green-rgb), 0.6);
     animation: pulse 2s ease-in-out infinite;
   }
 
@@ -1480,13 +1481,13 @@
   .number {
     font-size: 16px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     font-family: "JetBrains Mono", "Fira Code", monospace;
   }
 
   .current-badge {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
     padding: 2px 8px;
     border-radius: 6px;
     font-size: 11px;
@@ -1503,12 +1504,12 @@
 
   .date-full {
     font-size: 13px;
-    color: #a6adc8;
+    color: var(--subtext0);
   }
 
   .date-relative {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .search-match-badges {
@@ -1525,33 +1526,33 @@
   }
 
   .match-badge.added {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
   }
 
   .match-badge.removed {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   .match-badge.changed {
-    background: rgba(249, 226, 175, 0.2);
-    color: #f9e2af;
+    background: rgba(var(--yellow-rgb), 0.2);
+    color: var(--yellow);
   }
 
   .expand-icon {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
     transition: transform 0.2s;
   }
 
   .generation-item.selected .expand-icon {
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .generation-detail {
-    background: rgba(30, 30, 46, 0.8);
-    border: 1px solid rgba(137, 180, 250, 0.3);
+    background: rgba(var(--base-rgb), 0.8);
+    border: 1px solid rgba(var(--blue-rgb), 0.3);
     border-top: none;
     border-radius: 0 0 8px 8px;
     overflow: hidden;
@@ -1574,7 +1575,7 @@
   }
 
   .detail-error {
-    color: #f38ba8;
+    color: var(--red);
     font-size: 13px;
   }
 
@@ -1597,14 +1598,14 @@
 
   .field-label {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
   .field-value {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
   }
 
   .field-value.mono {
@@ -1613,15 +1614,15 @@
 
   .field-value.revision {
     font-size: 12px;
-    background: rgba(249, 226, 175, 0.1);
+    background: rgba(var(--yellow-rgb), 0.1);
     padding: 4px 8px;
     border-radius: 4px;
-    color: #f9e2af;
+    color: var(--yellow);
   }
 
   .field-value.path {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
     word-break: break-all;
   }
 
@@ -1629,7 +1630,7 @@
   .diff-section {
     margin-bottom: 16px;
     padding: 12px;
-    background: rgba(49, 50, 68, 0.3);
+    background: rgba(var(--surface0-rgb), 0.3);
     border-radius: 8px;
   }
 
@@ -1644,7 +1645,7 @@
 
   .diff-section h4 {
     font-size: 13px;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0;
     font-weight: 500;
   }
@@ -1657,9 +1658,9 @@
   .diff-tab {
     padding: 4px 10px;
     border: none;
-    background: rgba(49, 50, 68, 0.5);
+    background: rgba(var(--surface0-rgb), 0.5);
     border-radius: 6px;
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.15s;
@@ -1669,13 +1670,13 @@
   }
 
   .diff-tab:hover {
-    background: rgba(49, 50, 68, 0.8);
-    color: #a6adc8;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--subtext0);
   }
 
   .diff-tab.active {
-    background: rgba(137, 180, 250, 0.2);
-    color: #89b4fa;
+    background: rgba(var(--blue-rgb), 0.2);
+    color: var(--blue);
   }
 
   .diff-tab.dimmed {
@@ -1690,18 +1691,18 @@
   }
 
   .tab-count.added {
-    background: rgba(166, 227, 161, 0.2);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    color: var(--green);
   }
 
   .tab-count.removed {
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
   }
 
   .tab-count.changed {
-    background: rgba(249, 226, 175, 0.2);
-    color: #f9e2af;
+    background: rgba(var(--yellow-rgb), 0.2);
+    color: var(--yellow);
   }
 
   .diff-filter {
@@ -1714,29 +1715,29 @@
   .diff-filter input {
     flex: 1;
     padding: 6px 10px;
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 6px;
-    background: rgba(30, 30, 46, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--base-rgb), 0.6);
+    color: var(--text);
     font-size: 12px;
     outline: none;
     transition: border-color 0.15s;
   }
 
   .diff-filter input:focus {
-    border-color: rgba(137, 180, 250, 0.5);
+    border-color: rgba(var(--blue-rgb), 0.5);
   }
 
   .diff-filter input::placeholder {
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .clear-filter {
     width: 20px;
     height: 20px;
     border: none;
-    background: rgba(243, 139, 168, 0.2);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    color: var(--red);
     border-radius: 50%;
     cursor: pointer;
     font-size: 12px;
@@ -1747,7 +1748,7 @@
   }
 
   .clear-filter:hover {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .diff-list {
@@ -1772,7 +1773,7 @@
   }
 
   .diff-item.clickable:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(var(--white-rgb), 0.06);
   }
 
   .diff-meta {
@@ -1783,30 +1784,23 @@
   }
 
   .diff-item.added {
-    background: rgba(166, 227, 161, 0.1);
+    background: rgba(var(--green-rgb), 0.1);
   }
 
   .diff-item.removed {
-    background: rgba(243, 139, 168, 0.1);
+    background: rgba(var(--red-rgb), 0.1);
   }
 
   .diff-item.changed {
-    background: rgba(249, 226, 175, 0.1);
+    background: rgba(var(--yellow-rgb), 0.1);
   }
 
   .diff-pkg {
     font-family: monospace;
-    color: #cdd6f4;
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .diff-change {
-    color: #6c7086;
-    font-family: monospace;
-    white-space: nowrap;
-    flex-shrink: 0;
   }
 
   .version-change {
@@ -1819,18 +1813,18 @@
   }
 
   .ver.old {
-    color: #6c7086;
+    color: var(--overlay0);
     text-decoration: line-through;
     opacity: 0.8;
   }
 
   .ver.new {
-    color: #a6e3a1;
+    color: var(--green);
     font-weight: 600;
   }
 
   .ver-arrow {
-    color: #6c7086;
+    color: var(--overlay0);
     font-size: 10px;
   }
 
@@ -1841,18 +1835,18 @@
     border-radius: 10px;
     font-family: monospace;
     white-space: nowrap;
-    color: #cdd6f4;
-    background: rgba(205, 214, 244, 0.08);
+    color: var(--text);
+    background: rgba(var(--text-rgb), 0.08);
   }
 
   .size-badge.positive {
-    color: #f38ba8;
-    background: rgba(243, 139, 168, 0.12);
+    color: var(--red);
+    background: rgba(var(--red-rgb), 0.12);
   }
 
   .size-badge.negative {
-    color: #a6e3a1;
-    background: rgba(166, 227, 161, 0.12);
+    color: var(--green);
+    background: rgba(var(--green-rgb), 0.12);
   }
 
   .dir-badge {
@@ -1866,21 +1860,13 @@
   }
 
   .dir-badge.up {
-    color: #a6e3a1;
-    background: rgba(166, 227, 161, 0.15);
+    color: var(--green);
+    background: rgba(var(--green-rgb), 0.15);
   }
 
   .dir-badge.down {
-    color: #f9e2af;
-    background: rgba(249, 226, 175, 0.15);
-  }
-
-  .diff-empty, .diff-empty-state {
-    color: #6c7086;
-    font-size: 12px;
-    font-style: italic;
-    text-align: center;
-    padding: 16px;
+    color: var(--yellow);
+    background: rgba(var(--yellow-rgb), 0.15);
   }
 
   .diff-pagination {
@@ -1890,23 +1876,23 @@
     gap: 12px;
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid rgba(69, 71, 90, 0.3);
+    border-top: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .page-btn {
     padding: 4px 12px;
-    border: 1px solid rgba(69, 71, 90, 0.3);
-    background: rgba(49, 50, 68, 0.4);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
+    background: rgba(var(--surface0-rgb), 0.4);
     border-radius: 4px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 11px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .page-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.6);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.6);
+    color: var(--text);
   }
 
   .page-btn:disabled {
@@ -1916,7 +1902,7 @@
 
   .page-info {
     font-size: 11px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .detail-actions {
@@ -1924,7 +1910,7 @@
     gap: 8px;
     flex-wrap: wrap;
     padding-top: 12px;
-    border-top: 1px solid rgba(69, 71, 90, 0.3);
+    border-top: 1px solid rgba(var(--surface1-rgb), 0.3);
     align-items: center;
   }
 
@@ -1933,43 +1919,43 @@
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 6px;
-    color: #cdd6f4;
+    color: var(--text);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .action-btn:hover {
-    background: rgba(49, 50, 68, 0.8);
-    border-color: rgba(137, 180, 250, 0.3);
+    background: rgba(var(--surface0-rgb), 0.8);
+    border-color: rgba(var(--blue-rgb), 0.3);
   }
 
   .action-btn.primary {
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.3) 0%, rgba(180, 190, 254, 0.3) 100%);
-    border-color: rgba(137, 180, 250, 0.4);
-    color: #89b4fa;
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.3) 0%, rgba(var(--lavender-rgb), 0.3) 100%);
+    border-color: rgba(var(--blue-rgb), 0.4);
+    color: var(--blue);
   }
 
   .action-btn.primary:hover {
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.4) 0%, rgba(180, 190, 254, 0.4) 100%);
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.4) 0%, rgba(var(--lavender-rgb), 0.4) 100%);
   }
 
   .action-btn.danger {
-    color: #f38ba8;
+    color: var(--red);
     margin-left: auto;
   }
 
   .action-btn.danger:hover {
-    background: rgba(243, 139, 168, 0.15);
-    border-color: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.15);
+    border-color: rgba(var(--red-rgb), 0.3);
   }
 
   .current-note {
     font-size: 13px;
-    color: #a6e3a1;
+    color: var(--green);
     font-style: italic;
   }
 
@@ -1978,7 +1964,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #6c7086;
+    color: var(--overlay0);
     font-style: italic;
   }
 
@@ -1997,7 +1983,7 @@
   .skeleton-field {
     height: 40px;
     flex: 1;
-    background: linear-gradient(90deg, rgba(69, 71, 90, 0.4) 25%, rgba(88, 91, 112, 0.6) 50%, rgba(69, 71, 90, 0.4) 75%);
+    background: linear-gradient(90deg, rgba(var(--surface1-rgb), 0.4) 25%, rgba(var(--surface2-rgb), 0.6) 50%, rgba(var(--surface1-rgb), 0.4) 75%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s infinite;
     border-radius: 6px;
@@ -2011,13 +1997,13 @@
     display: flex;
     gap: 8px;
     padding-top: 12px;
-    border-top: 1px solid rgba(69, 71, 90, 0.3);
+    border-top: 1px solid rgba(var(--surface1-rgb), 0.3);
   }
 
   .skeleton-btn {
     width: 100px;
     height: 32px;
-    background: linear-gradient(90deg, rgba(69, 71, 90, 0.4) 25%, rgba(88, 91, 112, 0.6) 50%, rgba(69, 71, 90, 0.4) 75%);
+    background: linear-gradient(90deg, rgba(var(--surface1-rgb), 0.4) 25%, rgba(var(--surface2-rgb), 0.6) 50%, rgba(var(--surface1-rgb), 0.4) 75%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s infinite;
     border-radius: 6px;
@@ -2035,7 +2021,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(var(--black-rgb), 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2044,31 +2030,31 @@
   }
 
   .modal {
-    background: #1e1e2e;
-    border: 1px solid rgba(69, 71, 90, 0.5);
+    background: var(--base);
+    border: 1px solid rgba(var(--surface1-rgb), 0.5);
     border-radius: 16px;
     padding: 24px;
     width: 100%;
     max-width: 420px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 60px rgba(var(--black-rgb), 0.5);
   }
 
   .modal h3 {
     font-size: 18px;
     font-weight: 600;
-    color: #cdd6f4;
+    color: var(--text);
     margin: 0 0 8px 0;
   }
 
   .modal-description {
     font-size: 14px;
-    color: #a6adc8;
+    color: var(--subtext0);
     margin: 0 0 16px 0;
     line-height: 1.5;
   }
 
   .modal-gen-info {
-    background: rgba(49, 50, 68, 0.4);
+    background: rgba(var(--surface0-rgb), 0.4);
     border-radius: 8px;
     padding: 12px;
     display: flex;
@@ -2081,20 +2067,20 @@
     font-family: "JetBrains Mono", "Fira Code", monospace;
     font-size: 14px;
     font-weight: 600;
-    color: #89b4fa;
+    color: var(--blue);
   }
 
   .modal-gen-date {
     font-size: 12px;
-    color: #6c7086;
+    color: var(--overlay0);
   }
 
   .modal-error {
-    background: rgba(243, 139, 168, 0.15);
-    border: 1px solid rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.15);
+    border: 1px solid rgba(var(--red-rgb), 0.3);
     border-radius: 8px;
     padding: 12px;
-    color: #f38ba8;
+    color: var(--red);
     font-size: 13px;
     margin-bottom: 16px;
   }
@@ -2107,26 +2093,26 @@
 
   .cancel-btn {
     padding: 10px 20px;
-    background: rgba(49, 50, 68, 0.5);
-    border: 1px solid rgba(69, 71, 90, 0.3);
+    background: rgba(var(--surface0-rgb), 0.5);
+    border: 1px solid rgba(var(--surface1-rgb), 0.3);
     border-radius: 8px;
-    color: #a6adc8;
+    color: var(--subtext0);
     font-size: 14px;
     cursor: pointer;
     transition: all 0.15s;
   }
 
   .cancel-btn:hover:not(:disabled) {
-    background: rgba(49, 50, 68, 0.8);
-    color: #cdd6f4;
+    background: rgba(var(--surface0-rgb), 0.8);
+    color: var(--text);
   }
 
   .confirm-btn {
     padding: 10px 20px;
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.3) 0%, rgba(180, 190, 254, 0.3) 100%);
-    border: 1px solid rgba(137, 180, 250, 0.4);
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.3) 0%, rgba(var(--lavender-rgb), 0.3) 100%);
+    border: 1px solid rgba(var(--blue-rgb), 0.4);
     border-radius: 8px;
-    color: #89b4fa;
+    color: var(--blue);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -2137,17 +2123,17 @@
   }
 
   .confirm-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(137, 180, 250, 0.4) 0%, rgba(180, 190, 254, 0.4) 100%);
+    background: linear-gradient(135deg, rgba(var(--blue-rgb), 0.4) 0%, rgba(var(--lavender-rgb), 0.4) 100%);
   }
 
   .confirm-btn.danger {
-    background: rgba(243, 139, 168, 0.2);
-    border-color: rgba(243, 139, 168, 0.4);
-    color: #f38ba8;
+    background: rgba(var(--red-rgb), 0.2);
+    border-color: rgba(var(--red-rgb), 0.4);
+    color: var(--red);
   }
 
   .confirm-btn.danger:hover:not(:disabled) {
-    background: rgba(243, 139, 168, 0.3);
+    background: rgba(var(--red-rgb), 0.3);
   }
 
   .confirm-btn:disabled,
@@ -2159,15 +2145,15 @@
   .btn-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(137, 180, 250, 0.3);
-    border-top-color: #89b4fa;
+    border: 2px solid rgba(var(--blue-rgb), 0.3);
+    border-top-color: var(--blue);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
 
   .confirm-btn.danger .btn-spinner {
-    border-color: rgba(243, 139, 168, 0.3);
-    border-top-color: #f38ba8;
+    border-color: rgba(var(--red-rgb), 0.3);
+    border-top-color: var(--red);
   }
 
   /* Toast */
@@ -2197,9 +2183,9 @@
   }
 
   .toast.success {
-    background: rgba(166, 227, 161, 0.2);
-    border: 1px solid rgba(166, 227, 161, 0.4);
-    color: #a6e3a1;
+    background: rgba(var(--green-rgb), 0.2);
+    border: 1px solid rgba(var(--green-rgb), 0.4);
+    color: var(--green);
   }
 
   .toast-icon {

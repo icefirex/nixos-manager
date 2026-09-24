@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Sidebar from "./lib/Sidebar.svelte";
   import HeaderStrip from "./lib/HeaderStrip.svelte";
   import Dashboard from "./lib/Dashboard.svelte";
@@ -13,10 +13,12 @@
   import GitModal from "./lib/GitModal.svelte";
   import TerminalOverlay from "./lib/TerminalOverlay.svelte";
   import FlakeInfoModal from "./lib/FlakeInfoModal.svelte";
+  import Settings from "./lib/Settings.svelte";
+  import { initTheme, watchSystemTheme } from "./lib/themes.ts";
 
-  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes']);
+  const VALID_PAGES = new Set(['dashboard', 'discover', 'packages', 'options', 'generations', 'history', 'changes', 'settings']);
   // UX-09: restore last active tab; fall back to dashboard for unknown values
-  const _savedPage = localStorage.getItem('nixos-manager:active-tab');
+  const _savedPage = localStorage.getItem('nixos-manager:active-tab') ?? '';
   let currentPage = $state(VALID_PAGES.has(_savedPage) ? _savedPage : 'dashboard');
 
   // Persist active tab whenever it changes
@@ -61,7 +63,7 @@
   async function loadSystemInfo() {
     try {
       systemInfo = await window.electronAPI.getSystemInfo();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to load system info:", e);
     }
   }
@@ -76,14 +78,17 @@
         const raw = sessionStorage.getItem('nixos-manager:dismissed-notifications');
         if (raw) dismissed = new Set(JSON.parse(raw));
       } catch {}
-      notificationCount = notifications.filter(n => !dismissed.has(n.id)).length;
-    } catch (e) {
+      notificationCount = notifications.filter((n: any) => !dismissed.has(n.id)).length;
+    } catch (e: any) {
       console.error("Failed to load notifications:", e);
       notificationCount = 0;
     }
   }
 
   $effect(() => {
+    // Theme: apply persisted choice ASAP and follow OS preference for 'system'
+    initTheme();
+    const unwatchTheme = watchSystemTheme();
     loadSystemInfo();
     loadNotificationCount();
 
@@ -92,7 +97,10 @@
     const cleanupFlake = window.electronAPI.onFlakeUpdateCheckComplete(() => {
       loadNotificationCount();
     });
-    return cleanupFlake;
+    return () => {
+      unwatchTheme();
+      cleanupFlake();
+    };
   });
 
   let isMaximized = $state(false);
@@ -172,6 +180,9 @@
         <div class="page" class:hidden={currentPage !== "changes"}>
           <Changes />
         </div>
+        <div class="page" class:hidden={currentPage !== "settings"}>
+          <Settings />
+        </div>
       </div>
     </div>
   </div>
@@ -211,12 +222,12 @@
   }
 
   .page::-webkit-scrollbar-thumb {
-    background: #45475a;
+    background: var(--surface1);
     border-radius: 4px;
   }
 
   .page::-webkit-scrollbar-thumb:hover {
-    background: #585b70;
+    background: var(--surface2);
   }
 
   .page.hidden {
@@ -235,17 +246,17 @@
 
   :global(body) {
     font-family: "Segoe UI", "Noto Sans", sans-serif;
-    background: #1e1e2e;
-    color: #cdd6f4;
+    background: var(--base);
+    color: var(--text);
   }
 
   .app-container {
     width: 100%;
     height: 100%;
-    background: #1e1e2e;
+    background: var(--base);
     display: flex;
     flex-direction: column;
-    border: 1px solid rgba(69, 71, 90, 0.8);
+    border: 1px solid rgba(var(--surface1-rgb), 0.8);
     overflow: hidden;
   }
 
@@ -254,8 +265,8 @@
     align-items: center;
     justify-content: space-between;
     height: 40px;
-    background: rgba(24, 24, 37, 0.95);
-    border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+    background: rgba(var(--mantle-rgb), 0.95);
+    border-bottom: 1px solid rgba(var(--surface0-rgb), 0.5);
     padding: 0 16px;
     -webkit-app-region: drag;
     flex-shrink: 0;
@@ -269,7 +280,7 @@
   .title-text {
     font-size: 13px;
     font-weight: 500;
-    color: #6c7086;
+    color: var(--overlay0);
     user-select: none;
   }
 
@@ -282,7 +293,7 @@
 
   .app-version {
     font-size: 11px;
-    color: rgba(205, 214, 244, 0.4);
+    color: rgba(var(--text-rgb), 0.4);
     margin-right: 8px;
     font-weight: 400;
   }
@@ -306,7 +317,7 @@
     line-height: 1;
     opacity: 0;
     transition: opacity 0.15s ease;
-    color: rgba(0, 0, 0, 0.7);
+    color: rgba(var(--black-rgb), 0.7);
   }
 
   .control-btn:hover .btn-icon {
@@ -314,32 +325,32 @@
   }
 
   .control-btn.minimize {
-    background: #f9e2af;
-    box-shadow: 0 0 8px rgba(249, 226, 175, 0.4);
+    background: var(--yellow);
+    box-shadow: 0 0 8px rgba(var(--yellow-rgb), 0.4);
   }
 
   .control-btn.minimize:hover {
-    box-shadow: 0 0 12px rgba(249, 226, 175, 0.7);
+    box-shadow: 0 0 12px rgba(var(--yellow-rgb), 0.7);
     transform: scale(1.1);
   }
 
   .control-btn.maximize {
-    background: #a6e3a1;
-    box-shadow: 0 0 8px rgba(166, 227, 161, 0.4);
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(var(--green-rgb), 0.4);
   }
 
   .control-btn.maximize:hover {
-    box-shadow: 0 0 12px rgba(166, 227, 161, 0.7);
+    box-shadow: 0 0 12px rgba(var(--green-rgb), 0.7);
     transform: scale(1.1);
   }
 
   .control-btn.close {
-    background: #f38ba8;
-    box-shadow: 0 0 8px rgba(243, 139, 168, 0.4);
+    background: var(--red);
+    box-shadow: 0 0 8px rgba(var(--red-rgb), 0.4);
   }
 
   .control-btn.close:hover {
-    box-shadow: 0 0 12px rgba(243, 139, 168, 0.7);
+    box-shadow: 0 0 12px rgba(var(--red-rgb), 0.7);
     transform: scale(1.1);
   }
 
@@ -358,18 +369,4 @@
     min-width: 0;
   }
 
-  .placeholder-page {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #6c7086;
-  }
-
-  .placeholder-page h2 {
-    font-size: 24px;
-    text-transform: capitalize;
-    margin-bottom: 8px;
-  }
 </style>
