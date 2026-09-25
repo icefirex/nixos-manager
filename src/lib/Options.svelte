@@ -99,6 +99,15 @@
     loadOptions();
   });
 
+  // Refresh when config options change elsewhere (Changes-page revert, Discover add/remove)
+  $effect(() => {
+    function onOptionsChanged() {
+      loadOptions();
+    }
+    window.addEventListener('options-changed', onOptionsChanged);
+    return () => window.removeEventListener('options-changed', onOptionsChanged);
+  });
+
   function switchSource(mode: any) {
     if (mode !== sourceMode) {
       sourceMode = mode;

@@ -68,6 +68,7 @@
       window.dispatchEvent(new CustomEvent('history-updated'));
       window.dispatchEvent(new CustomEvent('pending-changes'));
       window.dispatchEvent(new CustomEvent('packages-changed'));
+      window.dispatchEvent(new CustomEvent('options-changed'));
       await loadChanges();
     } catch (e: any) {
       alert(e.message || 'Failed to revert option');

@@ -289,6 +289,7 @@
         window.dispatchEvent(new CustomEvent('history-updated'));
         window.dispatchEvent(new CustomEvent('pending-changes'));
         window.dispatchEvent(new CustomEvent('packages-changed'));
+      window.dispatchEvent(new CustomEvent('options-changed'));
       } else {
         showToast(result.error || 'Failed to remove package', 'error');
       }
@@ -501,6 +502,7 @@
         window.dispatchEvent(new CustomEvent('history-updated'));
         window.dispatchEvent(new CustomEvent('pending-changes'));
         window.dispatchEvent(new CustomEvent('packages-changed'));
+      window.dispatchEvent(new CustomEvent('options-changed'));
       } else {
         showToast(result.error || 'Failed to add package', 'error');
       }
