@@ -2,7 +2,7 @@
 , stdenv
 , buildNpmPackage
 , electron
-, makeWrapper
+
 , makeDesktopItem
 , copyDesktopItems
 , librsvg
@@ -31,7 +31,6 @@ in buildNpmPackage {
   npmDepsHash = "sha256-BIy6txKpaC0HuN7PVlgz5Sbia8HPrzG7P21ceAgIKek=";
 
   nativeBuildInputs = [
-    makeWrapper
     copyDesktopItems
     librsvg  # For converting SVG to PNG icons
   ];
@@ -70,6 +69,8 @@ in buildNpmPackage {
     # Copy built files
     cp -r dist $out/lib/${pname}/
     cp -r dist-electron $out/lib/${pname}/
+    # NOTE: do not place a package.json inside dist-electron/ — the app resolves
+    # its root by walking up to the package.json that owns dist/index.html.
     cp package.json $out/lib/${pname}/
 
     # Install bundled fallback scripts (used when nixos-rebuild-wrapper / nix-eval-flake
@@ -83,12 +84,23 @@ in buildNpmPackage {
       rsvg-convert -w $size -h $size assets/icon.svg -o $out/share/icons/hicolor/''${size}x''${size}/apps/${pname}.png
     done
 
-    # Create wrapper script that uses system Electron
-    # GPU flags help reduce compositor stutter on launch/close
-    makeWrapper ${electron}/bin/electron $out/bin/${pname} \
-      --add-flags "$out/lib/${pname}/dist-electron/main.js" \
-      --add-flags "--disable-gpu-compositing" \
-      --set ELECTRON_IS_DEV 0
+    # Create wrapper script that uses system Electron.
+    # - `exec -a` sets argv[0] so Electron reports app_id/WM_CLASS "nixos-manager"
+    #   (matches the installed desktop file -> proper taskbar icon + name on
+    #   X11 and Wayland; without this the compositor shows generic icon/name
+    #   "electron")
+    # - `--class` reinforces WM_CLASS on X11
+    # - GPU flag helps reduce compositor stutter on launch/close
+    mkdir -p $out/bin
+    cat > $out/bin/${pname} <<WRAP
+#!${stdenv.shell}
+export ELECTRON_IS_DEV=0
+exec -a ${pname} ${electron}/bin/electron \
+  $out/lib/${pname}/dist-electron/main.js \
+  --class=${pname} \
+  --disable-gpu-compositing "\$@"
+WRAP
+    chmod +x $out/bin/${pname}
 
     runHook postInstall
   '';

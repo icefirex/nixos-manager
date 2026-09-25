@@ -30,7 +30,12 @@ function themeFilePath() {
 function resolveAppRoot(): string {
   let dir = app.getAppPath();
   for (let i = 0; i < 4; i++) {
-    if (fs.existsSync(path.join(dir, 'package.json'))) {
+    // The real app root owns BOTH package.json and the built renderer.
+    // (Guards against stray package.json files in subdirectories.)
+    if (
+      fs.existsSync(path.join(dir, 'package.json')) &&
+      fs.existsSync(path.join(dir, 'dist', 'index.html'))
+    ) {
       return dir;
     }
     const parent = path.dirname(dir);

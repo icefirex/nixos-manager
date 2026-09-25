@@ -67,5 +67,6 @@
     "@xterm/xterm": "^6.0.0",
     "highlight.js": "^11.9.0",
     "lucide-svelte": "^0.577.0"
-  }
+  },
+  "desktopName": "nixos-manager.desktop"
 }

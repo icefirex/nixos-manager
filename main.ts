@@ -3,6 +3,7 @@ import electron from 'electron';
 const { app, BrowserWindow } = electron as any;
 
 app.setName('nixos-manager');
+app.setAppUserModelId('nixos-manager');
 
 // Import window management
 import { createWindow, registerWindowHandlers } from './src/main/window.ts';
