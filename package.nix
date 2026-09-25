@@ -84,23 +84,32 @@ in buildNpmPackage {
       rsvg-convert -w $size -h $size assets/icon.svg -o $out/share/icons/hicolor/''${size}x''${size}/apps/${pname}.png
     done
 
-    # Create wrapper script that uses system Electron.
-    # - `exec -a` sets argv[0] so Electron reports app_id/WM_CLASS "nixos-manager"
-    #   (matches the installed desktop file -> proper taskbar icon + name on
-    #   X11 and Wayland; without this the compositor shows generic icon/name
-    #   "electron")
-    # - `--class` reinforces WM_CLASS on X11
-    # - GPU flag helps reduce compositor stutter on launch/close
+    # Wrapper: launches system Electron (keeps the nixpkgs launcher's runtime
+    # environment setup for GIO/XDG/sandbox paths).
     mkdir -p $out/bin
     cat > $out/bin/${pname} <<WRAP
 #!${stdenv.shell}
 export ELECTRON_IS_DEV=0
-exec -a ${pname} ${electron}/bin/electron \
+exec ${electron}/bin/electron \
   $out/lib/${pname}/dist-electron/main.js \
-  --class=${pname} \
   --disable-gpu-compositing "\$@"
 WRAP
     chmod +x $out/bin/${pname}
+
+    # Electron binaries report a fixed Wayland app_id / X11 WM_CLASS of
+    # "electron" (derived from the compiled-in executable path; no flag or
+    # API can change it). Ship a desktop entry under that exact name so
+    # compositors resolve the taskbar icon and title to NixOS Manager.
+    # Installed system-wide via the NixOS module / system profile.
+    mkdir -p $out/share/applications
+    cat > $out/share/applications/electron.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=NixOS Manager
+Icon=nixos-manager
+Exec=nixos-manager
+StartupWMClass=electron
+EOF
 
     runHook postInstall
   '';
