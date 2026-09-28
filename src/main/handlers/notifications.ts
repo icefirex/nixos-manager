@@ -195,7 +195,12 @@ function createNotificationsHandlers(deps: NotificationsDeps = {}) {
       // 1. Check git sync status (async)
       if (flakeDir) {
         try {
-          await depsRunCmd(`git -C "${flakeDir}" fetch --quiet 2>/dev/null || true`, 5000);
+          // Background check: never prompt for credentials (private repos the
+          // active gh account can't read) — fail fast and skip the check.
+          await depsRunCmd(
+            `env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS= git -C "${flakeDir}" fetch --quiet 2>/dev/null || true`,
+            5000
+          );
 
           const [behindCount, aheadCount, status] = await Promise.all([
             depsRunCmd(`git -C "${flakeDir}" rev-list --count HEAD..@{u} 2>/dev/null || echo 0`),

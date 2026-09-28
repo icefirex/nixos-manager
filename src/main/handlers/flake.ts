@@ -147,7 +147,15 @@ async function runUpdateChecks(flakeDir: any) {
     try {
       const { stdout } = await execAsync(
         `git ls-remote "https://github.com/${owner}/${repo}.git" "${refSpec}"`,
-        { timeout: 15000, env }
+        {
+          timeout: 15000,
+          env: {
+            ...env,
+            // Background check: never prompt for credentials on private repos
+            GIT_TERMINAL_PROMPT: '0',
+            GIT_ASKPASS: '',
+          },
+        }
       );
       const latestRev = (stdout || '').trim().split(/\s+/)[0];
       inputUpdateStatus[name] = Boolean(latestRev && latestRev !== rev);
